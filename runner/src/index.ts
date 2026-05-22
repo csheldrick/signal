@@ -153,45 +153,85 @@ async function main(): Promise<void> {
     },
   });
 
-  // 9. Inject activation at the boundary-violating node (EXP-002)
-  //    Loom node IDs are UUIDs — find SearchPlugin by name in the LoomExport,
-  //    then look up that UUID in the substrate (imported in step 6).
-  const violationLoomNode = loomExport.nodes.find(
+  // 9. Inject activation — run all three experiments before the tick loop so
+  //    their propagation is captured in the same observation window.
+
+  // EXP-002: Single boundary violation (SearchPlugin → DocumentStore)
+  //
+  // ContradictionDetectionOperator requires BOTH sides of a contradiction edge to
+  // exceed `operatorActivationThreshold`. Injecting only at SearchPlugin leaves
+  // DocumentStore cold → operator never fires. We inject at both nodes to model the
+  // realistic scenario where storage is also actively being used.
+  const searchPluginNode = loomExport.nodes.find(
     n => n.name === 'SearchPlugin' && (n.kind === 'service' || n.kind === 'class'),
   );
-  if (violationLoomNode) {
-    const violationNode = runtime.graph.getNode(violationLoomNode.id);
-    if (violationNode) {
-      console.log(`\nInjecting activation at SearchPlugin (${violationLoomNode.id.slice(0, 8)}...) (EXP-002)...`);
-      runtime.inject(violationNode.id, 0.8);
+  if (searchPluginNode && runtime.graph.getNode(searchPluginNode.id)) {
+    console.log(`EXP-002: Injecting at SearchPlugin  (${searchPluginNode.id.slice(0, 8)}...)`);
+    runtime.inject(searchPluginNode.id, 0.8);
+    // Activate the violated boundary too so the operator sees both sides
+    const storeNodeForExp002 = loomExport.nodes.find(n => n.name === 'DocumentStore');
+    if (storeNodeForExp002 && runtime.graph.getNode(storeNodeForExp002.id)) {
+      runtime.inject(storeNodeForExp002.id, 0.6);
     }
   } else {
-    console.log('\nNote: SearchPlugin node not found — run loom onboard after creating app/src/plugins/search.ts');
+    console.log('EXP-002: SearchPlugin not found (run loom onboard after creating app/src/plugins/search.ts)');
   }
 
-  // 10. Start the runtime
-  console.log('\nRuntime started. Running 20 ticks (10 seconds)...\n');
+  // EXP-003: Hub node cascade (InvertedIndex → dependents)
+  const invertedIndexNode = loomExport.nodes.find(
+    n => n.name === 'InvertedIndex' && (n.kind === 'class' || n.kind === 'service'),
+  );
+  if (invertedIndexNode && runtime.graph.getNode(invertedIndexNode.id)) {
+    console.log(`EXP-003: Injecting at InvertedIndex (${invertedIndexNode.id.slice(0, 8)}...) — cascade test`);
+    runtime.inject(invertedIndexNode.id, 0.9);
+  } else {
+    console.log('EXP-003: InvertedIndex not found (run loom onboard after creating app/src/indexing/index.ts)');
+  }
+
+  // EXP-005: Compound tension (PresenceTracker violates two boundaries)
+  const presenceNode = loomExport.nodes.find(
+    n => n.name === 'PresenceTracker' && (n.kind === 'class' || n.kind === 'service'),
+  );
+  const documentStoreNode = loomExport.nodes.find(n => n.name === 'DocumentStore');
+  const syncEngineNode = loomExport.nodes.find(n => n.name === 'SyncEngine');
+  if (presenceNode && runtime.graph.getNode(presenceNode.id)) {
+    console.log(`EXP-005: Injecting at PresenceTracker (${presenceNode.id.slice(0, 8)}...) — compound tension test`);
+    runtime.inject(presenceNode.id, 0.8);
+    // Also activate both violated subsystems to maximise operator pressure
+    if (documentStoreNode && runtime.graph.getNode(documentStoreNode.id)) {
+      runtime.inject(documentStoreNode.id, 0.6);
+    }
+    if (syncEngineNode && runtime.graph.getNode(syncEngineNode.id)) {
+      runtime.inject(syncEngineNode.id, 0.6);
+    }
+  } else {
+    console.log('EXP-005: PresenceTracker not found (run loom onboard after creating app/src/collaboration/presence.ts)');
+  }
+
+  // 10. Start the runtime — 30 ticks to give the cascade room to propagate
+  console.log('\nRuntime started. Running 30 ticks (15 seconds)...\n');
   runtime.start();
 
   // 11. Observe and report
-  const startTime = Date.now();
-  const TICK_LIMIT = 20;
+  const TICK_LIMIT = 30;
   let lastTickCount = 0;
 
   const observer = setInterval(() => {
     const state = runtime.getState();
     if (state.tickCount > lastTickCount) {
       lastTickCount = state.tickCount;
-      process.stdout.write(`tick ${String(state.tickCount).padStart(2)} | nodes: ${state.nodeCount} | activation: ${state.totalActivation.toFixed(3)} | tensions: ${state.unresolvedTensions} | pending: ${state.pendingExecutions}\r`);
+      process.stdout.write(
+        `tick ${String(state.tickCount).padStart(2)} | nodes: ${state.nodeCount} | Σactivation: ${state.totalActivation.toFixed(3)} | tensions: ${state.unresolvedTensions} | pending: ${state.pendingExecutions}\r`,
+      );
     }
     if (state.tickCount >= TICK_LIMIT) {
       clearInterval(observer);
-      reportResults(runtime);
+      reportResults(runtime, loomExport);
     }
   }, 100);
 }
 
-function reportResults(runtime: ContinuityRuntime): void {
+function reportResults(runtime: ContinuityRuntime, loomExport: LoomExport): void {
   const state = runtime.getState();
   const tensions = runtime.tensions.getUnresolved();
 
@@ -202,14 +242,54 @@ function reportResults(runtime: ContinuityRuntime): void {
   console.log(`Unresolved tensions: ${state.unresolvedTensions}`);
   console.log(`Events logged:       ${state.eventCount}`);
 
-  if (tensions.length > 0) {
-    console.log('\nTensions detected:');
-    for (const t of tensions) {
-      console.log(`  [${t.kind}] pressure=${t.pressure.toFixed(2)} sources=[${t.sourceNodes.join(', ')}]`);
+  // ── Substrate heatmap (top 10 nodes by activation) ──────────────────────────
+  const allNodes = loomExport.nodes
+    .map(n => ({ node: n, substrateNode: runtime.graph.getNode(n.id) }))
+    .filter(({ substrateNode }) => substrateNode !== undefined)
+    .map(({ node, substrateNode }) => ({
+      name: node.name,
+      kind: node.kind,
+      activation: substrateNode!.activation ?? 0,
+    }))
+    .sort((a, b) => b.activation - a.activation)
+    .slice(0, 10);
+
+  if (allNodes.length > 0) {
+    console.log('\nSubstrate heatmap (top 10 by activation):');
+    const maxAct = allNodes[0]?.activation ?? 1;
+    for (const { name, kind, activation } of allNodes) {
+      const barWidth = 20;
+      const filled = Math.round((activation / Math.max(maxAct, 0.01)) * barWidth);
+      const bar = '█'.repeat(filled) + '░'.repeat(barWidth - filled);
+      console.log(`  ${bar} ${activation.toFixed(3)}  ${name} (${kind})`);
     }
-    console.log('\nEXP-002: ✓ Tension detection working');
-  } else {
-    console.log('\nEXP-002: No tensions yet (inject more activation or run more ticks)');
+  }
+
+  // ── Per-experiment verdicts ──────────────────────────────────────────────────
+  console.log('\n── Experiment results ──');
+
+  const exp001Met = loomExport.nodes.length >= 20 && loomExport.edges.length >= 15;
+  console.log(`EXP-001 (E2E pipeline):       ${exp001Met ? '✓' : '✗'} ${loomExport.nodes.length} nodes / ${loomExport.edges.length} edges (need ≥20/≥15)`);
+
+  const contradictions = tensions.filter(t => t.kind === 'contradiction');
+  console.log(`EXP-002 (boundary violation): ${contradictions.length > 0 ? '✓' : '✗'} ${contradictions.length} contradiction tension(s)`);
+
+  const invertedIndexNode = loomExport.nodes.find(n => n.name === 'InvertedIndex');
+  const hubFound = invertedIndexNode !== undefined && runtime.graph.getNode(invertedIndexNode.id) !== undefined;
+  console.log(`EXP-003 (hub cascade):        ${hubFound ? '✓' : '–'} InvertedIndex hub ${hubFound ? 'injected — check heatmap for cascade' : 'not found yet'}`);
+
+  const presenceNode = loomExport.nodes.find(n => n.name === 'PresenceTracker');
+  const compoundViolations = presenceNode
+    ? contradictions.filter(t => t.sourceNodes.some(id => id === presenceNode.id))
+    : [];
+  console.log(`EXP-005 (compound tension):   ${compoundViolations.length > 0 ? '✓' : '–'} ${compoundViolations.length} tension(s) from PresenceTracker`);
+
+  if (tensions.length > 0) {
+    console.log('\nAll unresolved tensions:');
+    for (const t of tensions) {
+      const shortSources = t.sourceNodes.map((id: string) => id.slice(0, 8)).join(', ');
+      console.log(`  [${t.kind}] pressure=${t.pressure.toFixed(2)} sources=[${shortSources}]`);
+    }
   }
 
   const snapshot = runtime.snapshot('experiment-run');
