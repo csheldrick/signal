@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-22T14:21:49.949Z",
+  "generatedAt": "2026-05-22T14:52:59.328Z",
   "project": {
     "name": "signal",
     "type": "application",
     "graphId": "bf558c90-f694-4ad6-a779-014d0c135819",
-    "graphVersion": 2
+    "graphVersion": 5
   },
   "comprehension": {
     "modules": [
@@ -67,6 +67,28 @@
           },
           {
             "file": "C:\\vscode-projects\\signal\\app\\package.json",
+            "derivation": "package.json defines the module name and version.",
+            "confidence": 0.98
+          }
+        ]
+      },
+      {
+        "id": "dd441966-1fdb-4ac7-8430-c91ce53511a4",
+        "label": "signal-runner",
+        "dir": "runner",
+        "fileCount": 1,
+        "confidence": 0.95,
+        "fanIn": 0,
+        "fanOut": 0,
+        "owners": [],
+        "evidence": [
+          {
+            "file": "C:\\vscode-projects\\signal\\runner",
+            "derivation": "runner/package.json found at runner/package.json — explicit module boundary (javascript).",
+            "confidence": 0.95
+          },
+          {
+            "file": "C:\\vscode-projects\\signal\\runner\\package.json",
             "derivation": "package.json defines the module name and version.",
             "confidence": 0.98
           }
@@ -623,6 +645,20 @@
         "method": "",
         "path": "",
         "confidence": 0.85
+      },
+      {
+        "id": "3e088ccf-30c6-4425-b99d-e221cc31b8a1",
+        "label": "app",
+        "method": "",
+        "path": "",
+        "confidence": 0.75
+      },
+      {
+        "id": "8eb5138e-a7c1-4fbe-8198-97981a57841d",
+        "label": "runner",
+        "method": "",
+        "path": "",
+        "confidence": 0.75
       }
     ]
   },
@@ -633,5 +669,5 @@
   "suggestions": [
     "Comprehension model looks healthy. Run `loom drift` to check for fresh divergence."
   ],
-  "executiveSummary": "- Signal is a modestly-scoped application consisting of a single module with 33 contracts, 13 service routes, and 1 invariant, suggesting a self-contained system with straightforward internal structure.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-mapped and stable with no known gaps in understanding.\n- The single-module architecture with no fan-in or fan-out coupling and zero architectural lineage events suggests the system either operates in isolation or its integration points have not yet been documented—this warrants clarification.\n- The low invariant count (1 across 33 contracts) is a concern; critical business rules may be implicit rather than explicitly captured, increasing risk of unintended behavioral changes during future development.\n- Recommended next steps: (1) verify whether external integrations exist and document any missing lineage events, (2) conduct an invariant discovery pass to surface and formalize implicit business rules, and (3) establish baseline coupling and evolution tracking before the system grows beyond its current single-module boundary."
+  "executiveSummary": "- Signal is a modular application composed of 2 modules (signal-app and signal-runner), 33 contracts, 1 invariant, and 15 services/routes, representing a modest but formally structured system with clear interface boundaries.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and internally consistent.\n- The single registered invariant should be reviewed to confirm it remains accurately scoped as the system grows, since under-specification of invariants is a common gap in early-stage projects.\n- Both modules show zero fan-in and zero fan-out coupling metrics, which may reflect incomplete dependency mapping rather than true isolation and warrants verification before handoff is considered complete.\n- Recommended next steps: validate that module coupling data is fully captured, confirm the invariant covers all critical system guarantees, and establish a baseline of architectural lineage events so future changes can be traced from this handoff point forward."
 }

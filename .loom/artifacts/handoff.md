@@ -1,15 +1,15 @@
 # Loom Handoff — signal
-> Graph v2 · Generated 2026-05-22T14:21:49 UTC
+> Graph v5 · Generated 2026-05-22T14:52:59 UTC
 
 **This document is a cross-session context brief.** Paste it into a new agent session to resume work without re-reading source files.
 
 ## Executive Summary
 
-- Signal is a modestly-scoped application consisting of a single module with 33 contracts, 13 service routes, and 1 invariant, suggesting a self-contained system with straightforward internal structure.
-- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-mapped and stable with no known gaps in understanding.
-- The single-module architecture with no fan-in or fan-out coupling and zero architectural lineage events suggests the system either operates in isolation or its integration points have not yet been documented—this warrants clarification.
-- The low invariant count (1 across 33 contracts) is a concern; critical business rules may be implicit rather than explicitly captured, increasing risk of unintended behavioral changes during future development.
-- Recommended next steps: (1) verify whether external integrations exist and document any missing lineage events, (2) conduct an invariant discovery pass to surface and formalize implicit business rules, and (3) establish baseline coupling and evolution tracking before the system grows beyond its current single-module boundary.
+- Signal is a modular application composed of 2 modules (signal-app and signal-runner), 33 contracts, 1 invariant, and 15 services/routes, representing a modest but formally structured system with clear interface boundaries.
+- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and internally consistent.
+- The single registered invariant should be reviewed to confirm it remains accurately scoped as the system grows, since under-specification of invariants is a common gap in early-stage projects.
+- Both modules show zero fan-in and zero fan-out coupling metrics, which may reflect incomplete dependency mapping rather than true isolation and warrants verification before handoff is considered complete.
+- Recommended next steps: validate that module coupling data is fully captured, confirm the invariant covers all critical system guarantees, and establish a baseline of architectural lineage events so future changes can be traced from this handoff point forward.
 
 ## Suggested Next Steps
 
@@ -19,10 +19,10 @@
 
 | Kind | Count |
 |---|---|
-| Modules | 1 |
+| Modules | 2 |
 | Contracts | 33 |
 | Invariants | 1 |
-| Services | 13 |
+| Services | 15 |
 | Lineage nodes | 0 |
 
 ## Modules
@@ -33,6 +33,12 @@
 - **Owners:** LocalSummarizer, LocalSummarizer.summarize, SignalApp, SignalApp.start, SignalApp.shutdown, SignalApp.isRunning, createDocument, updateDocument, linkDocuments, deleteDocument, GraphBuilder, GraphBuilder.buildGraph, GraphBuilder.findClusters, GraphBuilder.findHubs, ExportPlugin, ExportPlugin.activate, ExportPlugin.deactivate, ExportPlugin.exportToMarkdown, PluginHost, PluginHost.register, Summarizer, AppConfig, Document, DocumentLink, LinkKind, SearchQuery, SearchResult, DocumentChange, GraphNode, AdjacencyList, Plugin, PluginContext, StorageEventType, StorageEventCreated, StorageEventUpdated, StorageEventDeleted, StorageEventLinked, StorageEvent, SyncState, VectorClock, SyncMessage
 - *Evidence:* `C:\vscode-projects\signal\app` — app/package.json found at app/package.json — explicit module boundary (javascript).
 - *Evidence:* `C:\vscode-projects\signal\app\package.json` — package.json defines the module name and version.
+
+### signal-runner (95%)
+- **Path:** `runner`
+- **Files:** 1 | **Coupling:** fanIn: 0, fanOut: 0
+- *Evidence:* `C:\vscode-projects\signal\runner` — runner/package.json found at runner/package.json — explicit module boundary (javascript).
+- *Evidence:* `C:\vscode-projects\signal\runner\package.json` — package.json defines the module name and version.
 
 ## Contracts
 

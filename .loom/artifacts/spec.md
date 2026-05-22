@@ -1,11 +1,16 @@
 # signal — Comprehension Report
-> Graph v2 · Project type: **web-api**
+> Graph v5 · Project type: **web-api**
 
 ## Module Boundaries
 
 ### signal-app
 Module boundary at app containing 13 source file(s).
 _Path: `app`_
+Confidence: 95%
+
+### signal-runner
+Module boundary at runner containing 1 source file(s).
+_Path: `runner`_
 Confidence: 95%
 
 ## Inferred Contracts
@@ -135,19 +140,32 @@ Confidence: 70%
 
 ## Entities
 
-- **Document**: Core knowledge unit with content, tags, and links
-- **DocumentLink**: Typed directional relationship between two documents
-- **LinkKind**: Classification of link relationships (reference, related, derived_from, blocks)
-- **SearchQuery**: Query parameters for document search
-- **SearchResult**: Search operation result
-- **DocumentChange**: Represents a mutation to a document
-- **GraphNode**: Node in the document adjacency graph
-- **AdjacencyList**: Graph structure of nodes and edges built from document links
-- **StorageEvent**: Event emitted on storage mutations (created/updated/deleted/linked)
+- **Document**: Defined in app/src/core/types.ts
+- **DocumentLink**: Defined in app/src/core/types.ts
+- **LinkKind**: Defined in app/src/core/types.ts
+- **SearchQuery**: Defined in app/src/core/types.ts
+- **SearchResult**: Defined in app/src/core/types.ts
+- **DocumentChange**: Defined in app/src/core/types.ts
+- **GraphNode**: Defined in app/src/graph/builder.ts
+- **AdjacencyList**: Defined in app/src/graph/builder.ts
+- **StorageEvent**: Defined in app/src/storage/events.ts
 - **SyncMessage**: Message exchanged between peers for document sync
 - **VectorClock**: Logical clock for causal ordering across peers
-- **Plugin**: Extension interface with activate/deactivate lifecycle
-- **PluginContext**: Sandboxed API surface exposed to plugins
+- **Plugin**: Defined in app/src/plugins/host.ts
+- **PluginContext**: Defined in app/src/plugins/host.ts
+- **Summarizer**: Defined in app/src/ai/summarizer.ts
+- **LocalSummarizer**: Defined in app/src/ai/summarizer.ts
+- **AppConfig**: Defined in app/src/core/app.ts
+- **SignalApp**: Defined in app/src/core/app.ts
+- **GraphBuilder**: Defined in app/src/graph/builder.ts
+- **ExportPlugin**: Defined in app/src/plugins/export.ts
+- **PluginHost**: Defined in app/src/plugins/host.ts
+- **SearchPlugin**: Defined in app/src/plugins/search.ts
+- **StorageEventType**: Defined in app/src/storage/events.ts
+- **StorageEventCreated**: Defined in app/src/storage/events.ts
+- **StorageEventUpdated**: Defined in app/src/storage/events.ts
+- **StorageEventDeleted**: Defined in app/src/storage/events.ts
+- **StorageEventLinked**: Defined in app/src/storage/events.ts
 
 ## Services
 
@@ -164,9 +182,15 @@ Confidence: 70%
 - **SyncProtocol**: Types and utilities for peer-to-peer sync messaging
 - **LocalSummarizer**: Local document summarization by sentence extraction
 - **UIRenderer**: Text-based rendering of documents and graphs
+- **app**: Module: app
+- **runner**: Module: runner
 
 ## Constraints
 
 - Plugin sandbox boundary: Plugins must interact only via PluginContext, not import storage or other internals directly
 - Local-first architecture: Data is stored locally (in-memory + JSON persistence) before any sync occurs
 - Event-driven storage: All storage mutations emit events so other subsystems can react without tight coupling
+- Input validation: Validation libraries or validation code patterns detected
+- Async job processing: Background job or queue processing patterns detected
+- Observability: Logging and telemetry instrumentation detected
+- Test coverage required: Test tooling and test file patterns detected
