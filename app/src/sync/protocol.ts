@@ -3,6 +3,35 @@
 
 export type SyncState = 'idle' | 'syncing' | 'conflicted' | 'resolved';
 
+export type ConflictStrategy = 'last-write-wins' | 'first-write-wins' | 'merge-content';
+
+export interface PeerInfo {
+  peerId: string;
+  /** Last vector clock we received from this peer. */
+  clock: VectorClock;
+  /** Epoch ms of the last successful exchange. */
+  lastSeen: number;
+  state: SyncState;
+}
+
+export interface SyncAck {
+  kind: 'ack';
+  peerId: string;
+  documentId: string;
+  clock: VectorClock;
+  timestamp: number;
+}
+
+export interface ConflictRecord {
+  documentId: string;
+  localClock: VectorClock;
+  remoteClock: VectorClock;
+  localTimestamp: number;
+  remoteTimestamp: number;
+  resolvedBy: ConflictStrategy;
+  resolvedAt: number;
+}
+
 export interface VectorClock {
   [peerId: string]: number;
 }

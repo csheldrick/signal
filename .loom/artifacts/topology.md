@@ -1,7 +1,7 @@
 # signal — Architectural Topology
 > Generated 2026-05-22 · Graph bf558c90
 
-44 nodes · 0 edges
+64 nodes · 0 edges
 
 ## Dependency Graph
 
@@ -27,6 +27,14 @@ graph TD
   app_31b8a1("app ·75%")
   runner_57841d("runner ·75%")
   ExperimentRunner_52f5c1("ExperimentRunner")
+  InvertedIndex_18bd45("InvertedIndex")
+  PresenceTracker_ad3848("PresenceTracker")
+  VersionHistory_7267f6("VersionHistory")
+  SyncManager_a80347("SyncManager")
+  SyncQueue_2ddcf9("SyncQueue")
+  SyncSession_c289b4("SyncSession")
+  ConflictResolver_cbc93b("ConflictResolver")
+  Runner_408022("Runner")
   %% entitys
   Document_6cf1f8[["Document"]]
   DocumentLink_2c9b80[["DocumentLink"]]
@@ -54,6 +62,18 @@ graph TD
   StorageEventUpdated_6fb7ef[["StorageEventUpdated ·68%"]]
   StorageEventDeleted_7edc85[["StorageEventDeleted ·68%"]]
   StorageEventLinked_3ce65d[["StorageEventLinked ·68%"]]
+  DocumentVersion_4ff74e[["DocumentVersion"]]
+  SearchHit_7badb0[["SearchHit"]]
+  DocumentVersion_bee421[["DocumentVersion"]]
+  IndexStats_6889fd[["IndexStats"]]
+  PeerInfo_3715ae[["PeerInfo"]]
+  ConflictRecord_5246ad[["ConflictRecord"]]
+  ConflictCandidate_f6673d[["ConflictCandidate"]]
+  ConflictResolution_a66661[["ConflictResolution"]]
+  PeerSession_1e931b[["PeerSession"]]
+  SyncAck_4fecb5[["SyncAck"]]
+  SyncState_73cfc5[["SyncState"]]
+  ConflictStrategy_69f145[["ConflictStrategy"]]
 
   %% relationships
 
@@ -63,8 +83,8 @@ graph TD
   classDef workflowStyle fill:#3d2f1e,stroke:#ffa54a,color:#fdf0e8
   classDef entityStyle fill:#2f1e3d,stroke:#c54aff,color:#f0e8fd
   class signal_app_0f3298,signal_runner_3511a4 moduleStyle
-  class CoreTypes_6a8434,SignalApp_76adff,DocumentStore_a47ce2,StorageEventBus_812d79,EditorOperations_b93e48,GraphBuilder_227f2d,PluginHost_9a372e,ExportPlugin_61138f,SearchPlugin_783151,SyncEngine_3e1fcd,SyncProtocol_ff1d82,LocalSummarizer_bbc114,UIRenderer_ba1179,app_31b8a1,runner_57841d,ExperimentRunner_52f5c1 serviceStyle
-  class Document_6cf1f8,DocumentLink_2c9b80,LinkKind_ddac64,SearchQuery_ede4bb,SearchResult_a7fa97,DocumentChange_d37604,GraphNode_30298f,AdjacencyList_7d7655,StorageEvent_0617fe,SyncMessage_2b7535,VectorClock_27ec07,Plugin_146a63,PluginContext_055dc6,Summarizer_681fb1,LocalSummarizer_9500ba,AppConfig_4c6c88,SignalApp_8a6325,GraphBuilder_32958b,ExportPlugin_2d7827,PluginHost_818559,SearchPlugin_45d93b,StorageEventType_2dc5e1,StorageEventCreated_35779c,StorageEventUpdated_6fb7ef,StorageEventDeleted_7edc85,StorageEventLinked_3ce65d entityStyle
+  class CoreTypes_6a8434,SignalApp_76adff,DocumentStore_a47ce2,StorageEventBus_812d79,EditorOperations_b93e48,GraphBuilder_227f2d,PluginHost_9a372e,ExportPlugin_61138f,SearchPlugin_783151,SyncEngine_3e1fcd,SyncProtocol_ff1d82,LocalSummarizer_bbc114,UIRenderer_ba1179,app_31b8a1,runner_57841d,ExperimentRunner_52f5c1,InvertedIndex_18bd45,PresenceTracker_ad3848,VersionHistory_7267f6,SyncManager_a80347,SyncQueue_2ddcf9,SyncSession_c289b4,ConflictResolver_cbc93b,Runner_408022 serviceStyle
+  class Document_6cf1f8,DocumentLink_2c9b80,LinkKind_ddac64,SearchQuery_ede4bb,SearchResult_a7fa97,DocumentChange_d37604,GraphNode_30298f,AdjacencyList_7d7655,StorageEvent_0617fe,SyncMessage_2b7535,VectorClock_27ec07,Plugin_146a63,PluginContext_055dc6,Summarizer_681fb1,LocalSummarizer_9500ba,AppConfig_4c6c88,SignalApp_8a6325,GraphBuilder_32958b,ExportPlugin_2d7827,PluginHost_818559,SearchPlugin_45d93b,StorageEventType_2dc5e1,StorageEventCreated_35779c,StorageEventUpdated_6fb7ef,StorageEventDeleted_7edc85,StorageEventLinked_3ce65d,DocumentVersion_4ff74e,SearchHit_7badb0,DocumentVersion_bee421,IndexStats_6889fd,PeerInfo_3715ae,ConflictRecord_5246ad,ConflictCandidate_f6673d,ConflictResolution_a66661,PeerSession_1e931b,SyncAck_4fecb5,SyncState_73cfc5,ConflictStrategy_69f145 entityStyle
 ```
 
 ## Coupling Table
@@ -89,8 +109,8 @@ graph TD
 | app | service | 0 | 0 | 0 |
 | runner | service | 0 | 0 | 0 |
 | ExperimentRunner | service | 0 | 0 | 0 |
-| Document | entity | 0 | 0 | 0 |
-| DocumentLink | entity | 0 | 0 | 0 |
+| InvertedIndex | service | 0 | 0 | 0 |
+| PresenceTracker | service | 0 | 0 | 0 |
 
 ## Next Steps
 

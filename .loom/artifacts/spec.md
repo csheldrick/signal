@@ -1,10 +1,10 @@
 # signal — Comprehension Report
-> Graph v6 · Project type: **web-api**
+> Graph v8 · Project type: **web-api**
 
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 13 source file(s).
+Module boundary at app containing 20 source file(s).
 _Path: `app`_
 Confidence: 95%
 
@@ -134,25 +134,57 @@ Confidence: 88%
 Exported function `PluginHost.register(plugin: Plugin): void` in app/src/plugins/host.ts. Pure function (no detected side effects).
 Confidence: 70%
 
+### PresenceTracker
+Exported function `PresenceTracker` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 88%
+
+### PresenceTracker.join
+Exported function `PresenceTracker.join(peerId: string, documentId?: string): PeerPresence` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### PresenceTracker.leave
+Exported function `PresenceTracker.leave(peerId: string): void` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 70%
+
+### PresenceTracker.getActive
+Exported function `PresenceTracker.getActive(): PeerPresence[]` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### PresenceTracker.getViewers
+Exported function `PresenceTracker.getViewers(documentId: string): PeerPresence[]` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### PresenceTracker.focusDocument
+Exported function `PresenceTracker.focusDocument(peerId: string, documentId: string): boolean` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### PresenceTracker.summary
+Exported function `PresenceTracker.summary(): {
+    active: number;
+    idle: number;
+    offline: number;
+}` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Confidence: 95%
+
 ## Detected Invariants
 
-- **guard: Guard clause (null/undefined check)**: Detected 1 occurrence(s) of guard pattern across 1 file(s) in module 'signal-app'. Example: "if (!existing) return undefined;" _(65%)_
+- **guard: Guard clause (null/undefined check)**: Detected 3 occurrence(s) of guard pattern across 3 file(s) in module 'signal-app'. Example: "if (!doc) return false;" _(88%)_
 
 ## Entities
 
-- **Document**: Core knowledge unit with id, title, content, tags, links, and timestamps
-- **DocumentLink**: Typed directed edge between two documents (reference, related, derived_from, blocks)
-- **LinkKind**: Enumerated relationship type for DocumentLink edges
-- **SearchQuery**: Query parameters for full-text and tag-based document search
-- **SearchResult**: Ranked document match returned from a search operation
-- **DocumentChange**: Delta record describing a mutation applied to a document
-- **GraphNode**: Lightweight projection of a document for graph traversal (id, title, linkCount)
-- **AdjacencyList**: In-memory graph structure with node map and edge sets
-- **StorageEvent**: Discriminated union event emitted on storage mutations (created, updated, deleted, linked)
-- **SyncMessage**: Wire message carrying a CRDT operation, payload, vector clock, and peer metadata
-- **VectorClock**: Per-peer logical clock map used for eventual-consistency conflict resolution
-- **Plugin**: Lifecycle interface (activate/deactivate) for extensible plugin modules
-- **PluginContext**: Sandboxed API surface exposed to plugins (list, search, get documents)
+- **Document**: Core content unit with id, title, content, tags, links, and timestamps
+- **DocumentLink**: Typed directional edge between two documents (reference, related, derived_from, blocks)
+- **LinkKind**: Enumerated relationship type for document links
+- **SearchQuery**: Full-text and tag-based query descriptor for document search
+- **SearchResult**: Scored document match returned from search
+- **DocumentChange**: Record of a mutation applied to a document
+- **GraphNode**: Graph vertex representing a document with link count
+- **AdjacencyList**: In-memory graph representation with node map and edge sets
+- **StorageEvent**: Discriminated union event emitted on document CRUD mutations (created, updated, deleted, linked)
+- **SyncMessage**: Protocol envelope carrying document state between peers
+- **VectorClock**: Peer-keyed logical clock map used for distributed concurrency detection
+- **Plugin**: Lifecycle interface for activatable/deactivatable extensions
+- **PluginContext**: Sandboxed API surface exposed to plugins — abstracts direct store access
 - **Summarizer**: Defined in app/src/ai/summarizer.ts
 - **LocalSummarizer**: Defined in app/src/ai/summarizer.ts
 - **AppConfig**: Defined in app/src/core/app.ts
@@ -166,25 +198,45 @@ Confidence: 70%
 - **StorageEventUpdated**: Defined in app/src/storage/events.ts
 - **StorageEventDeleted**: Defined in app/src/storage/events.ts
 - **StorageEventLinked**: Defined in app/src/storage/events.ts
+- **DocumentVersion**: Immutable snapshot of a Document forming a parent-child temporal chain
+- **SearchHit**: Indexed search result with document ID and IDF score
+- **DocumentVersion**: Versioned snapshot with parentVersionId enabling lineage chains
+- **IndexStats**: Metrics snapshot of the inverted index state
+- **PeerInfo**: Metadata about a known sync peer including clock and last-seen timestamp
+- **ConflictRecord**: Audit record of a detected and resolved write conflict
+- **ConflictCandidate**: Pair of concurrent document versions awaiting resolution
+- **ConflictResolution**: Outcome of conflict resolution including winning document and record
+- **PeerSession**: Stateful representation of an active sync session with a remote peer
+- **SyncAck**: Acknowledgement message confirming receipt of a sync message
+- **SyncState**: State machine value for a sync session (idle, syncing, conflicted, resolved)
+- **ConflictStrategy**: Policy enum for resolving concurrent writes (last-write-wins, first-write-wins, merge-content)
 
 ## Services
 
 - **CoreTypes**: Shared type vocabulary imported by all modules
-- **SignalApp**: Central application wiring hub that composes all subsystems; highest fan-out node in the dependency graph
-- **DocumentStore**: In-memory CRUD store for documents with JSON file persistence and event emission; central hub depended on by most modules
-- **StorageEventBus**: Pub/sub event bus for storage mutation events enabling decoupled inter-module communication
-- **EditorOperations**: High-level document editing functions (create, update, link) delegating to DocumentStore
-- **GraphBuilder**: Builds a traversable AdjacencyList from document links stored in DocumentStore
-- **PluginHost**: Manages plugin lifecycle and enforces sandbox boundary by exposing only PluginContext to plugins
-- **ExportPlugin**: Plugin that exports documents to Markdown using only PluginContext (correct boundary usage)
-- **SearchPlugin**: Plugin that performs document search but directly imports DocumentStore in violation of the plugin sandbox boundary
-- **SyncEngine**: Stub eventual-consistency sync layer that tracks vector clocks and queues outbound SyncMessages
+- **SignalApp**: Root application wiring all subsystems together; high fan-out central hub node
+- **DocumentStore**: In-memory CRUD store with JSON file persistence; hub node depended on by most modules
+- **StorageEventBus**: Event emitter for storage mutations; decouples store from consumers via pub/sub
+- **EditorOperations**: High-level document editing operations (create, update, link) delegating to DocumentStore
+- **GraphBuilder**: Constructs traversable adjacency-list graph from document links stored in DocumentStore
+- **PluginHost**: Plugin lifecycle manager exposing sandboxed PluginContext; enforces subsystem boundary
+- **ExportPlugin**: Markdown export plugin using only PluginContext (correct boundary usage, contrast to SearchPlugin)
+- **SearchPlugin**: Plugin that bypasses PluginContext and imports DocumentStore directly (deliberate boundary violation)
+- **SyncEngine**: Core sync logic: maintains vector clock, processes inbound SyncMessages, produces outbound messages
 - **SyncProtocol**: Types and utilities for peer-to-peer sync messaging
-- **LocalSummarizer**: Local AI summarization implementation that extracts top-N sentences from document content
-- **UIRenderer**: Text-based renderer for documents and graph adjacency lists
+- **LocalSummarizer**: Local AI summarizer extracting leading sentences from document content
+- **UIRenderer**: UI rendering layer for the workspace
 - **app**: Module: app
 - **runner**: Module: runner
-- **ExperimentRunner**: Node.js entry point that instantiates Weave ContinuityRuntime, loads a LoomExport from .loom/loom.db, and wires Utilis intent handlers and operators
+- **ExperimentRunner**: Runner package that wires Signal, Loom, Weave, and Utilis together for experiment execution
+- **InvertedIndex**: Full-text search index with IDF scoring; fan-in hub for document indexing
+- **PresenceTracker**: Collaboration presence module with compound boundary violation: imports DocumentStore and SyncEngine directly
+- **VersionHistory**: Document versioning and history management
+- **SyncManager**: Top-level sync coordinator: subscribes to store events, manages peer sessions, runs flush loop
+- **SyncQueue**: Outbound message queue buffering SyncMessages before transmission
+- **SyncSession**: Per-peer session state management for the sync layer
+- **ConflictResolver**: Detects concurrent writes via vector clock comparison and applies configurable merge strategy
+- **Runner**: Experiment runner package wiring Signal, Loom, Weave, and Utilis together for architectural analysis
 
 ## Constraints
 
@@ -195,9 +247,18 @@ Confidence: 70%
 - Async job processing: Background job or queue processing patterns detected
 - Observability: Logging and telemetry instrumentation detected
 - Test coverage required: Test tooling and test file patterns detected
-- Plugin Sandbox Boundary: Plugins must interact with the system exclusively through PluginContext, not by importing DocumentStore or other internal modules directly, to preserve encapsulation and security
+- Plugin Sandbox Boundary: Plugins must access data only through PluginContext, not by importing DocumentStore or other internal modules directly, to maintain subsystem isolation
 - Local-First Storage: All document data is persisted locally (JSON file + in-memory Map) with no remote database dependency, supporting offline-first usage
 - Eventual Consistency: Sync layer uses vector clocks and CRDT-style merge to reconcile divergent document states across peers without requiring coordination
 - Type-Only Cross-Module Imports: Several modules import only types (import type) from dependencies, limiting runtime coupling and enabling better tree-shaking
 - No External Runtime Dependencies in app/: The app package declares no runtime dependencies, only devDependencies, constraining it to pure TypeScript with Node built-ins
 - Loom Onboarding Prerequisite: The experiment runner requires loom onboard to have been executed in the signal root to produce .loom/loom.db before the runner can start
+- Subsystem Boundary Isolation: Collaboration, sync, storage, and editor subsystems should not cross-import each other directly; cross-subsystem access must go through defined interfaces (e.g., PluginContext, events)
+- Local-First / Offline Capability: All storage and operations must work locally without a server; JSON file persistence and in-memory store enforce this
+- Eventual Consistency via Vector Clocks: Concurrent writes are detected using vector clocks and resolved via a configurable strategy rather than requiring coordination locks
+- Immutable Version Snapshots: Document versions are append-only parent-child chains; history must not be mutated to preserve lineage integrity
+- Type Centrality via core/types: All shared types must be defined in core/types.ts to maintain a single source of truth; no duplicate type definitions across modules
+- Sync Subsystem Isolation: Collaboration concerns (e.g., presence) should not reach into the sync layer directly; cross-subsystem access must be mediated
+- Local-First Data Ownership: All data is stored and processed locally (in-memory + JSON file); no mandatory remote backend
+- No Test Coverage: Test script is a no-op placeholder; no automated tests exist yet, creating quality risk
+- Non-Cryptographic ID Generation: Document IDs are generated from Date.now() + counter, not cryptographically random, risking collisions in concurrent environments

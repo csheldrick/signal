@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-22T15:02:12.921Z",
+  "generatedAt": "2026-05-22T17:55:23.308Z",
   "project": {
     "name": "signal",
     "type": "application",
     "graphId": "bf558c90-f694-4ad6-a779-014d0c135819",
-    "graphVersion": 6
+    "graphVersion": 8
   },
   "comprehension": {
     "modules": [
@@ -12,7 +12,7 @@
         "id": "3231fa31-0384-4228-9d84-6784110f3298",
         "label": "signal-app",
         "dir": "app",
-        "fileCount": 13,
+        "fileCount": 20,
         "confidence": 0.95,
         "fanIn": 0,
         "fanOut": 0,
@@ -57,7 +57,30 @@
           "StorageEvent",
           "SyncState",
           "VectorClock",
-          "SyncMessage"
+          "SyncMessage",
+          "PresenceTracker",
+          "PresenceTracker.join",
+          "PresenceTracker.leave",
+          "PresenceTracker.getActive",
+          "PresenceTracker.getViewers",
+          "PresenceTracker.focusDocument",
+          "PresenceTracker.summary",
+          "PresenceStatus",
+          "PeerPresence",
+          "IndexStats",
+          "SearchHit",
+          "DocumentVersion",
+          "VersionDiff",
+          "ConflictCandidate",
+          "ConflictResolution",
+          "TransportSend",
+          "SyncManagerOptions",
+          "ConflictStrategy",
+          "PeerInfo",
+          "SyncAck",
+          "ConflictRecord",
+          "QueueEntry",
+          "SyncQueueOptions"
         ],
         "evidence": [
           {
@@ -173,6 +196,22 @@
           {
             "file": "app/src/plugins/host.ts",
             "startLine": 29,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "d90bbc2c-100d-4e66-9884-20b6d57a8a14",
+        "label": "PresenceTracker.leave",
+        "signature": "PresenceTracker.leave(peerId: string): void",
+        "confidence": 0.7,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 48,
             "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
             "confidence": 0.7
           }
@@ -378,6 +417,22 @@
         ]
       },
       {
+        "id": "3163e304-02c4-48a0-bb6c-bee597c5995c",
+        "label": "PresenceTracker",
+        "signature": "PresenceTracker",
+        "confidence": 0.88,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 29,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
         "id": "c10c54d0-b1eb-43dc-b9b2-c9b995ce7f87",
         "label": "LocalSummarizer.summarize",
         "signature": "LocalSummarizer.summarize(document: Document): Promise<string>",
@@ -536,18 +591,104 @@
             "confidence": 0.95
           }
         ]
+      },
+      {
+        "id": "9756ca51-f424-4dc7-8ebf-1095e9967dde",
+        "label": "PresenceTracker.join",
+        "signature": "PresenceTracker.join(peerId: string, documentId?: string): PeerPresence",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 37,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "1c37d9af-4bac-439f-b2b1-fdab227b81e4",
+        "label": "PresenceTracker.getActive",
+        "signature": "PresenceTracker.getActive(): PeerPresence[]",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 55,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "64bb802e-d7fa-4fe3-b555-764bed2b95be",
+        "label": "PresenceTracker.getViewers",
+        "signature": "PresenceTracker.getViewers(documentId: string): PeerPresence[]",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 59,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "b685b3a0-a2bc-4e5c-9f3c-2f8d6e7e5011",
+        "label": "PresenceTracker.focusDocument",
+        "signature": "PresenceTracker.focusDocument(peerId: string, documentId: string): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 65,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "a979709e-5ef1-4841-a3d0-ad432c539619",
+        "label": "PresenceTracker.summary",
+        "signature": "PresenceTracker.summary(): {\n    active: number;\n    idle: number;\n    offline: number;\n}",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 81,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
       }
     ],
     "invariants": [
       {
         "id": "30813070-68f5-427a-a4a3-6b4ef4fcce43",
         "label": "guard: Guard clause (null/undefined check)",
-        "description": "Detected 1 occurrence(s) of guard pattern across 1 file(s) in module 'signal-app'. Example: \"if (!existing) return undefined;\"",
-        "confidence": 0.65,
+        "description": "Detected 3 occurrence(s) of guard pattern across 3 file(s) in module 'signal-app'. Example: \"if (!doc) return false;\"",
+        "confidence": 0.88,
         "evidence": [
           {
             "file": "app/src/storage/store.ts",
             "startLine": 46,
+            "derivation": "Guard clause (null/undefined check) pattern detected by static analysis (regex: guard).",
+            "confidence": 0.72
+          },
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 67,
             "derivation": "Guard clause (null/undefined check) pattern detected by static analysis (regex: guard).",
             "confidence": 0.72
           }
@@ -666,6 +807,62 @@
         "method": "",
         "path": "",
         "confidence": 0.85
+      },
+      {
+        "id": "b3248c65-1322-4dca-9c78-b1594e18bd45",
+        "label": "InvertedIndex",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "3bd84923-448d-4db0-8757-ff3607ad3848",
+        "label": "PresenceTracker",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "1cf05bd8-149d-48d4-bf19-9668c77267f6",
+        "label": "VersionHistory",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "166a3c8c-b9b3-4c4f-a337-5d0ac4a80347",
+        "label": "SyncManager",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "8847fbfd-77f7-4ff9-a150-5e560a2ddcf9",
+        "label": "SyncQueue",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "e59d6181-8168-486c-9d7b-442074c289b4",
+        "label": "SyncSession",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "2e78d8df-91a5-4eb7-8ece-0e094acbc93b",
+        "label": "ConflictResolver",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "00f1ea99-d929-4d8e-9bda-ba9df2408022",
+        "label": "Runner",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
       }
     ]
   },
@@ -676,5 +873,5 @@
   "suggestions": [
     "Comprehension model looks healthy. Run `loom drift` to check for fresh divergence."
   ],
-  "executiveSummary": "- Signal is a modest application composed of 2 modules, 33 contracts, 1 invariant, and 16 service routes, representing a relatively contained system with clear service boundaries.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and stable.\n- Coupling posture is clean, with both top modules (signal-app and signal-runner) showing zero fan-in and fan-out, suggesting they are well-isolated but worth monitoring as the system grows to ensure integration points are captured.\n- The single registered invariant should be reviewed to confirm it adequately covers the 33 contracts, as low invariant coverage relative to contract volume can leave behavioral assumptions undocumented.\n- Recommended next steps: validate invariant coverage against all contracts, confirm the absence of architectural lineage events reflects intentional stability rather than missing history, and establish a baseline coupling audit cadence as new modules are introduced."
+  "executiveSummary": "- Signal is a 2-module application composed of signal-app and signal-runner, supported by 40 contracts, 1 invariant, and 24 service routes, representing a moderately sized but well-bounded system ready for active development or handoff.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-understood and stable at the time of this handoff.\n- Both top-level modules show zero fan-in and fan-out coupling, which may reflect accurate isolation or could indicate that inter-module dependency data has not yet been fully mapped and should be verified.\n- The single registered invariant warrants explicit review to confirm it is still enforced across all 24 service routes and has not been quietly violated as the contract surface grew to 40 entries.\n- Recommended next steps: validate module coupling metrics are complete and not artifacts of incomplete analysis, confirm the lone invariant is tested and visible in CI, and establish a baseline for architectural lineage tracking so future structural decisions are captured from this point forward."
 }

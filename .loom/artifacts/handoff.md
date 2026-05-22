@@ -1,15 +1,15 @@
 # Loom Handoff — signal
-> Graph v6 · Generated 2026-05-22T15:02:12 UTC
+> Graph v8 · Generated 2026-05-22T17:55:23 UTC
 
 **This document is a cross-session context brief.** Paste it into a new agent session to resume work without re-reading source files.
 
 ## Executive Summary
 
-- Signal is a modest application composed of 2 modules, 33 contracts, 1 invariant, and 16 service routes, representing a relatively contained system with clear service boundaries.
-- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and stable.
-- Coupling posture is clean, with both top modules (signal-app and signal-runner) showing zero fan-in and fan-out, suggesting they are well-isolated but worth monitoring as the system grows to ensure integration points are captured.
-- The single registered invariant should be reviewed to confirm it adequately covers the 33 contracts, as low invariant coverage relative to contract volume can leave behavioral assumptions undocumented.
-- Recommended next steps: validate invariant coverage against all contracts, confirm the absence of architectural lineage events reflects intentional stability rather than missing history, and establish a baseline coupling audit cadence as new modules are introduced.
+- Signal is a 2-module application composed of signal-app and signal-runner, supported by 40 contracts, 1 invariant, and 24 service routes, representing a moderately sized but well-bounded system ready for active development or handoff.
+- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-understood and stable at the time of this handoff.
+- Both top-level modules show zero fan-in and fan-out coupling, which may reflect accurate isolation or could indicate that inter-module dependency data has not yet been fully mapped and should be verified.
+- The single registered invariant warrants explicit review to confirm it is still enforced across all 24 service routes and has not been quietly violated as the contract surface grew to 40 entries.
+- Recommended next steps: validate module coupling metrics are complete and not artifacts of incomplete analysis, confirm the lone invariant is tested and visible in CI, and establish a baseline for architectural lineage tracking so future structural decisions are captured from this point forward.
 
 ## Suggested Next Steps
 
@@ -20,17 +20,17 @@
 | Kind | Count |
 |---|---|
 | Modules | 2 |
-| Contracts | 33 |
+| Contracts | 40 |
 | Invariants | 1 |
-| Services | 16 |
+| Services | 24 |
 | Lineage nodes | 0 |
 
 ## Modules
 
 ### signal-app (95%)
 - **Path:** `app`
-- **Files:** 13 | **Coupling:** fanIn: 0, fanOut: 0
-- **Owners:** LocalSummarizer, LocalSummarizer.summarize, SignalApp, SignalApp.start, SignalApp.shutdown, SignalApp.isRunning, createDocument, updateDocument, linkDocuments, deleteDocument, GraphBuilder, GraphBuilder.buildGraph, GraphBuilder.findClusters, GraphBuilder.findHubs, ExportPlugin, ExportPlugin.activate, ExportPlugin.deactivate, ExportPlugin.exportToMarkdown, PluginHost, PluginHost.register, Summarizer, AppConfig, Document, DocumentLink, LinkKind, SearchQuery, SearchResult, DocumentChange, GraphNode, AdjacencyList, Plugin, PluginContext, StorageEventType, StorageEventCreated, StorageEventUpdated, StorageEventDeleted, StorageEventLinked, StorageEvent, SyncState, VectorClock, SyncMessage
+- **Files:** 20 | **Coupling:** fanIn: 0, fanOut: 0
+- **Owners:** LocalSummarizer, LocalSummarizer.summarize, SignalApp, SignalApp.start, SignalApp.shutdown, SignalApp.isRunning, createDocument, updateDocument, linkDocuments, deleteDocument, GraphBuilder, GraphBuilder.buildGraph, GraphBuilder.findClusters, GraphBuilder.findHubs, ExportPlugin, ExportPlugin.activate, ExportPlugin.deactivate, ExportPlugin.exportToMarkdown, PluginHost, PluginHost.register, Summarizer, AppConfig, Document, DocumentLink, LinkKind, SearchQuery, SearchResult, DocumentChange, GraphNode, AdjacencyList, Plugin, PluginContext, StorageEventType, StorageEventCreated, StorageEventUpdated, StorageEventDeleted, StorageEventLinked, StorageEvent, SyncState, VectorClock, SyncMessage, PresenceTracker, PresenceTracker.join, PresenceTracker.leave, PresenceTracker.getActive, PresenceTracker.getViewers, PresenceTracker.focusDocument, PresenceTracker.summary, PresenceStatus, PeerPresence, IndexStats, SearchHit, DocumentVersion, VersionDiff, ConflictCandidate, ConflictResolution, TransportSend, SyncManagerOptions, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, QueueEntry, SyncQueueOptions
 - *Evidence:* `C:\vscode-projects\signal\app` — app/package.json found at app/package.json — explicit module boundary (javascript).
 - *Evidence:* `C:\vscode-projects\signal\app\package.json` — package.json defines the module name and version.
 
@@ -77,6 +77,13 @@ PluginHost.register(plugin: Plugin): void
 ```
 - **Module:** signal-app
 - *Evidence:* `app/src/plugins/host.ts:29` — Exported function signature extracted by static analysis. Side effects detected: none.
+
+### PresenceTracker.leave (70%)
+```
+PresenceTracker.leave(peerId: string): void
+```
+- **Module:** signal-app
+- *Evidence:* `app/src/collaboration/presence.ts:48` — Exported function signature extracted by static analysis. Side effects detected: none.
 
 ### Contract: Document (85%)
 
@@ -140,6 +147,13 @@ PluginHost
 - **Module:** signal-app
 - *Evidence:* `app/src/plugins/host.ts:20` — Exported function signature extracted by static analysis. Side effects detected: none.
 
+### PresenceTracker (88%)
+```
+PresenceTracker
+```
+- **Module:** signal-app
+- *Evidence:* `app/src/collaboration/presence.ts:29` — Exported function signature extracted by static analysis. Side effects detected: none.
+
 ### LocalSummarizer.summarize (95%)
 ```
 LocalSummarizer.summarize(document: Document): Promise<string>
@@ -175,24 +189,11 @@ linkDocuments(store: DocumentStore, sourceId: string, targetId: string, kind: Li
 - **Module:** signal-app
 - *Evidence:* `app/src/editor/operations.ts:32` — Exported function signature extracted by static analysis. Side effects detected: none.
 
-### deleteDocument (95%)
-```
-deleteDocument(store: DocumentStore, id: string): boolean
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/editor/operations.ts:42` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### GraphBuilder.buildGraph (95%)
-```
-GraphBuilder.buildGraph(): AdjacencyList
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/graph/builder.ts:22` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-_…and 3 more contracts_
+_…and 10 more contracts_
 
 ## Invariants
 
-- **guard: Guard clause (null/undefined check)** (65%)
-  Detected 1 occurrence(s) of guard pattern across 1 file(s) in module 'signal-app'. Example: "if (!existing) return undefined;"
+- **guard: Guard clause (null/undefined check)** (88%)
+  Detected 3 occurrence(s) of guard pattern across 3 file(s) in module 'signal-app'. Example: "if (!doc) return false;"
   - evidence: `app/src/storage/store.ts:46`
+  - evidence: `app/src/collaboration/presence.ts:67`
