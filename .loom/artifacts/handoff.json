@@ -1,0 +1,637 @@
+{
+  "generatedAt": "2026-05-22T14:21:49.949Z",
+  "project": {
+    "name": "signal",
+    "type": "application",
+    "graphId": "bf558c90-f694-4ad6-a779-014d0c135819",
+    "graphVersion": 2
+  },
+  "comprehension": {
+    "modules": [
+      {
+        "id": "3231fa31-0384-4228-9d84-6784110f3298",
+        "label": "signal-app",
+        "dir": "app",
+        "fileCount": 13,
+        "confidence": 0.95,
+        "fanIn": 0,
+        "fanOut": 0,
+        "owners": [
+          "LocalSummarizer",
+          "LocalSummarizer.summarize",
+          "SignalApp",
+          "SignalApp.start",
+          "SignalApp.shutdown",
+          "SignalApp.isRunning",
+          "createDocument",
+          "updateDocument",
+          "linkDocuments",
+          "deleteDocument",
+          "GraphBuilder",
+          "GraphBuilder.buildGraph",
+          "GraphBuilder.findClusters",
+          "GraphBuilder.findHubs",
+          "ExportPlugin",
+          "ExportPlugin.activate",
+          "ExportPlugin.deactivate",
+          "ExportPlugin.exportToMarkdown",
+          "PluginHost",
+          "PluginHost.register",
+          "Summarizer",
+          "AppConfig",
+          "Document",
+          "DocumentLink",
+          "LinkKind",
+          "SearchQuery",
+          "SearchResult",
+          "DocumentChange",
+          "GraphNode",
+          "AdjacencyList",
+          "Plugin",
+          "PluginContext",
+          "StorageEventType",
+          "StorageEventCreated",
+          "StorageEventUpdated",
+          "StorageEventDeleted",
+          "StorageEventLinked",
+          "StorageEvent",
+          "SyncState",
+          "VectorClock",
+          "SyncMessage"
+        ],
+        "evidence": [
+          {
+            "file": "C:\\vscode-projects\\signal\\app",
+            "derivation": "app/package.json found at app/package.json — explicit module boundary (javascript).",
+            "confidence": 0.95
+          },
+          {
+            "file": "C:\\vscode-projects\\signal\\app\\package.json",
+            "derivation": "package.json defines the module name and version.",
+            "confidence": 0.98
+          }
+        ]
+      }
+    ],
+    "contracts": [
+      {
+        "id": "e2342b69-f87b-4daa-9a9c-134769871c8c",
+        "label": "SignalApp.start",
+        "signature": "SignalApp.start(dataPath?: string): void",
+        "confidence": 0.7,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/core/app.ts",
+            "startLine": 51,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "714d26f8-dc89-4887-9623-f84c637dca56",
+        "label": "SignalApp.shutdown",
+        "signature": "SignalApp.shutdown(dataPath?: string): void",
+        "confidence": 0.7,
+        "sideEffects": [
+          "database"
+        ],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/core/app.ts",
+            "startLine": 59,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: database.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "e68297b9-78f1-4dd7-8a94-7471b5a6bb83",
+        "label": "ExportPlugin.activate",
+        "signature": "ExportPlugin.activate(context: PluginContext): void",
+        "confidence": 0.7,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/plugins/export.ts",
+            "startLine": 12,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "6b417636-79d9-4315-aff7-2a62e73606ae",
+        "label": "ExportPlugin.deactivate",
+        "signature": "ExportPlugin.deactivate(): void",
+        "confidence": 0.7,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/plugins/export.ts",
+            "startLine": 16,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "d0edfce0-7d55-4a8b-adb4-74bb08cb219d",
+        "label": "PluginHost.register",
+        "signature": "PluginHost.register(plugin: Plugin): void",
+        "confidence": 0.7,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/plugins/host.ts",
+            "startLine": 29,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "7dffc4e4-6861-4812-b367-e940a34750c2",
+        "label": "Contract: Document",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "636e47b2-5b46-4eb6-8260-e7791e5c6cfb",
+        "label": "Contract: DocumentLink",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "6b2b1847-36d6-46c5-a1a0-0f6a70e4be64",
+        "label": "Contract: LinkKind",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "9b50cbb7-643b-409a-8cc7-247bfb6a197f",
+        "label": "Contract: SearchQuery",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "9b6c476f-080d-479f-be91-08ddd078c5f7",
+        "label": "Contract: SearchResult",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "cf5553fd-a251-4224-a2f4-e2be63a06cb1",
+        "label": "Contract: DocumentChange",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "7f73b7ec-ea9c-4357-b085-9306ea442d1b",
+        "label": "Contract: GraphNode",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "a87b98b0-a54a-4f4f-9854-92254d6258f4",
+        "label": "Contract: AdjacencyList",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "ec6729f5-8ef4-489b-9c78-810f3c22992d",
+        "label": "Contract: StorageEvent",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "d5d9c119-6a52-4bca-88a9-338b2db7a841",
+        "label": "Contract: SyncMessage",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "b72e2ccb-9fd3-44ee-9e00-784e2cb39963",
+        "label": "Contract: VectorClock",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "c2c4ed26-34ef-4226-8e1e-c1d319c0ec7e",
+        "label": "Contract: Plugin",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "2079e3a1-33a4-4334-af26-3d1952e80724",
+        "label": "Contract: PluginContext",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "716eabb2-f03f-4159-ab4a-3a775f872e6c",
+        "label": "LocalSummarizer",
+        "signature": "LocalSummarizer",
+        "confidence": 0.88,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/ai/summarizer.ts",
+            "startLine": 11,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "3774526e-7cab-406b-893e-879435504aab",
+        "label": "SignalApp",
+        "signature": "SignalApp",
+        "confidence": 0.88,
+        "sideEffects": [
+          "database"
+        ],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/core/app.ts",
+            "startLine": 19,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: database.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "e7eea29e-8d1e-4009-8390-dc4fe1aeb7b6",
+        "label": "GraphBuilder",
+        "signature": "GraphBuilder",
+        "confidence": 0.88,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/graph/builder.ts",
+            "startLine": 19,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "2c008e18-7981-4519-9d29-428bbd0aa436",
+        "label": "ExportPlugin",
+        "signature": "ExportPlugin",
+        "confidence": 0.88,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/plugins/export.ts",
+            "startLine": 7,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "efa04071-ba6c-43b9-92f4-63e425dc2d89",
+        "label": "PluginHost",
+        "signature": "PluginHost",
+        "confidence": 0.88,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/plugins/host.ts",
+            "startLine": 20,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "c10c54d0-b1eb-43dc-b9b2-c9b995ce7f87",
+        "label": "LocalSummarizer.summarize",
+        "signature": "LocalSummarizer.summarize(document: Document): Promise<string>",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/ai/summarizer.ts",
+            "startLine": 18,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "216ea49e-11d0-48cf-9c0b-929ea22ef0a6",
+        "label": "SignalApp.isRunning",
+        "signature": "SignalApp.isRunning(): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/core/app.ts",
+            "startLine": 73,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "630b3cf8-f4de-4eae-ad2d-9078053b53e3",
+        "label": "createDocument",
+        "signature": "createDocument(store: DocumentStore, title: string, content: string, tags: string[]): Document",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 14,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "4bd21ff5-720b-40d0-8bf7-7e6b878ba147",
+        "label": "updateDocument",
+        "signature": "updateDocument(store: DocumentStore, id: string, changes: DocumentChange): Document | undefined",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 24,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "8e0b1867-5c36-4783-a535-46ec2efbd01f",
+        "label": "linkDocuments",
+        "signature": "linkDocuments(store: DocumentStore, sourceId: string, targetId: string, kind: LinkKind): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 32,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "1a30b0f4-2501-4211-9129-9090c3d423b5",
+        "label": "deleteDocument",
+        "signature": "deleteDocument(store: DocumentStore, id: string): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 42,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "edfc60f3-d964-4f0f-a2f1-f8b2c5652898",
+        "label": "GraphBuilder.buildGraph",
+        "signature": "GraphBuilder.buildGraph(): AdjacencyList",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/graph/builder.ts",
+            "startLine": 22,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "43cdaf88-ec27-4f4e-93dc-32339ed2c38a",
+        "label": "GraphBuilder.findClusters",
+        "signature": "GraphBuilder.findClusters(): string[][]",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/graph/builder.ts",
+            "startLine": 43,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "ded2ef85-8776-420f-8761-878ea0834a41",
+        "label": "GraphBuilder.findHubs",
+        "signature": "GraphBuilder.findHubs(minLinks: number): GraphNode[]",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/graph/builder.ts",
+            "startLine": 74,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "b9c55b51-4d20-48c0-9657-48ef12edc3cb",
+        "label": "ExportPlugin.exportToMarkdown",
+        "signature": "ExportPlugin.exportToMarkdown(): string",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/plugins/export.ts",
+            "startLine": 20,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      }
+    ],
+    "invariants": [
+      {
+        "id": "30813070-68f5-427a-a4a3-6b4ef4fcce43",
+        "label": "guard: Guard clause (null/undefined check)",
+        "description": "Detected 1 occurrence(s) of guard pattern across 1 file(s) in module 'signal-app'. Example: \"if (!existing) return undefined;\"",
+        "confidence": 0.65,
+        "evidence": [
+          {
+            "file": "app/src/storage/store.ts",
+            "startLine": 46,
+            "derivation": "Guard clause (null/undefined check) pattern detected by static analysis (regex: guard).",
+            "confidence": 0.72
+          }
+        ]
+      }
+    ],
+    "services": [
+      {
+        "id": "05d2ca03-c8ef-44c7-ac5f-7ec13a6a8434",
+        "label": "CoreTypes",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "288d52cd-1d29-45d7-87a1-c0b60876adff",
+        "label": "SignalApp",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "8587cd92-66d3-4ccd-82dd-2e0c22a47ce2",
+        "label": "DocumentStore",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "3fe0a73a-3953-45e1-b6cd-14d8da812d79",
+        "label": "StorageEventBus",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "08619d6d-cafb-4247-b64f-8bc3d3b93e48",
+        "label": "EditorOperations",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "7dc5c0fc-25a8-4a85-8ca2-ec0a3c227f2d",
+        "label": "GraphBuilder",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "6576e1a0-5472-4be8-8d10-5855339a372e",
+        "label": "PluginHost",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "36199d01-2b6a-4ec9-a3b9-7cbc2761138f",
+        "label": "ExportPlugin",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "aa8e7040-2d46-4d52-a2ad-c2bbfa783151",
+        "label": "SearchPlugin",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "745e2787-582f-4389-a1e1-d311bd3e1fcd",
+        "label": "SyncEngine",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "be6364f6-c1c7-4a40-8216-aa4049ff1d82",
+        "label": "SyncProtocol",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "ccc54288-1095-4103-a052-02e55dbbc114",
+        "label": "LocalSummarizer",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "f55a8b0b-967f-4be0-8932-30cdc8ba1179",
+        "label": "UIRenderer",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      }
+    ]
+  },
+  "lineage": [],
+  "drift": [],
+  "proposals": [],
+  "lowConfidenceNodes": [],
+  "suggestions": [
+    "Comprehension model looks healthy. Run `loom drift` to check for fresh divergence."
+  ],
+  "executiveSummary": "- Signal is a modestly-scoped application consisting of a single module with 33 contracts, 13 service routes, and 1 invariant, suggesting a self-contained system with straightforward internal structure.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-mapped and stable with no known gaps in understanding.\n- The single-module architecture with no fan-in or fan-out coupling and zero architectural lineage events suggests the system either operates in isolation or its integration points have not yet been documented—this warrants clarification.\n- The low invariant count (1 across 33 contracts) is a concern; critical business rules may be implicit rather than explicitly captured, increasing risk of unintended behavioral changes during future development.\n- Recommended next steps: (1) verify whether external integrations exist and document any missing lineage events, (2) conduct an invariant discovery pass to surface and formalize implicit business rules, and (3) establish baseline coupling and evolution tracking before the system grows beyond its current single-module boundary."
+}

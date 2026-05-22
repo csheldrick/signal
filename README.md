@@ -91,11 +91,8 @@ mkdir signal && cd signal
 pnpm init
 mkdir -p app/src workspace
 
-# initialize Loom workspace (creates .loom/ with config.json + SQLite DB)
-loom init
-
-# Loom explores the codebase and crystallizes knowledge
-loom explore .
+# initialize and onboard — creates .loom/, analyzes source, crystallizes knowledge
+loom onboard
 
 # Loom exports structural graph for Weave consumption
 # (LoomExporter builds LoomExport from the semantic graph)
@@ -107,7 +104,7 @@ loom explore .
 # Weave fires execution intents when activation thresholds cross
 # runtime.dispatchIntent(intent)  — Utilis handles execution
 
-# Query the system
+# Query the system (available after onboard completes)
 loom topology           # visualize dependency graph
 loom lineage <path>     # trace why something exists
 loom explain <node>     # explain with evidence

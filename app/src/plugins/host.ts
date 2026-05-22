@@ -1,0 +1,56 @@
+// ── Plugin Host ─────────────────────────────────────────────
+// Plugin lifecycle manager. Defines the sandbox boundary.
+// Plugins receive a PluginContext — NOT the store directly.
+
+import type { Document, SearchQuery, SearchResult } from '../core/types.js';
+
+export interface Plugin {
+  id: string;
+  name: string;
+  activate(context: PluginContext): void;
+  deactivate(): void;
+}
+
+export interface PluginContext {
+  listDocuments(): Document[];
+  searchDocuments(query: SearchQuery): SearchResult[];
+  getDocument(id: string): Document | undefined;
+}
+
+export class PluginHost {
+  private plugins: Map<string, Plugin> = new Map();
+  private enabled: Set<string> = new Set();
+  private context: PluginContext;
+
+  constructor(context: PluginContext) {
+    this.context = context;
+  }
+
+  register(plugin: Plugin): void {
+    this.plugins.set(plugin.id, plugin);
+  }
+
+  enable(pluginId: string): boolean {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin || this.enabled.has(pluginId)) return false;
+    plugin.activate(this.context);
+    this.enabled.add(pluginId);
+    return true;
+  }
+
+  disable(pluginId: string): boolean {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin || !this.enabled.has(pluginId)) return false;
+    plugin.deactivate();
+    this.enabled.delete(pluginId);
+    return true;
+  }
+
+  list(): Array<{ id: string; name: string; enabled: boolean }> {
+    return Array.from(this.plugins.values()).map(p => ({
+      id: p.id,
+      name: p.name,
+      enabled: this.enabled.has(p.id),
+    }));
+  }
+}

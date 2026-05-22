@@ -9,6 +9,7 @@
     "test": "echo \"No tests configured yet\""
   },
   "devDependencies": {
+    "@types/node": "^25.9.1",
     "typescript": "^5.5.0"
   }
 }
