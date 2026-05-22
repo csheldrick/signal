@@ -86,24 +86,25 @@ Source code + git history
 ## Suggested Development Flow
 
 ```bash
-# initialize project
-mkdir signal && cd signal
-pnpm init
-mkdir -p app/src workspace
-
-# initialize and onboard — creates .loom/, analyzes source, crystallizes knowledge
+# Step 1: onboard — init + explore + crystallize + topology in one command
+cd signal
 loom onboard
 
-# Loom exports structural graph for Weave consumption
-# (LoomExporter builds LoomExport from the semantic graph)
+# Step 2: build the Signal app source
+cd app && npm install && npm run build && cd ..
 
-# Weave runtime starts, imports Loom export, runs tick loop
-# runtime.importFromLoom(export)  — merges into substrate
-# runtime.start()                 — begins tick-based scheduling
+# Step 3: install and build the runner
+cd runner && npm install && npm run build
 
-# Weave fires execution intents when activation thresholds cross
-# runtime.dispatchIntent(intent)  — Utilis handles execution
+# Step 4: run — starts Weave, imports the Loom graph, runs the tick loop
+npm start
+```
 
+**Note:** Weave has no standalone CLI. `runner/` is how you run it for Signal —
+it instantiates `ContinuityRuntime`, imports the Loom graph, wires Utilis,
+and calls `runtime.start()`.
+
+```bash
 # Query the system (available after onboard completes)
 loom topology           # visualize dependency graph
 loom lineage <path>     # trace why something exists

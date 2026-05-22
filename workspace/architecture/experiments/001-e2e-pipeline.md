@@ -24,8 +24,18 @@ Expected output: Loom produces a `LoomExport` containing:
 
 ### Phase 2: Cognitive import (Weave)
 
+Weave has no CLI. Run it via the Signal runner:
+
+```bash
+cd signal/runner
+npm install && npm run build
+npm start
+```
+
+The runner (`runner/src/index.ts`) does this:
+
 ```typescript
-import { ContinuityRuntime } from 'weave';
+import { ContinuityRuntime, ContradictionDetectionOperator } from 'weave';
 
 const runtime = new ContinuityRuntime({ dbPath: '.weave/substrate.db' });
 const loomExport = /* load from Loom */;

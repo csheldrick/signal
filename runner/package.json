@@ -1,0 +1,22 @@
+{
+  "name": "signal-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Signal experiment runner — wires Loom, Weave, and Utilis together",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts"
+  },
+  "dependencies": {
+    "weave": "file:../../weave",
+    "@loom/graph": "file:../../loom/packages/graph",
+    "@loom/types": "file:../../loom/packages/types",
+    "@utilis/core": "file:../../utilis/packages/core"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}
