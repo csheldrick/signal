@@ -6,10 +6,11 @@
   "description": "Signal — a local-first collaborative knowledge workspace",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"No tests configured yet\""
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
   }
 }
