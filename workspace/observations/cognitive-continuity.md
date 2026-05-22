@@ -8,6 +8,7 @@ memory of what changed, what was recently edited, or what architectural decision
 to the current structure.
 
 This means the tool cannot answer questions like:
+
 - "Which files have been most actively changed in the last sprint?"
 - "Which boundary violation was introduced most recently?"
 - "Is this module drifting away from its original purpose?"
@@ -36,20 +37,6 @@ reverberates all the way to the UI layer, giving the team a live map of blast ra
 Git also has no concept of architectural rules. A commit that introduces a boundary
 violation looks identical to one that doesn't. Weave's operator layer encodes those
 rules and fires when they are broken.
-
-## What this means for the runner
-
-The runner (`runner/src/index.ts`) is not just a test harness — it is the **cognitive
-bootstrap**. The first time you run it, Weave has no memory. After twenty ticks, it
-has observed the current activation state, detected tensions, and persisted both to
-`.weave/substrate.db`.
-
-The *second* time you run the runner (after making code changes), Weave *loads its
-previous state* and diffs it against the new Loom export. It knows which nodes are
-new, which changed, and which disappeared. The activation it injects is not arbitrary
-— it reflects the actual delta between snapshots.
-
-This is the flywheel: each run makes the substrate more faithful to reality.
 
 ## The handoff problem
 

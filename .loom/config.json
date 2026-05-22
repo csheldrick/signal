@@ -1,11 +1,18 @@
 {
-  "graphId": "bf558c90-f694-4ad6-a779-014d0c135819",
+  "graphId": "19516acf-ce24-41b7-990b-b0020b81d9af",
   "name": "signal",
   "type": "application",
   "dbPath": ".loom/loom.db",
+  "exclude": [
+    ".github/",
+    ".weave/",
+    ".loom/",
+    ".context/",
+    "scripts/"
+  ],
   "llm": {
     "provider": "copilot",
-    "model": "claude-sonnet-4.6",
+    "model": "gpt-5-mini",
     "semanticProvider": "copilot",
     "semanticModel": "gpt-5-mini"
   },
@@ -16,5 +23,5 @@
     "claude": false,
     "appendMode": true
   },
-  "createdAt": "2026-05-22T14:21:16.768Z"
+  "createdAt": "2026-05-22T21:59:35.898Z"
 }

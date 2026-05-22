@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-05-22T17:55:23.308Z",
+  "generatedAt": "2026-05-22T22:00:31.469Z",
   "project": {
     "name": "signal",
     "type": "application",
-    "graphId": "bf558c90-f694-4ad6-a779-014d0c135819",
-    "graphVersion": 8
+    "graphId": "19516acf-ce24-41b7-990b-b0020b81d9af",
+    "graphVersion": 2
   },
   "comprehension": {
     "modules": [
       {
-        "id": "3231fa31-0384-4228-9d84-6784110f3298",
+        "id": "e5467d77-487d-419f-8235-77c38f4d1b16",
         "label": "signal-app",
         "dir": "app",
         "fileCount": 20,
@@ -19,6 +19,13 @@
         "owners": [
           "LocalSummarizer",
           "LocalSummarizer.summarize",
+          "PresenceTracker",
+          "PresenceTracker.join",
+          "PresenceTracker.leave",
+          "PresenceTracker.getActive",
+          "PresenceTracker.getViewers",
+          "PresenceTracker.focusDocument",
+          "PresenceTracker.summary",
           "SignalApp",
           "SignalApp.start",
           "SignalApp.shutdown",
@@ -30,14 +37,9 @@
           "GraphBuilder",
           "GraphBuilder.buildGraph",
           "GraphBuilder.findClusters",
-          "GraphBuilder.findHubs",
-          "ExportPlugin",
-          "ExportPlugin.activate",
-          "ExportPlugin.deactivate",
-          "ExportPlugin.exportToMarkdown",
-          "PluginHost",
-          "PluginHost.register",
           "Summarizer",
+          "PresenceStatus",
+          "PeerPresence",
           "AppConfig",
           "Document",
           "DocumentLink",
@@ -47,6 +49,8 @@
           "DocumentChange",
           "GraphNode",
           "AdjacencyList",
+          "IndexStats",
+          "SearchHit",
           "Plugin",
           "PluginContext",
           "StorageEventType",
@@ -55,32 +59,21 @@
           "StorageEventDeleted",
           "StorageEventLinked",
           "StorageEvent",
-          "SyncState",
-          "VectorClock",
-          "SyncMessage",
-          "PresenceTracker",
-          "PresenceTracker.join",
-          "PresenceTracker.leave",
-          "PresenceTracker.getActive",
-          "PresenceTracker.getViewers",
-          "PresenceTracker.focusDocument",
-          "PresenceTracker.summary",
-          "PresenceStatus",
-          "PeerPresence",
-          "IndexStats",
-          "SearchHit",
-          "DocumentVersion",
-          "VersionDiff",
           "ConflictCandidate",
           "ConflictResolution",
           "TransportSend",
           "SyncManagerOptions",
+          "SyncState",
           "ConflictStrategy",
           "PeerInfo",
           "SyncAck",
           "ConflictRecord",
+          "VectorClock",
+          "SyncMessage",
           "QueueEntry",
-          "SyncQueueOptions"
+          "SyncQueueOptions",
+          "DocumentVersion",
+          "VersionDiff"
         ],
         "evidence": [
           {
@@ -94,33 +87,27 @@
             "confidence": 0.98
           }
         ]
-      },
-      {
-        "id": "dd441966-1fdb-4ac7-8430-c91ce53511a4",
-        "label": "signal-runner",
-        "dir": "runner",
-        "fileCount": 1,
-        "confidence": 0.95,
-        "fanIn": 0,
-        "fanOut": 0,
-        "owners": [],
-        "evidence": [
-          {
-            "file": "C:\\vscode-projects\\signal\\runner",
-            "derivation": "runner/package.json found at runner/package.json — explicit module boundary (javascript).",
-            "confidence": 0.95
-          },
-          {
-            "file": "C:\\vscode-projects\\signal\\runner\\package.json",
-            "derivation": "package.json defines the module name and version.",
-            "confidence": 0.98
-          }
-        ]
       }
     ],
     "contracts": [
       {
-        "id": "e2342b69-f87b-4daa-9a9c-134769871c8c",
+        "id": "291e5078-2a5d-4f8f-a91c-fc0fc17be844",
+        "label": "PresenceTracker.leave",
+        "signature": "PresenceTracker.leave(peerId: string): void",
+        "confidence": 0.7,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 48,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.7
+          }
+        ]
+      },
+      {
+        "id": "d91242ec-2aef-4e58-ae1c-3deb8ccea2f1",
         "label": "SignalApp.start",
         "signature": "SignalApp.start(dataPath?: string): void",
         "confidence": 0.7,
@@ -136,7 +123,7 @@
         ]
       },
       {
-        "id": "714d26f8-dc89-4887-9623-f84c637dca56",
+        "id": "e10cd6df-df30-484f-9248-b76a0b91dd91",
         "label": "SignalApp.shutdown",
         "signature": "SignalApp.shutdown(dataPath?: string): void",
         "confidence": 0.7,
@@ -154,71 +141,7 @@
         ]
       },
       {
-        "id": "e68297b9-78f1-4dd7-8a94-7471b5a6bb83",
-        "label": "ExportPlugin.activate",
-        "signature": "ExportPlugin.activate(context: PluginContext): void",
-        "confidence": 0.7,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/plugins/export.ts",
-            "startLine": 12,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.7
-          }
-        ]
-      },
-      {
-        "id": "6b417636-79d9-4315-aff7-2a62e73606ae",
-        "label": "ExportPlugin.deactivate",
-        "signature": "ExportPlugin.deactivate(): void",
-        "confidence": 0.7,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/plugins/export.ts",
-            "startLine": 16,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.7
-          }
-        ]
-      },
-      {
-        "id": "d0edfce0-7d55-4a8b-adb4-74bb08cb219d",
-        "label": "PluginHost.register",
-        "signature": "PluginHost.register(plugin: Plugin): void",
-        "confidence": 0.7,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/plugins/host.ts",
-            "startLine": 29,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.7
-          }
-        ]
-      },
-      {
-        "id": "d90bbc2c-100d-4e66-9884-20b6d57a8a14",
-        "label": "PresenceTracker.leave",
-        "signature": "PresenceTracker.leave(peerId: string): void",
-        "confidence": 0.7,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/collaboration/presence.ts",
-            "startLine": 48,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.7
-          }
-        ]
-      },
-      {
-        "id": "7dffc4e4-6861-4812-b367-e940a34750c2",
+        "id": "901bbfb7-c559-4288-819d-77b608159b63",
         "label": "Contract: Document",
         "signature": "",
         "confidence": 0.85,
@@ -227,7 +150,7 @@
         "evidence": []
       },
       {
-        "id": "636e47b2-5b46-4eb6-8260-e7791e5c6cfb",
+        "id": "a8f56cd2-852c-4cd9-bcd0-5d6f9e7ff8ca",
         "label": "Contract: DocumentLink",
         "signature": "",
         "confidence": 0.85,
@@ -236,34 +159,7 @@
         "evidence": []
       },
       {
-        "id": "6b2b1847-36d6-46c5-a1a0-0f6a70e4be64",
-        "label": "Contract: LinkKind",
-        "signature": "",
-        "confidence": 0.85,
-        "sideEffects": [],
-        "module": "",
-        "evidence": []
-      },
-      {
-        "id": "9b50cbb7-643b-409a-8cc7-247bfb6a197f",
-        "label": "Contract: SearchQuery",
-        "signature": "",
-        "confidence": 0.85,
-        "sideEffects": [],
-        "module": "",
-        "evidence": []
-      },
-      {
-        "id": "9b6c476f-080d-479f-be91-08ddd078c5f7",
-        "label": "Contract: SearchResult",
-        "signature": "",
-        "confidence": 0.85,
-        "sideEffects": [],
-        "module": "",
-        "evidence": []
-      },
-      {
-        "id": "cf5553fd-a251-4224-a2f4-e2be63a06cb1",
+        "id": "70a5164d-0915-4936-90f7-3c19e62997f8",
         "label": "Contract: DocumentChange",
         "signature": "",
         "confidence": 0.85,
@@ -272,8 +168,8 @@
         "evidence": []
       },
       {
-        "id": "7f73b7ec-ea9c-4357-b085-9306ea442d1b",
-        "label": "Contract: GraphNode",
+        "id": "ac5e500b-0cfd-4113-a5ae-9e44bb4d8700",
+        "label": "Contract: SearchQuery",
         "signature": "",
         "confidence": 0.85,
         "sideEffects": [],
@@ -281,8 +177,8 @@
         "evidence": []
       },
       {
-        "id": "a87b98b0-a54a-4f4f-9854-92254d6258f4",
-        "label": "Contract: AdjacencyList",
+        "id": "8369bde2-f1d4-4232-a0b0-4380dd275c0e",
+        "label": "Contract: SearchResult",
         "signature": "",
         "confidence": 0.85,
         "sideEffects": [],
@@ -290,8 +186,8 @@
         "evidence": []
       },
       {
-        "id": "ec6729f5-8ef4-489b-9c78-810f3c22992d",
-        "label": "Contract: StorageEvent",
+        "id": "38be27dc-0327-4d65-a0a9-6168399e8a55",
+        "label": "Contract: SearchHit",
         "signature": "",
         "confidence": 0.85,
         "sideEffects": [],
@@ -299,16 +195,7 @@
         "evidence": []
       },
       {
-        "id": "d5d9c119-6a52-4bca-88a9-338b2db7a841",
-        "label": "Contract: SyncMessage",
-        "signature": "",
-        "confidence": 0.85,
-        "sideEffects": [],
-        "module": "",
-        "evidence": []
-      },
-      {
-        "id": "b72e2ccb-9fd3-44ee-9e00-784e2cb39963",
+        "id": "3faab10c-120f-4754-b306-2bbb491c9d7b",
         "label": "Contract: VectorClock",
         "signature": "",
         "confidence": 0.85,
@@ -317,7 +204,97 @@
         "evidence": []
       },
       {
-        "id": "c2c4ed26-34ef-4226-8e1e-c1d319c0ec7e",
+        "id": "4190e800-a29e-4f22-abf9-6426a36b2c34",
+        "label": "Contract: SyncMessage",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "0b25ee3e-4985-4379-ae34-806946e4108d",
+        "label": "Contract: SyncAck",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "b95b0e0b-7d12-46e9-b7e9-e326e8563e96",
+        "label": "Contract: PeerInfo",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "cc1dc329-a25b-46bb-adc6-a0f894e20649",
+        "label": "Contract: ConflictRecord",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "19e67cb4-9e36-4b67-93df-1f832a9ba9c1",
+        "label": "Contract: ConflictCandidate",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "fad091dc-8274-46ec-a773-4aea0e9f7255",
+        "label": "Contract: ConflictResolution",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "a92f434d-ec9f-4b33-86dc-6a7dd5069c21",
+        "label": "Contract: StorageEvent",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "4df66c01-7bab-4433-9411-a454a595850b",
+        "label": "Contract: GraphNode",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "d4391e7f-962e-49c5-92d3-8dc443ed8145",
+        "label": "Contract: AdjacencyList",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "f1b246f1-8a8f-4b92-b7ba-4b076ed8a0e4",
+        "label": "Contract: IndexStats",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "228754d2-d5c3-469a-9af7-e3c93bbe89f1",
         "label": "Contract: Plugin",
         "signature": "",
         "confidence": 0.85,
@@ -326,7 +303,7 @@
         "evidence": []
       },
       {
-        "id": "2079e3a1-33a4-4334-af26-3d1952e80724",
+        "id": "ea240376-647b-4dee-90d7-0d69a5bfb637",
         "label": "Contract: PluginContext",
         "signature": "",
         "confidence": 0.85,
@@ -335,7 +312,16 @@
         "evidence": []
       },
       {
-        "id": "716eabb2-f03f-4159-ab4a-3a775f872e6c",
+        "id": "62734073-824d-45e9-973e-5edde3883fec",
+        "label": "Contract: PeerSession",
+        "signature": "",
+        "confidence": 0.85,
+        "sideEffects": [],
+        "module": "",
+        "evidence": []
+      },
+      {
+        "id": "addd1809-5600-43a1-b2eb-723cc53cf74c",
         "label": "LocalSummarizer",
         "signature": "LocalSummarizer",
         "confidence": 0.88,
@@ -351,7 +337,23 @@
         ]
       },
       {
-        "id": "3774526e-7cab-406b-893e-879435504aab",
+        "id": "805114ec-3236-4d47-9037-5a4f511a2b7d",
+        "label": "PresenceTracker",
+        "signature": "PresenceTracker",
+        "confidence": 0.88,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 29,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "00ff1032-0a08-42bb-b40b-be67f771603e",
         "label": "SignalApp",
         "signature": "SignalApp",
         "confidence": 0.88,
@@ -369,7 +371,7 @@
         ]
       },
       {
-        "id": "e7eea29e-8d1e-4009-8390-dc4fe1aeb7b6",
+        "id": "2d99dd40-ff7b-40b2-b68a-71fc8a272873",
         "label": "GraphBuilder",
         "signature": "GraphBuilder",
         "confidence": 0.88,
@@ -385,55 +387,7 @@
         ]
       },
       {
-        "id": "2c008e18-7981-4519-9d29-428bbd0aa436",
-        "label": "ExportPlugin",
-        "signature": "ExportPlugin",
-        "confidence": 0.88,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/plugins/export.ts",
-            "startLine": 7,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.88
-          }
-        ]
-      },
-      {
-        "id": "efa04071-ba6c-43b9-92f4-63e425dc2d89",
-        "label": "PluginHost",
-        "signature": "PluginHost",
-        "confidence": 0.88,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/plugins/host.ts",
-            "startLine": 20,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.88
-          }
-        ]
-      },
-      {
-        "id": "3163e304-02c4-48a0-bb6c-bee597c5995c",
-        "label": "PresenceTracker",
-        "signature": "PresenceTracker",
-        "confidence": 0.88,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/collaboration/presence.ts",
-            "startLine": 29,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.88
-          }
-        ]
-      },
-      {
-        "id": "c10c54d0-b1eb-43dc-b9b2-c9b995ce7f87",
+        "id": "25c5f0d2-0f79-4df8-a236-c52d18f46bcb",
         "label": "LocalSummarizer.summarize",
         "signature": "LocalSummarizer.summarize(document: Document): Promise<string>",
         "confidence": 0.95,
@@ -449,151 +403,7 @@
         ]
       },
       {
-        "id": "216ea49e-11d0-48cf-9c0b-929ea22ef0a6",
-        "label": "SignalApp.isRunning",
-        "signature": "SignalApp.isRunning(): boolean",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/core/app.ts",
-            "startLine": 73,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "630b3cf8-f4de-4eae-ad2d-9078053b53e3",
-        "label": "createDocument",
-        "signature": "createDocument(store: DocumentStore, title: string, content: string, tags: string[]): Document",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/editor/operations.ts",
-            "startLine": 14,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "4bd21ff5-720b-40d0-8bf7-7e6b878ba147",
-        "label": "updateDocument",
-        "signature": "updateDocument(store: DocumentStore, id: string, changes: DocumentChange): Document | undefined",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/editor/operations.ts",
-            "startLine": 24,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "8e0b1867-5c36-4783-a535-46ec2efbd01f",
-        "label": "linkDocuments",
-        "signature": "linkDocuments(store: DocumentStore, sourceId: string, targetId: string, kind: LinkKind): boolean",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/editor/operations.ts",
-            "startLine": 32,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "1a30b0f4-2501-4211-9129-9090c3d423b5",
-        "label": "deleteDocument",
-        "signature": "deleteDocument(store: DocumentStore, id: string): boolean",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/editor/operations.ts",
-            "startLine": 42,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "edfc60f3-d964-4f0f-a2f1-f8b2c5652898",
-        "label": "GraphBuilder.buildGraph",
-        "signature": "GraphBuilder.buildGraph(): AdjacencyList",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/graph/builder.ts",
-            "startLine": 22,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "43cdaf88-ec27-4f4e-93dc-32339ed2c38a",
-        "label": "GraphBuilder.findClusters",
-        "signature": "GraphBuilder.findClusters(): string[][]",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/graph/builder.ts",
-            "startLine": 43,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "ded2ef85-8776-420f-8761-878ea0834a41",
-        "label": "GraphBuilder.findHubs",
-        "signature": "GraphBuilder.findHubs(minLinks: number): GraphNode[]",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/graph/builder.ts",
-            "startLine": 74,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "b9c55b51-4d20-48c0-9657-48ef12edc3cb",
-        "label": "ExportPlugin.exportToMarkdown",
-        "signature": "ExportPlugin.exportToMarkdown(): string",
-        "confidence": 0.95,
-        "sideEffects": [],
-        "module": "signal-app",
-        "evidence": [
-          {
-            "file": "app/src/plugins/export.ts",
-            "startLine": 20,
-            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
-            "confidence": 0.95
-          }
-        ]
-      },
-      {
-        "id": "9756ca51-f424-4dc7-8ebf-1095e9967dde",
+        "id": "29ce0b28-22e7-4d5e-a7e0-e4b060e05cce",
         "label": "PresenceTracker.join",
         "signature": "PresenceTracker.join(peerId: string, documentId?: string): PeerPresence",
         "confidence": 0.95,
@@ -609,7 +419,7 @@
         ]
       },
       {
-        "id": "1c37d9af-4bac-439f-b2b1-fdab227b81e4",
+        "id": "dccd50d2-3044-4030-af64-fc053c49d2e7",
         "label": "PresenceTracker.getActive",
         "signature": "PresenceTracker.getActive(): PeerPresence[]",
         "confidence": 0.95,
@@ -625,7 +435,7 @@
         ]
       },
       {
-        "id": "64bb802e-d7fa-4fe3-b555-764bed2b95be",
+        "id": "e807e14a-cb41-4c9f-85e5-3f074cfea781",
         "label": "PresenceTracker.getViewers",
         "signature": "PresenceTracker.getViewers(documentId: string): PeerPresence[]",
         "confidence": 0.95,
@@ -641,7 +451,7 @@
         ]
       },
       {
-        "id": "b685b3a0-a2bc-4e5c-9f3c-2f8d6e7e5011",
+        "id": "f03797a4-ddcc-4fef-966d-79c6341f57e9",
         "label": "PresenceTracker.focusDocument",
         "signature": "PresenceTracker.focusDocument(peerId: string, documentId: string): boolean",
         "confidence": 0.95,
@@ -657,7 +467,7 @@
         ]
       },
       {
-        "id": "a979709e-5ef1-4841-a3d0-ad432c539619",
+        "id": "1d4a562f-f9c9-42e9-9ce9-d76d9bf12495",
         "label": "PresenceTracker.summary",
         "signature": "PresenceTracker.summary(): {\n    active: number;\n    idle: number;\n    offline: number;\n}",
         "confidence": 0.95,
@@ -671,24 +481,136 @@
             "confidence": 0.95
           }
         ]
+      },
+      {
+        "id": "64c4df26-034f-450d-b5d9-0a96d4f12cac",
+        "label": "SignalApp.isRunning",
+        "signature": "SignalApp.isRunning(): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/core/app.ts",
+            "startLine": 73,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "bdeb4771-62e5-4db3-8b69-90c91a54b6fd",
+        "label": "createDocument",
+        "signature": "createDocument(store: DocumentStore, title: string, content: string, tags: string[]): Document",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 14,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "e635180f-71ba-40c1-bc33-b2f7b1cf30de",
+        "label": "updateDocument",
+        "signature": "updateDocument(store: DocumentStore, id: string, changes: DocumentChange): Document | undefined",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 24,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "7be3eb2e-2030-4d19-bb97-9ff8e98a4052",
+        "label": "linkDocuments",
+        "signature": "linkDocuments(store: DocumentStore, sourceId: string, targetId: string, kind: LinkKind): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 32,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "7d7da7d9-6c7e-4546-91a0-0d23aea4683d",
+        "label": "deleteDocument",
+        "signature": "deleteDocument(store: DocumentStore, id: string): boolean",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/editor/operations.ts",
+            "startLine": 42,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "c7827ec4-d591-4eef-bc36-519e05b722ab",
+        "label": "GraphBuilder.buildGraph",
+        "signature": "GraphBuilder.buildGraph(): AdjacencyList",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/graph/builder.ts",
+            "startLine": 22,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "129fd80e-b19d-4683-9163-b99f21740847",
+        "label": "GraphBuilder.findClusters",
+        "signature": "GraphBuilder.findClusters(): string[][]",
+        "confidence": 0.95,
+        "sideEffects": [],
+        "module": "signal-app",
+        "evidence": [
+          {
+            "file": "app/src/graph/builder.ts",
+            "startLine": 43,
+            "derivation": "Exported function signature extracted by static analysis. Side effects detected: none.",
+            "confidence": 0.95
+          }
+        ]
       }
     ],
     "invariants": [
       {
-        "id": "30813070-68f5-427a-a4a3-6b4ef4fcce43",
+        "id": "b0faf6fb-e1b9-47c1-988a-ec96eed6e24d",
         "label": "guard: Guard clause (null/undefined check)",
         "description": "Detected 3 occurrence(s) of guard pattern across 3 file(s) in module 'signal-app'. Example: \"if (!doc) return false;\"",
         "confidence": 0.88,
         "evidence": [
           {
-            "file": "app/src/storage/store.ts",
-            "startLine": 46,
+            "file": "app/src/collaboration/presence.ts",
+            "startLine": 67,
             "derivation": "Guard clause (null/undefined check) pattern detected by static analysis (regex: guard).",
             "confidence": 0.72
           },
           {
-            "file": "app/src/collaboration/presence.ts",
-            "startLine": 67,
+            "file": "app/src/indexing/index.ts",
+            "startLine": 39,
             "derivation": "Guard clause (null/undefined check) pattern detected by static analysis (regex: guard).",
             "confidence": 0.72
           }
@@ -697,181 +619,148 @@
     ],
     "services": [
       {
-        "id": "05d2ca03-c8ef-44c7-ac5f-7ec13a6a8434",
-        "label": "CoreTypes",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "288d52cd-1d29-45d7-87a1-c0b60876adff",
-        "label": "SignalApp",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "8587cd92-66d3-4ccd-82dd-2e0c22a47ce2",
+        "id": "d507f6df-1a69-47bc-96e0-c29ec95f8d4a",
         "label": "DocumentStore",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "3fe0a73a-3953-45e1-b6cd-14d8da812d79",
+        "id": "d8c403fb-ce25-47b8-88cd-123a566c6045",
         "label": "StorageEventBus",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "08619d6d-cafb-4247-b64f-8bc3d3b93e48",
-        "label": "EditorOperations",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "7dc5c0fc-25a8-4a85-8ca2-ec0a3c227f2d",
+        "id": "8213b52e-54ef-44b7-8ac9-1089d789e2e6",
         "label": "GraphBuilder",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "6576e1a0-5472-4be8-8d10-5855339a372e",
-        "label": "PluginHost",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "36199d01-2b6a-4ec9-a3b9-7cbc2761138f",
-        "label": "ExportPlugin",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "aa8e7040-2d46-4d52-a2ad-c2bbfa783151",
-        "label": "SearchPlugin",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "745e2787-582f-4389-a1e1-d311bd3e1fcd",
-        "label": "SyncEngine",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "be6364f6-c1c7-4a40-8216-aa4049ff1d82",
-        "label": "SyncProtocol",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "ccc54288-1095-4103-a052-02e55dbbc114",
-        "label": "LocalSummarizer",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "f55a8b0b-967f-4be0-8932-30cdc8ba1179",
-        "label": "UIRenderer",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "3e088ccf-30c6-4425-b99d-e221cc31b8a1",
-        "label": "app",
-        "method": "",
-        "path": "",
-        "confidence": 0.75
-      },
-      {
-        "id": "8eb5138e-a7c1-4fbe-8198-97981a57841d",
-        "label": "runner",
-        "method": "",
-        "path": "",
-        "confidence": 0.75
-      },
-      {
-        "id": "cfd8be11-17d2-4750-8bcf-9f1b8752f5c1",
-        "label": "ExperimentRunner",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "b3248c65-1322-4dca-9c78-b1594e18bd45",
+        "id": "46330dd3-33cf-4889-a7e9-29f5acb19661",
         "label": "InvertedIndex",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "3bd84923-448d-4db0-8757-ff3607ad3848",
-        "label": "PresenceTracker",
+        "id": "29872be3-3384-4b0c-b871-e5adea031669",
+        "label": "SyncEngine",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "1cf05bd8-149d-48d4-bf19-9668c77267f6",
-        "label": "VersionHistory",
-        "method": "",
-        "path": "",
-        "confidence": 0.85
-      },
-      {
-        "id": "166a3c8c-b9b3-4c4f-a337-5d0ac4a80347",
+        "id": "d97a64b4-8b11-4463-9ace-23ecf4a5fbd4",
         "label": "SyncManager",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "8847fbfd-77f7-4ff9-a150-5e560a2ddcf9",
+        "id": "63c092c6-3408-4d4d-9524-973955514f8b",
         "label": "SyncQueue",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "e59d6181-8168-486c-9d7b-442074c289b4",
-        "label": "SyncSession",
+        "id": "7a95efce-a7eb-4c70-80aa-ffb68aac5c11",
+        "label": "PeerSession",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "2e78d8df-91a5-4eb7-8ece-0e094acbc93b",
+        "id": "4eb4d894-0ee5-4175-824b-3f658e387473",
         "label": "ConflictResolver",
         "method": "",
         "path": "",
         "confidence": 0.85
       },
       {
-        "id": "00f1ea99-d929-4d8e-9bda-ba9df2408022",
-        "label": "Runner",
+        "id": "060cbe9d-b23b-4e98-9585-e6fa0160e618",
+        "label": "PresenceTracker",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "f2e7317b-ddba-4f94-9289-55bc2a9ccd45",
+        "label": "PluginHost",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "bb1db09c-313c-4334-9a9c-100aafd53963",
+        "label": "SearchPlugin",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "a6d0565e-e232-49a0-9a53-2760b5e9a4de",
+        "label": "ExportPlugin",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "8fd4f281-2941-4a0f-afe2-8afa08faf6c2",
+        "label": "LocalSummarizer",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "153ee2a1-7852-4ba3-88f1-afb2f5e9147e",
+        "label": "VersionHistory",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "ec99aef8-15d8-4aec-8849-4bf7477c322b",
+        "label": "EditorOperations",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "c6534d32-0ba6-4626-97b0-132bab0717d9",
+        "label": "UIRenderer",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
+      },
+      {
+        "id": "a44aab60-bbaf-49f2-a41b-2b70939b62bb",
+        "label": "SignalApp",
         "method": "",
         "path": "",
         "confidence": 0.85
       }
     ]
   },
-  "lineage": [],
+  "lineage": [
+    {
+      "id": "dea58ef0-336e-4fb2-8c44-f254d10547ae",
+      "label": "[REFACTOR] refactor: update README for clarity, remove runner package, and adjust package.j",
+      "kind": "refactor",
+      "shortHash": "d266672",
+      "date": "2026-05-22",
+      "author": "csheldrick",
+      "isArchitectural": true
+    }
+  ],
   "drift": [],
   "proposals": [],
   "lowConfidenceNodes": [],
   "suggestions": [
     "Comprehension model looks healthy. Run `loom drift` to check for fresh divergence."
-  ],
-  "executiveSummary": "- Signal is a 2-module application composed of signal-app and signal-runner, supported by 40 contracts, 1 invariant, and 24 service routes, representing a moderately sized but well-bounded system ready for active development or handoff.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-understood and stable at the time of this handoff.\n- Both top-level modules show zero fan-in and fan-out coupling, which may reflect accurate isolation or could indicate that inter-module dependency data has not yet been fully mapped and should be verified.\n- The single registered invariant warrants explicit review to confirm it is still enforced across all 24 service routes and has not been quietly violated as the contract surface grew to 40 entries.\n- Recommended next steps: validate module coupling metrics are complete and not artifacts of incomplete analysis, confirm the lone invariant is tested and visible in CI, and establish a baseline for architectural lineage tracking so future structural decisions are captured from this point forward."
+  ]
 }

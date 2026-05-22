@@ -66,9 +66,11 @@ Node activation is preserved across reimports.
 weave run --ticks 30 --utilis
 ```
 
-This registers contradiction detection and graph clustering operators, wires the Utilis
-intent handler from `~/.utilis/config.yaml`, and registers an execution trigger that
-fires a `code_review` intent for any node whose activation exceeds 0.7.
+This registers contradiction detection, graph clustering, and inference operators
+(cyclic-dependency, boundary-erosion, subsystem-overload), wires the Utilis intent
+handler from `~/.utilis/config.yaml`, and registers an execution trigger that fires
+a `code_review` intent for any `concept`, `observation`, or `subsystem` node whose
+activation exceeds 0.3.
 
 **Without Utilis (operators only):**
 
@@ -80,9 +82,28 @@ weave run --ticks 30
 
 ```bash
 weave status                 # overview: node count, total activation, pressure, tensions
-weave inspect nodes          # all nodes sorted by activation
-weave inject tensions        # unresolved architectural tensions
+weave observe activation     # top 25 nodes by activation (bar chart)
+weave observe tensions       # unresolved tensions sorted by pressure
+weave observe clusters       # detected subsystem clusters and their members
 ```
+
+### 5. Inject semantic observations
+
+The `weave inject --type <type> "<description>"` command creates an observation node
+and auto-wires it to structurally relevant Loom-imported nodes via fuzzy label matching.
+See `.context/framework-info.md` for a complete library of inject commands covering all
+six categories: `goal`, `architecture`, `observation`, `constraint`, `hypothesis`, `tension`.
+
+```bash
+weave inject --type tension "Plugin sandbox claims isolation but SearchPlugin proves it is unenforced"
+weave inject --type goal "Persistent full-text index: InvertedIndex must survive process restart"
+weave inject --type hypothesis "SearchPlugin direct store access will cause stale search results"
+weave run --ticks 10 --utilis
+weave observe tensions
+```
+
+Each injection type maps to a specific edge type (`supports`, `contradicts`, `predicts`,
+`blocks`, `related_to`) so activation flows correctly through the structural graph.
 
 ---
 
@@ -95,10 +116,10 @@ activation at changed nodes.
 # Make a change in app/src/
 # ...
 
-loom explore .               # reanalyse changed files
-weave import                 # merge updated graph (activation preserved)
-weave run --ticks 10         # run operators — new tensions surface at changed nodes
-weave inspect tensions       # see what drifted
+loom explore .                # reanalyse changed files
+weave import                  # merge updated graph (activation preserved)
+weave run --ticks 10 --utilis # run operators — new tensions surface at changed nodes
+weave observe tensions        # see what drifted
 ```
 
 ---
@@ -108,10 +129,10 @@ weave inspect tensions       # see what drifted
 Inject activation at a specific node to simulate change pressure and watch it cascade:
 
 ```bash
-weave inspect nodes          # find node IDs
-weave inject <node-id> 0.8   # inject at a node
-weave run --ticks 10         # observe propagation through the dependency graph
-weave inspect nodes          # see updated activation heatmap
+weave inspect nodes           # find node IDs
+weave inject <node-id> 0.8    # inject at a node
+weave run --ticks 10 --utilis # observe propagation through the dependency graph
+weave inspect nodes           # see updated activation heatmap
 ```
 
 Save and restore substrate state:
@@ -162,8 +183,9 @@ When Weave's `ContradictionDetectionOperator` runs, these direct imports appear 
 app/src/ + git history
   → loom onboard .           crystallize into .loom/loom.db
   → weave import             build LoomExport, merge into .weave/substrate.db
+  → weave inject --type ...  create wired observations (goals, tensions, hypotheses, etc.)
   → weave run --ticks N      activation propagates, operators detect tensions
-  → ExecutionIntent          fires when node activation > 0.7 (with --utilis)
+  → ExecutionIntent          fires when node activation > 0.3 (with --utilis)
   → Utilis                   routes to configured provider, runs code_review
   → IntentResult             success/error/partial fed back into substrate
   → graph state updated      execution_result node created, tensions resolved or created

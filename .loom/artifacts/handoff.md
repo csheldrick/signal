@@ -1,15 +1,7 @@
 # Loom Handoff — signal
-> Graph v8 · Generated 2026-05-22T17:55:23 UTC
+> Graph v2 · Generated 2026-05-22T22:00:31 UTC
 
 **This document is a cross-session context brief.** Paste it into a new agent session to resume work without re-reading source files.
-
-## Executive Summary
-
-- Signal is a 2-module application composed of signal-app and signal-runner, supported by 40 contracts, 1 invariant, and 24 service routes, representing a moderately sized but well-bounded system ready for active development or handoff.
-- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the codebase is well-understood and stable at the time of this handoff.
-- Both top-level modules show zero fan-in and fan-out coupling, which may reflect accurate isolation or could indicate that inter-module dependency data has not yet been fully mapped and should be verified.
-- The single registered invariant warrants explicit review to confirm it is still enforced across all 24 service routes and has not been quietly violated as the contract surface grew to 40 entries.
-- Recommended next steps: validate module coupling metrics are complete and not artifacts of incomplete analysis, confirm the lone invariant is tested and visible in CI, and establish a baseline for architectural lineage tracking so future structural decisions are captured from this point forward.
 
 ## Suggested Next Steps
 
@@ -19,28 +11,29 @@
 
 | Kind | Count |
 |---|---|
-| Modules | 2 |
+| Modules | 1 |
 | Contracts | 40 |
 | Invariants | 1 |
-| Services | 24 |
-| Lineage nodes | 0 |
+| Services | 18 |
+| Lineage nodes | 1 |
 
 ## Modules
 
 ### signal-app (95%)
 - **Path:** `app`
 - **Files:** 20 | **Coupling:** fanIn: 0, fanOut: 0
-- **Owners:** LocalSummarizer, LocalSummarizer.summarize, SignalApp, SignalApp.start, SignalApp.shutdown, SignalApp.isRunning, createDocument, updateDocument, linkDocuments, deleteDocument, GraphBuilder, GraphBuilder.buildGraph, GraphBuilder.findClusters, GraphBuilder.findHubs, ExportPlugin, ExportPlugin.activate, ExportPlugin.deactivate, ExportPlugin.exportToMarkdown, PluginHost, PluginHost.register, Summarizer, AppConfig, Document, DocumentLink, LinkKind, SearchQuery, SearchResult, DocumentChange, GraphNode, AdjacencyList, Plugin, PluginContext, StorageEventType, StorageEventCreated, StorageEventUpdated, StorageEventDeleted, StorageEventLinked, StorageEvent, SyncState, VectorClock, SyncMessage, PresenceTracker, PresenceTracker.join, PresenceTracker.leave, PresenceTracker.getActive, PresenceTracker.getViewers, PresenceTracker.focusDocument, PresenceTracker.summary, PresenceStatus, PeerPresence, IndexStats, SearchHit, DocumentVersion, VersionDiff, ConflictCandidate, ConflictResolution, TransportSend, SyncManagerOptions, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, QueueEntry, SyncQueueOptions
+- **Owners:** LocalSummarizer, LocalSummarizer.summarize, PresenceTracker, PresenceTracker.join, PresenceTracker.leave, PresenceTracker.getActive, PresenceTracker.getViewers, PresenceTracker.focusDocument, PresenceTracker.summary, SignalApp, SignalApp.start, SignalApp.shutdown, SignalApp.isRunning, createDocument, updateDocument, linkDocuments, deleteDocument, GraphBuilder, GraphBuilder.buildGraph, GraphBuilder.findClusters, Summarizer, PresenceStatus, PeerPresence, AppConfig, Document, DocumentLink, LinkKind, SearchQuery, SearchResult, DocumentChange, GraphNode, AdjacencyList, IndexStats, SearchHit, Plugin, PluginContext, StorageEventType, StorageEventCreated, StorageEventUpdated, StorageEventDeleted, StorageEventLinked, StorageEvent, ConflictCandidate, ConflictResolution, TransportSend, SyncManagerOptions, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, VectorClock, SyncMessage, QueueEntry, SyncQueueOptions, DocumentVersion, VersionDiff
 - *Evidence:* `C:\vscode-projects\signal\app` — app/package.json found at app/package.json — explicit module boundary (javascript).
 - *Evidence:* `C:\vscode-projects\signal\app\package.json` — package.json defines the module name and version.
 
-### signal-runner (95%)
-- **Path:** `runner`
-- **Files:** 1 | **Coupling:** fanIn: 0, fanOut: 0
-- *Evidence:* `C:\vscode-projects\signal\runner` — runner/package.json found at runner/package.json — explicit module boundary (javascript).
-- *Evidence:* `C:\vscode-projects\signal\runner\package.json` — package.json defines the module name and version.
-
 ## Contracts
+
+### PresenceTracker.leave (70%)
+```
+PresenceTracker.leave(peerId: string): void
+```
+- **Module:** signal-app
+- *Evidence:* `app/src/collaboration/presence.ts:48` — Exported function signature extracted by static analysis. Side effects detected: none.
 
 ### SignalApp.start (70%)
 ```
@@ -57,59 +50,45 @@ SignalApp.shutdown(dataPath?: string): void
 - **Module:** signal-app
 - *Evidence:* `app/src/core/app.ts:59` — Exported function signature extracted by static analysis. Side effects detected: database.
 
-### ExportPlugin.activate (70%)
-```
-ExportPlugin.activate(context: PluginContext): void
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/plugins/export.ts:12` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### ExportPlugin.deactivate (70%)
-```
-ExportPlugin.deactivate(): void
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/plugins/export.ts:16` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### PluginHost.register (70%)
-```
-PluginHost.register(plugin: Plugin): void
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/plugins/host.ts:29` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### PresenceTracker.leave (70%)
-```
-PresenceTracker.leave(peerId: string): void
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/collaboration/presence.ts:48` — Exported function signature extracted by static analysis. Side effects detected: none.
-
 ### Contract: Document (85%)
 
 ### Contract: DocumentLink (85%)
 
-### Contract: LinkKind (85%)
+### Contract: DocumentChange (85%)
 
 ### Contract: SearchQuery (85%)
 
 ### Contract: SearchResult (85%)
 
-### Contract: DocumentChange (85%)
+### Contract: SearchHit (85%)
+
+### Contract: VectorClock (85%)
+
+### Contract: SyncMessage (85%)
+
+### Contract: SyncAck (85%)
+
+### Contract: PeerInfo (85%)
+
+### Contract: ConflictRecord (85%)
+
+### Contract: ConflictCandidate (85%)
+
+### Contract: ConflictResolution (85%)
+
+### Contract: StorageEvent (85%)
 
 ### Contract: GraphNode (85%)
 
 ### Contract: AdjacencyList (85%)
 
-### Contract: StorageEvent (85%)
-
-### Contract: SyncMessage (85%)
-
-### Contract: VectorClock (85%)
+### Contract: IndexStats (85%)
 
 ### Contract: Plugin (85%)
 
 ### Contract: PluginContext (85%)
+
+### Contract: PeerSession (85%)
 
 ### LocalSummarizer (88%)
 ```
@@ -117,6 +96,13 @@ LocalSummarizer
 ```
 - **Module:** signal-app
 - *Evidence:* `app/src/ai/summarizer.ts:11` — Exported function signature extracted by static analysis. Side effects detected: none.
+
+### PresenceTracker (88%)
+```
+PresenceTracker
+```
+- **Module:** signal-app
+- *Evidence:* `app/src/collaboration/presence.ts:29` — Exported function signature extracted by static analysis. Side effects detected: none.
 
 ### SignalApp (88%)
 ```
@@ -133,27 +119,6 @@ GraphBuilder
 - **Module:** signal-app
 - *Evidence:* `app/src/graph/builder.ts:19` — Exported function signature extracted by static analysis. Side effects detected: none.
 
-### ExportPlugin (88%)
-```
-ExportPlugin
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/plugins/export.ts:7` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### PluginHost (88%)
-```
-PluginHost
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/plugins/host.ts:20` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### PresenceTracker (88%)
-```
-PresenceTracker
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/collaboration/presence.ts:29` — Exported function signature extracted by static analysis. Side effects detected: none.
-
 ### LocalSummarizer.summarize (95%)
 ```
 LocalSummarizer.summarize(document: Document): Promise<string>
@@ -161,33 +126,19 @@ LocalSummarizer.summarize(document: Document): Promise<string>
 - **Module:** signal-app
 - *Evidence:* `app/src/ai/summarizer.ts:18` — Exported function signature extracted by static analysis. Side effects detected: none.
 
-### SignalApp.isRunning (95%)
+### PresenceTracker.join (95%)
 ```
-SignalApp.isRunning(): boolean
+PresenceTracker.join(peerId: string, documentId?: string): PeerPresence
 ```
 - **Module:** signal-app
-- *Evidence:* `app/src/core/app.ts:73` — Exported function signature extracted by static analysis. Side effects detected: none.
+- *Evidence:* `app/src/collaboration/presence.ts:37` — Exported function signature extracted by static analysis. Side effects detected: none.
 
-### createDocument (95%)
+### PresenceTracker.getActive (95%)
 ```
-createDocument(store: DocumentStore, title: string, content: string, tags: string[]): Document
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/editor/operations.ts:14` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### updateDocument (95%)
-```
-updateDocument(store: DocumentStore, id: string, changes: DocumentChange): Document | undefined
+PresenceTracker.getActive(): PeerPresence[]
 ```
 - **Module:** signal-app
-- *Evidence:* `app/src/editor/operations.ts:24` — Exported function signature extracted by static analysis. Side effects detected: none.
-
-### linkDocuments (95%)
-```
-linkDocuments(store: DocumentStore, sourceId: string, targetId: string, kind: LinkKind): boolean
-```
-- **Module:** signal-app
-- *Evidence:* `app/src/editor/operations.ts:32` — Exported function signature extracted by static analysis. Side effects detected: none.
+- *Evidence:* `app/src/collaboration/presence.ts:55` — Exported function signature extracted by static analysis. Side effects detected: none.
 
 _…and 10 more contracts_
 
@@ -195,5 +146,9 @@ _…and 10 more contracts_
 
 - **guard: Guard clause (null/undefined check)** (88%)
   Detected 3 occurrence(s) of guard pattern across 3 file(s) in module 'signal-app'. Example: "if (!doc) return false;"
-  - evidence: `app/src/storage/store.ts:46`
   - evidence: `app/src/collaboration/presence.ts:67`
+  - evidence: `app/src/indexing/index.ts:39`
+
+## Architectural Lineage
+
+- **[REFACTOR]** [REFACTOR] refactor: update README for clarity, remove runner package, and adjust package.j [`d266672`] · 2026-05-22 by csheldrick
