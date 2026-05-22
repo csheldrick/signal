@@ -1,15 +1,15 @@
 # Loom Handoff — signal
-> Graph v5 · Generated 2026-05-22T14:52:59 UTC
+> Graph v6 · Generated 2026-05-22T15:02:12 UTC
 
 **This document is a cross-session context brief.** Paste it into a new agent session to resume work without re-reading source files.
 
 ## Executive Summary
 
-- Signal is a modular application composed of 2 modules (signal-app and signal-runner), 33 contracts, 1 invariant, and 15 services/routes, representing a modest but formally structured system with clear interface boundaries.
-- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and internally consistent.
-- The single registered invariant should be reviewed to confirm it remains accurately scoped as the system grows, since under-specification of invariants is a common gap in early-stage projects.
-- Both modules show zero fan-in and zero fan-out coupling metrics, which may reflect incomplete dependency mapping rather than true isolation and warrants verification before handoff is considered complete.
-- Recommended next steps: validate that module coupling data is fully captured, confirm the invariant covers all critical system guarantees, and establish a baseline of architectural lineage events so future changes can be traced from this handoff point forward.
+- Signal is a modest application composed of 2 modules, 33 contracts, 1 invariant, and 16 service routes, representing a relatively contained system with clear service boundaries.
+- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and stable.
+- Coupling posture is clean, with both top modules (signal-app and signal-runner) showing zero fan-in and fan-out, suggesting they are well-isolated but worth monitoring as the system grows to ensure integration points are captured.
+- The single registered invariant should be reviewed to confirm it adequately covers the 33 contracts, as low invariant coverage relative to contract volume can leave behavioral assumptions undocumented.
+- Recommended next steps: validate invariant coverage against all contracts, confirm the absence of architectural lineage events reflects intentional stability rather than missing history, and establish a baseline coupling audit cadence as new modules are introduced.
 
 ## Suggested Next Steps
 
@@ -22,7 +22,7 @@
 | Modules | 2 |
 | Contracts | 33 |
 | Invariants | 1 |
-| Services | 15 |
+| Services | 16 |
 | Lineage nodes | 0 |
 
 ## Modules

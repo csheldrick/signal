@@ -25,6 +25,18 @@ import {
 } from 'weave';
 import type { ExecutionIntent, IntentResult } from 'weave';
 
+import {
+  createIntentHandler,
+  loadConfig,
+  Router,
+  Agent,
+  CopilotAdapter,
+  AnthropicAdapter,
+  OpenAIAdapter,
+  OllamaAdapter,
+} from '@utilis/core';
+import type { IntentHandler } from '@utilis/core';
+
 // Loom packages are CommonJS — use createRequire to import them from ESM
 const require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,35 +121,17 @@ async function main(): Promise<void> {
   const importResult = runtime.importFromLoom(loomExport);
   console.log(`Imported:        ${importResult.nodesCreated} new nodes, ${importResult.edgesCreated} new edges, ${importResult.nodesUpdated} updated`);
 
-  // 7. Wire Utilis intent handler (logs intents — swap in createIntentHandler() for real execution)
-  runtime.setIntentHandler(async (intent: ExecutionIntent): Promise<IntentResult> => {
-    const now = new Date().toISOString();
-    console.log(`\n⚡ ExecutionIntent fired!`);
-    console.log(`   mode:     ${intent.mode}`);
-    console.log(`   taskType: ${intent.taskType ?? 'general'}`);
-    console.log(`   prompt:   ${intent.prompt.slice(0, 80)}...`);
-
-    // To connect real Utilis execution:
-    //   import { createIntentHandler } from '@utilis/core';
-    //   import { buildAgent } from './utilis-setup.js';
-    //   const handler = createIntentHandler({ agent: await buildAgent() });
-    //   runtime.setIntentHandler(handler);
-
-    return {
-      intentId: intent.intentId,
-      completedAt: now,
-      status: 'ok',
-      content: '[stub] Intent logged. Wire createIntentHandler() for real execution.',
-      providerId: 'stub',
-      model: 'stub',
-      taskType: intent.taskType ?? 'general',
-      complexityTier: intent.complexity ?? 'low',
-      fallbackUsed: false,
-      inputTokens: 0,
-      outputTokens: 0,
-      latencyMs: 0,
-    };
-  });
+  // 7. Wire Utilis intent handler via createIntentHandler
+  const utilisConfig = loadConfig();
+  const router = new Router({ mode: utilisConfig.routing.mode, fallback: utilisConfig.routing.fallback });
+  if (utilisConfig.providers.copilot) router.register(new CopilotAdapter(utilisConfig.providers.copilot.apiKey));
+  if (utilisConfig.providers.anthropic) router.register(new AnthropicAdapter(utilisConfig.providers.anthropic.apiKey));
+  if (utilisConfig.providers.openai) router.register(new OpenAIAdapter(utilisConfig.providers.openai.apiKey));
+  if (utilisConfig.providers.ollama) router.register(new OllamaAdapter(utilisConfig.providers.ollama.baseUrl));
+  const agent = new Agent(router);
+  const handler: IntentHandler = createIntentHandler({ agent, cwd: SIGNAL_ROOT }) as IntentHandler;
+  runtime.setIntentHandler(handler);
+  console.log('Utilis intent handler registered.');
 
   // 8. Register execution trigger: fire intent when a node exceeds 0.7 activation
   runtime.registerTrigger({
@@ -160,17 +154,19 @@ async function main(): Promise<void> {
   });
 
   // 9. Inject activation at the boundary-violating node (EXP-002)
-  //    plugins/search.ts directly imports from storage/store.ts
-  const violationNodeId = resolve(SIGNAL_ROOT, 'app/src/plugins/search.ts');
-  const relativeViolation = 'app/src/plugins/search.ts';
-
-  // Try both absolute and relative node IDs (Loom may use either)
-  const violationNode = runtime.graph.getNode(violationNodeId) ?? runtime.graph.getNode(relativeViolation);
-  if (violationNode) {
-    console.log('\nInjecting activation at boundary-violating node (EXP-002)...');
-    runtime.inject(violationNode.id, 0.8);
+  //    Loom node IDs are UUIDs — find SearchPlugin by name in the LoomExport,
+  //    then look up that UUID in the substrate (imported in step 6).
+  const violationLoomNode = loomExport.nodes.find(
+    n => n.name === 'SearchPlugin' && (n.kind === 'service' || n.kind === 'class'),
+  );
+  if (violationLoomNode) {
+    const violationNode = runtime.graph.getNode(violationLoomNode.id);
+    if (violationNode) {
+      console.log(`\nInjecting activation at SearchPlugin (${violationLoomNode.id.slice(0, 8)}...) (EXP-002)...`);
+      runtime.inject(violationNode.id, 0.8);
+    }
   } else {
-    console.log('\nNote: boundary-violation node not found in graph yet (run loom onboard after creating app/src/plugins/search.ts)');
+    console.log('\nNote: SearchPlugin node not found — run loom onboard after creating app/src/plugins/search.ts');
   }
 
   // 10. Start the runtime

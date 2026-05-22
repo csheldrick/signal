@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-22T14:52:59.328Z",
+  "generatedAt": "2026-05-22T15:02:12.921Z",
   "project": {
     "name": "signal",
     "type": "application",
     "graphId": "bf558c90-f694-4ad6-a779-014d0c135819",
-    "graphVersion": 5
+    "graphVersion": 6
   },
   "comprehension": {
     "modules": [
@@ -659,6 +659,13 @@
         "method": "",
         "path": "",
         "confidence": 0.75
+      },
+      {
+        "id": "cfd8be11-17d2-4750-8bcf-9f1b8752f5c1",
+        "label": "ExperimentRunner",
+        "method": "",
+        "path": "",
+        "confidence": 0.85
       }
     ]
   },
@@ -669,5 +676,5 @@
   "suggestions": [
     "Comprehension model looks healthy. Run `loom drift` to check for fresh divergence."
   ],
-  "executiveSummary": "- Signal is a modular application composed of 2 modules (signal-app and signal-runner), 33 contracts, 1 invariant, and 15 services/routes, representing a modest but formally structured system with clear interface boundaries.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and internally consistent.\n- The single registered invariant should be reviewed to confirm it remains accurately scoped as the system grows, since under-specification of invariants is a common gap in early-stage projects.\n- Both modules show zero fan-in and zero fan-out coupling metrics, which may reflect incomplete dependency mapping rather than true isolation and warrants verification before handoff is considered complete.\n- Recommended next steps: validate that module coupling data is fully captured, confirm the invariant covers all critical system guarantees, and establish a baseline of architectural lineage events so future changes can be traced from this handoff point forward."
+  "executiveSummary": "- Signal is a modest application composed of 2 modules, 33 contracts, 1 invariant, and 16 service routes, representing a relatively contained system with clear service boundaries.\n- Comprehension health is strong: zero low-confidence nodes, zero active drift events, and zero pending evolution proposals indicate the knowledge graph is current and stable.\n- Coupling posture is clean, with both top modules (signal-app and signal-runner) showing zero fan-in and fan-out, suggesting they are well-isolated but worth monitoring as the system grows to ensure integration points are captured.\n- The single registered invariant should be reviewed to confirm it adequately covers the 33 contracts, as low invariant coverage relative to contract volume can leave behavioral assumptions undocumented.\n- Recommended next steps: validate invariant coverage against all contracts, confirm the absence of architectural lineage events reflects intentional stability rather than missing history, and establish a baseline coupling audit cadence as new modules are introduced."
 }

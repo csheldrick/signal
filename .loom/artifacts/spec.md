@@ -1,5 +1,5 @@
 # signal — Comprehension Report
-> Graph v5 · Project type: **web-api**
+> Graph v6 · Project type: **web-api**
 
 ## Module Boundaries
 
@@ -140,19 +140,19 @@ Confidence: 70%
 
 ## Entities
 
-- **Document**: Defined in app/src/core/types.ts
-- **DocumentLink**: Defined in app/src/core/types.ts
-- **LinkKind**: Defined in app/src/core/types.ts
-- **SearchQuery**: Defined in app/src/core/types.ts
-- **SearchResult**: Defined in app/src/core/types.ts
-- **DocumentChange**: Defined in app/src/core/types.ts
-- **GraphNode**: Defined in app/src/graph/builder.ts
-- **AdjacencyList**: Defined in app/src/graph/builder.ts
-- **StorageEvent**: Defined in app/src/storage/events.ts
-- **SyncMessage**: Message exchanged between peers for document sync
-- **VectorClock**: Logical clock for causal ordering across peers
-- **Plugin**: Defined in app/src/plugins/host.ts
-- **PluginContext**: Defined in app/src/plugins/host.ts
+- **Document**: Core knowledge unit with id, title, content, tags, links, and timestamps
+- **DocumentLink**: Typed directed edge between two documents (reference, related, derived_from, blocks)
+- **LinkKind**: Enumerated relationship type for DocumentLink edges
+- **SearchQuery**: Query parameters for full-text and tag-based document search
+- **SearchResult**: Ranked document match returned from a search operation
+- **DocumentChange**: Delta record describing a mutation applied to a document
+- **GraphNode**: Lightweight projection of a document for graph traversal (id, title, linkCount)
+- **AdjacencyList**: In-memory graph structure with node map and edge sets
+- **StorageEvent**: Discriminated union event emitted on storage mutations (created, updated, deleted, linked)
+- **SyncMessage**: Wire message carrying a CRDT operation, payload, vector clock, and peer metadata
+- **VectorClock**: Per-peer logical clock map used for eventual-consistency conflict resolution
+- **Plugin**: Lifecycle interface (activate/deactivate) for extensible plugin modules
+- **PluginContext**: Sandboxed API surface exposed to plugins (list, search, get documents)
 - **Summarizer**: Defined in app/src/ai/summarizer.ts
 - **LocalSummarizer**: Defined in app/src/ai/summarizer.ts
 - **AppConfig**: Defined in app/src/core/app.ts
@@ -170,20 +170,21 @@ Confidence: 70%
 ## Services
 
 - **CoreTypes**: Shared type vocabulary imported by all modules
-- **SignalApp**: Central hub wiring all subsystems together
-- **DocumentStore**: In-memory document CRUD with JSON file persistence and event emission
-- **StorageEventBus**: Pub/sub event bus for storage mutation notifications
-- **EditorOperations**: High-level document editing operations (create, update, link)
-- **GraphBuilder**: Builds traversable adjacency graph from document links
-- **PluginHost**: Plugin lifecycle manager enforcing sandbox boundary
-- **ExportPlugin**: Markdown export plugin using PluginContext correctly
-- **SearchPlugin**: Search plugin that deliberately violates plugin boundary by importing DocumentStore directly
-- **SyncEngine**: Stub eventual-consistency sync engine using vector clocks
+- **SignalApp**: Central application wiring hub that composes all subsystems; highest fan-out node in the dependency graph
+- **DocumentStore**: In-memory CRUD store for documents with JSON file persistence and event emission; central hub depended on by most modules
+- **StorageEventBus**: Pub/sub event bus for storage mutation events enabling decoupled inter-module communication
+- **EditorOperations**: High-level document editing functions (create, update, link) delegating to DocumentStore
+- **GraphBuilder**: Builds a traversable AdjacencyList from document links stored in DocumentStore
+- **PluginHost**: Manages plugin lifecycle and enforces sandbox boundary by exposing only PluginContext to plugins
+- **ExportPlugin**: Plugin that exports documents to Markdown using only PluginContext (correct boundary usage)
+- **SearchPlugin**: Plugin that performs document search but directly imports DocumentStore in violation of the plugin sandbox boundary
+- **SyncEngine**: Stub eventual-consistency sync layer that tracks vector clocks and queues outbound SyncMessages
 - **SyncProtocol**: Types and utilities for peer-to-peer sync messaging
-- **LocalSummarizer**: Local document summarization by sentence extraction
-- **UIRenderer**: Text-based rendering of documents and graphs
+- **LocalSummarizer**: Local AI summarization implementation that extracts top-N sentences from document content
+- **UIRenderer**: Text-based renderer for documents and graph adjacency lists
 - **app**: Module: app
 - **runner**: Module: runner
+- **ExperimentRunner**: Node.js entry point that instantiates Weave ContinuityRuntime, loads a LoomExport from .loom/loom.db, and wires Utilis intent handlers and operators
 
 ## Constraints
 
@@ -194,3 +195,9 @@ Confidence: 70%
 - Async job processing: Background job or queue processing patterns detected
 - Observability: Logging and telemetry instrumentation detected
 - Test coverage required: Test tooling and test file patterns detected
+- Plugin Sandbox Boundary: Plugins must interact with the system exclusively through PluginContext, not by importing DocumentStore or other internal modules directly, to preserve encapsulation and security
+- Local-First Storage: All document data is persisted locally (JSON file + in-memory Map) with no remote database dependency, supporting offline-first usage
+- Eventual Consistency: Sync layer uses vector clocks and CRDT-style merge to reconcile divergent document states across peers without requiring coordination
+- Type-Only Cross-Module Imports: Several modules import only types (import type) from dependencies, limiting runtime coupling and enabling better tree-shaking
+- No External Runtime Dependencies in app/: The app package declares no runtime dependencies, only devDependencies, constraining it to pure TypeScript with Node built-ins
+- Loom Onboarding Prerequisite: The experiment runner requires loom onboard to have been executed in the signal root to produce .loom/loom.db before the runner can start

@@ -1,7 +1,7 @@
 # signal — Architectural Topology
 > Generated 2026-05-22 · Graph bf558c90
 
-43 nodes · 0 edges
+44 nodes · 0 edges
 
 ## Dependency Graph
 
@@ -26,20 +26,21 @@ graph TD
   UIRenderer_ba1179("UIRenderer")
   app_31b8a1("app ·75%")
   runner_57841d("runner ·75%")
+  ExperimentRunner_52f5c1("ExperimentRunner")
   %% entitys
-  Document_6cf1f8[["Document ·68%"]]
-  DocumentLink_2c9b80[["DocumentLink ·68%"]]
-  LinkKind_ddac64[["LinkKind ·68%"]]
-  SearchQuery_ede4bb[["SearchQuery ·68%"]]
-  SearchResult_a7fa97[["SearchResult ·68%"]]
-  DocumentChange_d37604[["DocumentChange ·68%"]]
-  GraphNode_30298f[["GraphNode ·68%"]]
-  AdjacencyList_7d7655[["AdjacencyList ·68%"]]
-  StorageEvent_0617fe[["StorageEvent ·68%"]]
+  Document_6cf1f8[["Document"]]
+  DocumentLink_2c9b80[["DocumentLink"]]
+  LinkKind_ddac64[["LinkKind"]]
+  SearchQuery_ede4bb[["SearchQuery"]]
+  SearchResult_a7fa97[["SearchResult"]]
+  DocumentChange_d37604[["DocumentChange"]]
+  GraphNode_30298f[["GraphNode"]]
+  AdjacencyList_7d7655[["AdjacencyList"]]
+  StorageEvent_0617fe[["StorageEvent"]]
   SyncMessage_2b7535[["SyncMessage"]]
   VectorClock_27ec07[["VectorClock"]]
-  Plugin_146a63[["Plugin ·68%"]]
-  PluginContext_055dc6[["PluginContext ·68%"]]
+  Plugin_146a63[["Plugin"]]
+  PluginContext_055dc6[["PluginContext"]]
   Summarizer_681fb1[["Summarizer ·68%"]]
   LocalSummarizer_9500ba[["LocalSummarizer ·68%"]]
   AppConfig_4c6c88[["AppConfig ·68%"]]
@@ -62,7 +63,7 @@ graph TD
   classDef workflowStyle fill:#3d2f1e,stroke:#ffa54a,color:#fdf0e8
   classDef entityStyle fill:#2f1e3d,stroke:#c54aff,color:#f0e8fd
   class signal_app_0f3298,signal_runner_3511a4 moduleStyle
-  class CoreTypes_6a8434,SignalApp_76adff,DocumentStore_a47ce2,StorageEventBus_812d79,EditorOperations_b93e48,GraphBuilder_227f2d,PluginHost_9a372e,ExportPlugin_61138f,SearchPlugin_783151,SyncEngine_3e1fcd,SyncProtocol_ff1d82,LocalSummarizer_bbc114,UIRenderer_ba1179,app_31b8a1,runner_57841d serviceStyle
+  class CoreTypes_6a8434,SignalApp_76adff,DocumentStore_a47ce2,StorageEventBus_812d79,EditorOperations_b93e48,GraphBuilder_227f2d,PluginHost_9a372e,ExportPlugin_61138f,SearchPlugin_783151,SyncEngine_3e1fcd,SyncProtocol_ff1d82,LocalSummarizer_bbc114,UIRenderer_ba1179,app_31b8a1,runner_57841d,ExperimentRunner_52f5c1 serviceStyle
   class Document_6cf1f8,DocumentLink_2c9b80,LinkKind_ddac64,SearchQuery_ede4bb,SearchResult_a7fa97,DocumentChange_d37604,GraphNode_30298f,AdjacencyList_7d7655,StorageEvent_0617fe,SyncMessage_2b7535,VectorClock_27ec07,Plugin_146a63,PluginContext_055dc6,Summarizer_681fb1,LocalSummarizer_9500ba,AppConfig_4c6c88,SignalApp_8a6325,GraphBuilder_32958b,ExportPlugin_2d7827,PluginHost_818559,SearchPlugin_45d93b,StorageEventType_2dc5e1,StorageEventCreated_35779c,StorageEventUpdated_6fb7ef,StorageEventDeleted_7edc85,StorageEventLinked_3ce65d entityStyle
 ```
 
@@ -87,9 +88,9 @@ graph TD
 | UIRenderer | service | 0 | 0 | 0 |
 | app | service | 0 | 0 | 0 |
 | runner | service | 0 | 0 | 0 |
+| ExperimentRunner | service | 0 | 0 | 0 |
 | Document | entity | 0 | 0 | 0 |
 | DocumentLink | entity | 0 | 0 | 0 |
-| LinkKind | entity | 0 | 0 | 0 |
 
 ## Next Steps
 
