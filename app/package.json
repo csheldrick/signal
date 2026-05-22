@@ -1,0 +1,10 @@
+{
+  "name": "signal-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Signal application code",
+  "scripts": {
+    "build": "echo \"No build configured yet\"",
+    "test": "echo \"No tests configured yet\""
+  }
+}
