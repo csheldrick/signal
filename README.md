@@ -50,54 +50,67 @@ workspace/
 
 ## Loom / Weave Runtime State
 
+Loom persists its semantic graph in a single SQLite database. The `.loom/` directory
+is created by `loom init` and contains:
+
 ```text
 .loom/
-├─ topology/
-├─ snapshots/
-├─ semantic/
-├─ abstractions/
-├─ evolution/
-├─ tensions/
-└─ config.json
+├─ config.json          # workspace metadata: graphId, name, type, dbPath, LLM config
+├─ loom.db              # SQLite semantic graph (nodes, edges, mutations, evidence)
+├─ snapshots/           # timestamped backups created by loom snapshot
+└─ artifacts/           # generated output files (weave exports, agent rules)
+```
 
+Weave persists its substrate in a single SQLite database. The `.weave/` directory
+contains:
+
+```text
 .weave/
-├─ state/
-│  ├─ snapshots/
-│  ├─ traces/
-│  └─ runs/
-├─ injections/
-├─ observations/
-├─ activation/
-├─ tensions/
-└─ config.json
+├─ config.json          # RuntimeConfig: decay, propagation, tick interval, thresholds
+└─ substrate.db         # SQLite substrate (nodes, edges, tensions, events, snapshots)
+```
+
+### Data flow
+
+```text
+Source code + git history
+  → Loom (crystallizes structural knowledge into .loom/loom.db)
+  → LoomExport (nodes, edges, clusters via loom-exporter)
+  → Weave (imports into substrate, assigns activation, tracks tensions)
+  → ExecutionIntent (when activation thresholds fire)
+  → Utilis (executes: model inference, shell, tools, workflows)
+  → IntentResult (feedback: success/error/partial/timeout)
+  → Weave (ingests result, updates graph, resolves tensions)
 ```
 
 ## Suggested Development Flow
 
 ```bash
-# initialize project (pnpm can be installed externally)
-mkdir signal
-cd signal
+# initialize project
+mkdir signal && cd signal
 pnpm init
-mkdir app workspace
+mkdir -p app/src workspace
 
-# initialize architecture topology
-loom onboard
+# initialize Loom workspace (creates .loom/ with config.json + SQLite DB)
+loom init
 
-# initialize persistent cognition runtime
-weave init
-weave run
+# Loom explores the codebase and crystallizes knowledge
+loom explore .
 
-# inject goals/constraints
-weave inject --type goal "support offline-first collaboration"
-weave inject --type constraint "all sync operations must be eventually consistent"
-weave inject --type architecture "plugin system must remain sandboxed"
+# Loom exports structural graph for Weave consumption
+# (LoomExporter builds LoomExport from the semantic graph)
 
-# evolve + observe + execute
-loom scan
-weave tick --n 50
-weave observe tensions
-utilis run scaffold sync-engine
+# Weave runtime starts, imports Loom export, runs tick loop
+# runtime.importFromLoom(export)  — merges into substrate
+# runtime.start()                 — begins tick-based scheduling
+
+# Weave fires execution intents when activation thresholds cross
+# runtime.dispatchIntent(intent)  — Utilis handles execution
+
+# Query the system
+loom topology           # visualize dependency graph
+loom lineage <path>     # trace why something exists
+loom explain <node>     # explain with evidence
 ```
 
 The app remains normal software engineering code. Loom and Weave provide persistent structural and runtime cognition layers around it.

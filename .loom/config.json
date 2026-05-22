@@ -1,4 +1,19 @@
 {
-  "project": "signal",
-  "managedBy": "loom"
+  "graphId": "",
+  "name": "signal",
+  "type": "application",
+  "dbPath": ".loom/loom.db",
+  "llm": {
+    "provider": "copilot",
+    "model": "claude-opus-4.6",
+    "semanticProvider": "copilot",
+    "semanticModel": "gpt-5-mini"
+  },
+  "agentRules": {
+    "copilot": false,
+    "agentsMd": false,
+    "cursor": false,
+    "claude": false,
+    "appendMode": true
+  }
 }

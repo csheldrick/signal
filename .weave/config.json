@@ -1,4 +1,14 @@
 {
   "project": "signal",
-  "managedBy": "weave"
+  "dbPath": ".weave/substrate.db",
+  "decayRate": 0.05,
+  "propagationDamping": 0.7,
+  "propagationThreshold": 0.01,
+  "activationCeiling": 1.0,
+  "propagationMaxDepth": 8,
+  "tickIntervalMs": 1000,
+  "operatorActivationThreshold": 0.3,
+  "confidencePropagationEveryNTicks": 5,
+  "evolutionRecordEveryNTicks": 10,
+  "maintenanceEveryNTicks": 50
 }
