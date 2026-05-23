@@ -53,8 +53,7 @@ export class SyncManager {
     store.events.on('*', (event: StorageEvent) => {
       const message = this.engine.generateOutbound(event);
       if (message) {
-        // .catch suppresses the rejection from queue.clear() on stop().
-        this.queue.enqueue(message).catch(() => { /* superseded or cleared */ });
+        void this.queue.enqueue(message);
       }
     });
   }
@@ -166,8 +165,7 @@ export class SyncManager {
     const due = this.queue.peek();
     for (const entry of due) {
       for (const session of this.sessions.values()) {
-        // Send to connected (syncing) or just-resolved sessions.
-        if (session.state === 'syncing' || session.state === 'resolved') {
+        if (session.state === 'idle' || session.state === 'resolved') {
           try {
             await this.transport(session.peerId, entry.message);
             this.queue.ack(entry.message);
