@@ -1,59 +1,38 @@
 #!/bin/bash
+# Bootstrap the Loom → Weave continuity framework for this repo.
+#
+# Two modes:
+#   ./framework_bootstrap.sh           Curated: replays hand-authored inject list
+#   ./framework_bootstrap.sh --utilis  Generative: LLM re-derives context from graph
+
+set -e
+
+MODE="curated"
+if [[ "$1" == "--utilis" ]]; then
+  MODE="generative"
+fi
+
+# 1. Crystallise the Loom structural model
 loom reset -y
 loom onboard
+
+# 2. Import the graph into the Weave substrate
 weave import
 weave inspect nodes
-weave inject --type goal "Offline-first operation: all document CRUD, search, and graph traversal must work without network connectivity"
-weave inject --type goal "CRDT-based collaborative editing: concurrent edits on the same document merge without user-facing conflicts"
-weave inject --type goal "Persistent full-text index: InvertedIndex must survive process restart without full reindex from document store"
-weave inject --type goal "LLM-powered summarization: replace LocalSummarizer stub with provider-backed implementation via Utilis"
-weave inject --type goal "Plugin isolation enforcement: runtime validation that plugins cannot import outside PluginContext"
-weave inject --type goal "Version branching and merge: support non-linear version histories with three-way merge on convergence"
-weave inject --type goal "Graph-driven navigation: traverse document link topology visually with cluster-aware layout"
-weave inject --type goal "Sync message durability: outbound messages that exhaust retry budget must persist to disk for later delivery"
-weave inject --type architecture "Hub-and-spoke: DocumentStore is the highest fan-in node — storage, sync, graph, versioning, indexing, and plugins all depend on it"
-weave inject --type architecture "Event-driven decoupling: StorageEventBus mediates all mutation side-effects; consumers subscribe via wildcard or typed events"
-weave inject --type architecture "Plugin sandbox boundary: PluginHost exposes PluginContext (read-only) to isolate third-party code from direct store access"
-weave inject --type architecture "Dual graph topology: spatial edges (DocumentLink via reference/related/derived_from/blocks) and temporal edges (VersionHistory parentVersionId chains) coexist"
-weave inject --type architecture "Vector clock causality: SyncEngine uses per-peer monotonic clocks with entrywise-max merge for conflict detection"
-weave inject --type architecture "Sync transport abstraction: SyncManager accepts any async send function — WebSocket, WebRTC, or direct call — no protocol lock-in"
-weave inject --type architecture "Immutable version snapshots: VersionHistory freezes every snapshot with Object.freeze; lineage chains are append-only"
-weave inject --type architecture "Separation of editing from storage: editor/operations.ts wraps store methods with ID generation but adds no business logic"
-weave inject --type observation "SearchPlugin bypasses PluginContext and imports DocumentStore directly — violates the plugin sandbox contract"
-weave inject --type observation "PresenceTracker imports both DocumentStore and SyncEngine, creating a compound boundary violation across two subsystems"
-weave inject --type observation "LocalSummarizer is a sentence-extraction heuristic stub with no LLM integration — the Summarizer interface is unfulfilled"
-weave inject --type observation "InvertedIndex stores all posting lists in memory with no serialization — every cold start requires full reindex"
-weave inject --type observation "SyncQueue drops messages permanently after 5 retry attempts with no dead-letter persistence"
-weave inject --type observation "VersionHistory diffs are line-based string comparison — no awareness of CRDT operations or semantic merge"
-weave inject --type observation "DocumentStore.delete cascades link removal but does not cascade to VersionHistory — orphaned version chains persist"
-weave inject --type observation "GraphBuilder.findClusters uses BFS connected components but has no feedback path to SyncManager for prioritizing cluster-local sync"
-weave inject --type observation "StorageEventBus has no backpressure mechanism — a burst of mutations can flood subscribers synchronously"
-weave inject --type observation "SyncEngine generates outbound messages for every storage event but applies no batching or coalescing for rapid edit sequences"
-weave inject --type constraint "Every document mutation (create, update, delete, link) must emit a StorageEvent before returning"
-weave inject --type constraint "Plugins must access documents exclusively through PluginContext — no direct store imports"
-weave inject --type constraint "Vector clocks must be monotonically non-decreasing per peer across all sync operations"
-weave inject --type constraint "Version snapshots are immutable after creation — no retroactive edits to historical versions"
-weave inject --type constraint "Document IDs must be globally unique across all peers in a sync group"
-weave inject --type constraint "Conflict resolution must produce an auditable ConflictRecord for every merge decision"
-weave inject --type constraint "Storage serialization format must remain JSON-compatible for local-first portability"
-weave inject --type constraint "Sync messages must be idempotent — replaying a message produces the same state as applying it once"
-weave inject --type hypothesis "SearchPlugin direct store access will cause stale search results when documents are modified through sync (bypasses event pipeline)"
-weave inject --type hypothesis "PresenceTracker importing SyncEngine creates a hidden circular dependency path: App→Sync→Store←Presence→Sync"
-weave inject --type hypothesis "Without index persistence, startup latency grows linearly with document count — unacceptable at 10k+ documents"
-weave inject --type hypothesis "SyncQueue message drops after 5 retries will cause permanent data divergence between peers in unreliable networks"
-weave inject --type hypothesis "Deleting a document without cascading to VersionHistory will cause getLineage to return orphaned chains with dangling references"
-weave inject --type hypothesis "Concurrent rapid edits without SyncEngine batching will generate O(n) sync messages where O(1) coalesced message suffices"
-weave inject --type hypothesis "The StorageEventBus wildcard subscriber pattern will become a bottleneck when plugin count exceeds 10 active subscribers"
-weave inject --type hypothesis "Line-based version diffs will produce false conflicts when two peers edit non-overlapping sections of the same document"
-weave inject --type tension "Plugin sandbox claims isolation but SearchPlugin proves it is unenforced — architectural intent contradicts implementation"
-weave inject --type tension "Local-first goal requires offline persistence but InvertedIndex and SyncQueue are memory-only with no disk fallback"
-weave inject --type tension "SyncEngine has conflict resolution strategies but VersionHistory has no merge capability — sync and versioning are disconnected"
-weave inject --type tension "StorageEventBus enables decoupling but PresenceTracker bypasses it entirely by importing subsystems directly"
-weave inject --type tension "Summarizer interface declares an AI capability boundary but the only implementation is a non-AI heuristic stub"
-weave inject --type tension "GraphBuilder detects document clusters but no component consumes cluster data for sync prioritization or UI grouping"
-weave inject --type tension "Version snapshots are immutable but document content is mutable — the versioning layer has no trigger to auto-snapshot on edit"
-weave inject --type tension "SyncManager supports pluggable transport but no concrete transport adapter exists — the abstraction is untested"
+
+# 3. Seed the substrate with semantic context
+if [[ "$MODE" == "generative" ]]; then
+  echo "Generating bootstrap context via LLM..."
+  weave bootstrap --utilis --save scripts/signal_bootstrap.json
+else
+  echo "Replaying curated inject list from scripts/signal_bootstrap.json..."
+  weave bootstrap --from scripts/signal_bootstrap.json
+fi
+
+# 4. Propagate activation and derive tensions
 weave run --ticks 30 --utilis
+
+# 5. Observe results
 weave observe tensions
 weave observe activation
 weave observe clusters
