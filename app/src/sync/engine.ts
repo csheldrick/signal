@@ -2,7 +2,13 @@
 // Stub sync engine. Imports from storage and sync/protocol,
 // creating cross-subsystem edges for Loom to detect.
 
-import type { DocumentStore } from '../storage/store.js';
+// Removed hard dependency on concrete DocumentStore; accept a minimal store interface.
+interface DocumentStoreLike {
+  create(id: string, title: string, content: string, tags?: string[]): unknown;
+  update(id: string, changes: { title?: string; content?: string; tags?: string[] }): unknown | undefined;
+  delete(id: string): boolean;
+}
+
 import type { StorageEvent } from '../storage/events.js';
 import type { SyncMessage, VectorClock } from './protocol.js';
 import { mergeClocks } from './protocol.js';
@@ -13,7 +19,7 @@ export class SyncEngine {
   private outbound: SyncMessage[] = [];
 
   constructor(
-    private readonly store: DocumentStore,
+    private readonly store: DocumentStoreLike,
     peerId: string,
   ) {
     this.peerId = peerId;
