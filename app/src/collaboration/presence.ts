@@ -38,21 +38,33 @@ export interface PeerPresence {
 }
 
 export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
-  // Deprecated and intentionally removed. Callers must migrate to the event-driven
-  // validator exposed by StorageEventBus.attachDocumentValidatorFromEvents(initialIds)
-  // and register it via PresenceTracker.setAsyncValidator().
+  // Deprecated helper retained for backwards-compatibility. Callers should
+  // migrate to StorageEventBus.attachDocumentValidatorFromEvents(initialIds)
+  // and register via PresenceTracker.setAsyncValidator(). This shim is safe:
+  // - never throws (treats errors as "not found")
+  // - awaits Promise-like reader results
+  // - emits a one-time deprecation warning to guide migration
+  let warned = false;
+
   return async (id: string) => {
-  // Backwards-compatible shim: the original helper converted a store
-  // into an async existence validator. Keep behavior minimal and safe:
-  // - treat exceptions as "not found" (do not throw)
-  // - avoid any direct IO beyond calling the provided reader
-  try {
-    const res = (await Promise.resolve((_store as DocumentReader).read(id))) as unknown;
-    return res !== undefined && res !== null;
-  } catch (_) {
-    return false;
-  }
-};
+    if (!warned) {
+      try {
+        // eslint-disable-next-line no-console
+        console.warn('createValidatorFromStore is deprecated; prefer StorageEventBus.attachDocumentValidatorFromEvents(initialIds) and PresenceTracker.setAsyncValidator().');
+      } catch (_) {
+        /* swallow console errors */
+      }
+      warned = true;
+    }
+
+    try {
+      const res = (_store as DocumentReader).read(id);
+      const resolved = await Promise.resolve(res) as unknown;
+      return resolved !== undefined && resolved !== null;
+    } catch (_) {
+      return false;
+    }
+  };
 }
 
 export class PresenceTracker {

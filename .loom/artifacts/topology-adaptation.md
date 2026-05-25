@@ -1,5 +1,5 @@
 # signal — Adaptive Topology Cycle
-> 2026-05-25T15:22:22.389Z · Graph 8314e077
+> 2026-05-25T17:16:36.254Z · Graph 8314e077
 
 ## Structural Changes
 
@@ -21,7 +21,7 @@
 | Clusters | 38 |
 | Entropy | 7.791 |
 | Edge utilization | 0.0% |
-| Avg edge weight | 0.798 |
+| Avg edge weight | 0.758 |
 | Structural redundancy | 0.0% |
 | Propagation efficiency | 6.5% |
 
