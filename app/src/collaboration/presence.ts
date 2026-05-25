@@ -174,8 +174,11 @@ export class PresenceTracker {
   }
 
   /**
-   * Set a synchronous validator. This setter is pure (no IO) per the public contract.
-   * For async/store-backed validators use setAsyncValidator instead.
+   * Set a synchronous validator. The function MUST be synchronous.
+   * For async/store-backed checks use setAsyncValidator instead.
+   * If a validator accidentally returns a Promise at runtime it will be
+   * treated as a failure and a warning will be emitted. This enforces the
+   * public contract that setValidator does not perform IO.
    */
   setValidator(validate?: (id: string) => boolean): void {
     if (!validate) {
@@ -183,9 +186,19 @@ export class PresenceTracker {
       return;
     }
     // Wrap sync validator into async internal validator without performing IO here.
+    // At runtime we detect Promise-returning validators and fail-safe to avoid
+    // blocking realtime flows — callers must use setAsyncValidator for IO.
     this.validator = async (id: string) => {
       try {
-        return Boolean(validate(id));
+        const result = validate(id);
+        // Detect accidental Promise-returning validators and fail-safe.
+        if (result && typeof (result as any).then === 'function') {
+          // Don't await — treat as invalid to preserve realtime path invariants.
+          // eslint-disable-next-line no-console
+          console.warn('PresenceTracker.setValidator: async validator provided to setValidator; treat as failure. Use setAsyncValidator for async checks.');
+          return false;
+        }
+        return Boolean(result);
       } catch (_) {
         // Treat thrown errors as validation failure but do not propagate to realtime flows.
         return false;
