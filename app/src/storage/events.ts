@@ -65,12 +65,8 @@ export class StorageEventBus {
       star?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
     };
 
-    // Schedule on the microtask queue so emit returns immediately.
-    if (typeof queueMicrotask === 'function') {
-      queueMicrotask(invoke);
-    } else {
-      Promise.resolve().then(invoke);
-    }
+    // Invoke synchronously to preserve ordering for validators/listeners.
+    invoke();
   }
 
   /**
