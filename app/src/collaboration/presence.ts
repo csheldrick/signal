@@ -37,21 +37,19 @@ export interface PeerPresence {
   lastSeen: number;
 }
 
-export function createValidatorFromStore(store: DocumentStore): (id: string) => Promise<boolean> {
-  // Backwards-compatible helper: callers that previously relied on
-  // createValidatorFromStore can use this to obtain an async validator
-  // without reaching into internal migration shims. The implementation
-  // is intentionally simple and safe: it checks existence and guards
-  // against unexpected store errors.
-  return async (id: string) => {
-    try {
-      const doc = store.read(id);
-      return doc !== undefined && doc !== null;
-    } catch (err) {
-      // If the store throws for any reason, treat as non-existent but
-      // avoid bubbling errors into realtime presence flows.
-      return false;
+export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
+  // Deprecated migration sentinel: do NOT perform direct store IO from PresenceTracker.
+  // Callers should instead use StorageEventBus.attachDocumentValidatorFromEvents()
+  // and register the resulting async validator with PresenceTracker.setAsyncValidator().
+  let warned = false;
+  return async (_id: string) => {
+    if (!warned) {
+      // eslint-disable-next-line no-console
+      console.warn('createValidatorFromStore is removed: use StorageEventBus.attachDocumentValidatorFromEvents() and PresenceTracker.setAsyncValidator() instead.');
+      warned = true;
     }
+    // Fail-safe: return false to avoid accidental acceptance of invalid documents.
+    return false;
   };
 }
 
@@ -196,7 +194,6 @@ export class PresenceTracker {
           // Don't await — treat as invalid to preserve realtime path invariants.
           // eslint-disable-next-line no-console
           console.warn('PresenceTracker.setValidator: async validator provided to setValidator; use setAsyncValidator for async checks.');
-          return false;
           return false;
         }
         return Boolean(result);
