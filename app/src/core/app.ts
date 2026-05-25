@@ -8,7 +8,7 @@ import { GraphBuilder } from '../graph/builder.js';
 import { PluginHost } from '../plugins/host.js';
 import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
-import { LocalSummarizer } from '../ai/summarizer.js';
+
 import type { Summarizer } from '../ai/summarizer.js';
 
 export interface AppConfig {
@@ -30,7 +30,17 @@ export class SignalApp {
     this.events = new StorageEventBus();
     this.store = new DocumentStore(this.events);
     this.graph = new GraphBuilder(this.store);
-    this.summarizer = new LocalSummarizer();
+    this.summarizer = {
+      isRemote: false,
+      async summarize(document) {
+        const sentences = document.content
+          .split(/[.!?]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        const selected = sentences.slice(0, 3);
+        return selected.join('. ') + (selected.length > 0 ? '.' : '');
+      }
+    };
     this.sync = new SyncEngine(this.store, config.peerId);
 
     const pluginContext: PluginContext = {
