@@ -157,8 +157,20 @@ export class PresenceTracker {
     return true;
   }
 
-  setValidator(validate?: (id: string) => Promise<boolean>): void {
-    this.validator = validate;
+  setValidator(validate?: (id: string) => boolean | Promise<boolean>): void {
+    if (!validate) {
+      this.validator = undefined;
+      return;
+    }
+    // Normalize synchronous or asynchronous validators into an async function
+    this.validator = async (id: string) => {
+      try {
+        return await Promise.resolve(validate(id) as Promise<boolean> | boolean);
+      } catch (_) {
+        // Treat thrown errors as validation failure but do not propagate to realtime flows.
+        return false;
+      }
+    };
   }
 
   summary(): { active: number; idle: number; offline: number } {
