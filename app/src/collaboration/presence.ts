@@ -191,33 +191,25 @@ export class PresenceTracker {
   }
 
   /**
-   * Set a synchronous validator. The function MUST be synchronous.
-   * For async/store-backed checks use setAsyncValidator instead.
-   * If a validator accidentally returns a Promise at runtime it will be
-   * treated as a failure and a warning will be emitted. This enforces the
-   * public contract that setValidator does not perform IO.
+   * Set a validator. Accepts either a synchronous validator (id => boolean)
+   * or an asynchronous one (id => Promise<boolean>). This unifies the
+   * previously separate sync/async setters into a single explicit API to
+   * avoid accidental misuse and to make the validator contract clear to
+   * callers (they may perform IO if needed).
    */
-  setValidator(validate?: (id: string) => boolean): void {
+  setValidator(validate?: (id: string) => Promise<boolean> | boolean): void {
     if (!validate) {
       this.validator = undefined;
       return;
     }
-    // Wrap sync validator into async internal validator without performing IO here.
-    // At runtime we detect Promise-returning validators and fail-safe to avoid
-    // blocking realtime flows — callers must use setAsyncValidator for IO.
+
+    // Normalize sync or async validator into the internal async validator.
+    // Callers are allowed to perform IO; errors are treated as validation
+    // failures to preserve realtime flow invariants.
     this.validator = async (id: string) => {
       try {
-        const result = validate(id);
-        // Detect accidental Promise-returning validators and fail-safe.
-        if (result && typeof (result as any).then === 'function') {
-          // Don't await — treat as invalid to preserve realtime path invariants.
-          // eslint-disable-next-line no-console
-          console.warn('PresenceTracker.setValidator: async validator provided to setValidator; use setAsyncValidator for async checks.');
-          return false;
-        }
-        return Boolean(result);
+        return await Promise.resolve((validate as any)(id) as Promise<boolean> | boolean);
       } catch (_) {
-        // Treat thrown errors as validation failure but do not propagate to realtime flows.
         return false;
       }
     };
