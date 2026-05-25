@@ -66,6 +66,18 @@ export class RemoteSummarizer implements Summarizer {
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;
 
+  // Simple failure tracking to avoid repeated remote attempts when the
+  // remote service is failing or slow. After maxFailures within failureWindowMs
+  // the summarizer will enter a short cooldown and return local summaries.
+  private failureCount: number = 0;
+  private lastFailureAt: number = 0;
+  private cooldownUntil: number = 0;
+
+  private readonly maxFailures: number = 3;
+  private readonly failureWindowMs: number = 10_000; // 10s window
+  private readonly cooldownMs: number = 5_000; // 5s cooldown
+  private readonly timeoutMs: number = 300;
+
   /**
    * Create a RemoteSummarizer.
    * - fetcher: function performing the remote summarization
@@ -82,24 +94,61 @@ export class RemoteSummarizer implements Summarizer {
     this.fallback = new LocalSummarizer(options?.maxSentences ?? 3);
   }
 
+  private now(): number {
+    return Date.now();
+  }
+
+  private recordFailure(): void {
+    const now = this.now();
+    if (now - this.lastFailureAt > this.failureWindowMs) {
+      // Failure window expired; reset counter
+      this.failureCount = 0;
+    }
+    this.failureCount += 1;
+    this.lastFailureAt = now;
+    if (this.failureCount >= this.maxFailures) {
+      this.cooldownUntil = now + this.cooldownMs;
+      // Reset failureCount so we don't immediately re-enter cooldown after it ends
+      this.failureCount = 0;
+    }
+  }
+
+  private recordSuccess(): void {
+    this.failureCount = 0;
+    this.lastFailureAt = 0;
+    this.cooldownUntil = 0;
+  }
+
   async summarize(document: Document): Promise<string> {
     if (!this.allowNetwork) {
       // Explicit opt-in required for network calls — fallback deterministically.
       return this.fallback.summarize(document);
     }
 
+    const now = this.now();
+    if (this.cooldownUntil && now < this.cooldownUntil) {
+      // We're in cooldown due to prior failures; return local summary quickly.
+      return this.fallback.summarize(document);
+    }
+
     try {
-      const timeoutMs = 300;
       const result = await Promise.race([
         this.fetcher(document),
-        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), timeoutMs)),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
       ]);
+
       if (typeof result !== 'string' || result.length === 0) {
+        // Treat invalid/empty responses as failures
+        this.recordFailure();
         return this.fallback.summarize(document);
       }
+
+      // Successful remote summary — reset failure tracking
+      this.recordSuccess();
       return result;
-    } catch (_) {
-      // On any remote failure, return a safe local summary.
+    } catch (err) {
+      // On any remote failure, record it and return a safe local summary.
+      this.recordFailure();
       return this.fallback.summarize(document);
     }
   }
