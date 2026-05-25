@@ -5,7 +5,7 @@
 // Weave's ContradictionDetectionOperator should surface it as a tension.
 
 import type { Plugin, PluginContext } from './host.js';
-  // ← VIOLATION
+
 import type { SearchQuery, SearchResult } from '../core/types.js';
 
 
