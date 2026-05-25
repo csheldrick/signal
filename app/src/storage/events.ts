@@ -55,8 +55,10 @@ export class StorageEventBus {
   }
 
   emit(event: StorageEvent): void {
-    // Invoke listeners asynchronously to avoid blocking the emitter and reduce
-    // tight synchronous coupling between storage and its subscribers.
+    // Listeners are invoked synchronously by default to preserve deterministic
+    // ordering for validators/listeners that must observe state changes before
+    // the emitter returns. If non-blocking semantics are required callers can
+    // opt-in using emitAsync(event).
     const direct = this.listeners.get(event.type);
     const star = this.listeners.get('*');
 
@@ -66,6 +68,27 @@ export class StorageEventBus {
     };
 
     // Invoke synchronously to preserve ordering for validators/listeners.
+    invoke();
+  }
+
+  /**
+   * Emit asynchronously. This preserves the old non-blocking behaviour for
+   * callers that explicitly want to avoid synchronous listener invocation.
+   *
+   * Usage: call emitAsync(...) when you knowingly do not require listeners
+   * to have observed the event before the emitter returns (background dispatch).
+   */
+  emitAsync(event: StorageEvent): void {
+    const direct = this.listeners.get(event.type);
+    const star = this.listeners.get('*');
+
+    const invoke = () => {
+      direct?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
+      star?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
+    };
+
+    // Preserve previous (historical) non-blocking behavior for callers that
+    // intentionally opt into async dispatch.
     Promise.resolve().then(() => invoke());
   }
 
