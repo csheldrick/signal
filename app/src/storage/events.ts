@@ -58,4 +58,37 @@ export class StorageEventBus {
     this.listeners.get(event.type)?.forEach(fn => fn(event));
     this.listeners.get('*')?.forEach(fn => fn(event));
   }
+
+  /**
+   * Attach a document-existence validator derived from observed storage events.
+   * Returns an async function that resolves true when the bus has observed a
+   * 'created' event for the id and not a subsequent 'deleted'. This provides
+   * a migration-friendly, testable replacement for direct store access so
+   * callers (e.g. PresenceTracker) need not import DocumentStore.
+   */
+  attachDocumentValidatorFromEvents(): (id: string) => Promise<boolean> {
+    const known = new Set<string>();
+
+    const listener: Listener = (event) => {
+      switch (event.type) {
+        case 'created':
+          known.add(event.document.id);
+          break;
+        case 'deleted':
+          known.delete(event.documentId);
+          break;
+        // updates/links do not change existence
+        case 'updated':
+        case 'linked':
+          break;
+      }
+    };
+
+    // Observe all events to maintain an internal existence set.
+    this.on('*', listener);
+
+    return async (id: string) => {
+      return known.has(id);
+    };
+  }
 }
