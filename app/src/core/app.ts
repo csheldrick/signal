@@ -54,6 +54,7 @@ export class SignalApp {
       listDocuments: () => this.store.list(),
       searchDocuments: (query) => this.store.search(query),
       getDocument: (id) => this.store.read(id),
+      getClock: () => ({}),
     };
     this.plugins = new PluginHost(pluginContext);
 

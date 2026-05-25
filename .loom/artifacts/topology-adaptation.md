@@ -1,27 +1,27 @@
 # signal — Adaptive Topology Cycle
-> 2026-05-25T17:16:36.254Z · Graph 8314e077
+> 2026-05-25T22:48:00.884Z · Graph cfd95a7b
 
 ## Structural Changes
 
 | Change | Count |
 |---|---|
 | Edges reinforced | 0 |
-| Edges decayed | 223 |
+| Edges decayed | 220 |
 | Edges pruned | 0 |
 | Edges inferred | 0 |
-| Clusters detected | 38 |
+| Clusters detected | 39 |
 
 ## Topology Metrics
 
 | Metric | Value |
 |---|---|
-| Nodes | 186 |
-| Edges | 223 |
+| Nodes | 187 |
+| Edges | 220 |
 | Active edges | 0 |
-| Clusters | 38 |
-| Entropy | 7.791 |
+| Clusters | 39 |
+| Entropy | 7.773 |
 | Edge utilization | 0.0% |
-| Avg edge weight | 0.758 |
+| Avg edge weight | 0.880 |
 | Structural redundancy | 0.0% |
-| Propagation efficiency | 6.5% |
+| Propagation efficiency | 6.3% |
 

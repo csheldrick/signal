@@ -1,147 +1,149 @@
 # signal — Architectural Topology
-> Generated 2026-05-25 · Graph 8314e077
+> Generated 2026-05-25 · Graph cfd95a7b
 
-57 nodes · 38 edges
+61 nodes · 36 edges
 
 ## Dependency Graph
 
 ```mermaid
 graph TD
   %% modules
-  signal_app_f6caef["signal-app"]
+  signal_app_38793f["signal-app"]
   %% services
-  DocumentStore_941145("DocumentStore")
-  SyncEngine_985eef("SyncEngine")
-  SyncManager_e25bfd("SyncManager")
-  DocumentStore_8232e3("DocumentStore")
-  SyncEngine_b752ca("SyncEngine")
-  SyncManager_184359("SyncManager")
-  app_292a4f("app")
+  DocumentStore_15cbc6("DocumentStore")
+  SyncEngine_2fa275("SyncEngine")
+  ClockProvider_58defb("ClockProvider")
+  SyncManager_b6cc61("SyncManager")
+  DocumentStore_330bdb("DocumentStore")
+  SyncEngine_8eb6ae("SyncEngine")
+  ClockProvider_a99b7b("ClockProvider")
+  SyncManager_d8b34b("SyncManager")
+  app_681d36("app")
   %% entitys
-  Summarizer_3c3b06[["Summarizer"]]
-  LocalSummarizer_67bd49[["LocalSummarizer"]]
-  PresenceStatus_c8eac9[["PresenceStatus"]]
-  PeerPresence_6fcd28[["PeerPresence"]]
-  PresenceTracker_932502[["PresenceTracker"]]
-  AppConfig_082c97[["AppConfig"]]
-  SignalApp_472e03[["SignalApp"]]
-  Document_971d43[["Document"]]
-  DocumentLink_e93312[["DocumentLink"]]
-  LinkKind_47e6af[["LinkKind"]]
-  SearchQuery_8e5707[["SearchQuery"]]
-  SearchResult_d4f61c[["SearchResult"]]
-  DocumentChange_af296a[["DocumentChange"]]
-  GraphNode_7b0885[["GraphNode"]]
-  AdjacencyList_4619d5[["AdjacencyList"]]
-  GraphBuilder_a6b39f[["GraphBuilder"]]
-  IndexStats_6c14c8[["IndexStats"]]
-  SearchHit_6e7662[["SearchHit"]]
-  InvertedIndex_59ab00[["InvertedIndex"]]
-  ExportPlugin_b8fce9[["ExportPlugin"]]
-  Plugin_d31f86[["Plugin"]]
-  PluginContext_df3580[["PluginContext"]]
-  PluginHost_022d40[["PluginHost"]]
-  SearchPlugin_2cf675[["SearchPlugin"]]
-  StorageEventType_37e898[["StorageEventType"]]
-  StorageEventCreated_c856b0[["StorageEventCreated"]]
-  StorageEventUpdated_037dce[["StorageEventUpdated"]]
-  StorageEventDeleted_667a8b[["StorageEventDeleted"]]
-  StorageEventLinked_d74a73[["StorageEventLinked"]]
-  StorageEvent_b74059[["StorageEvent"]]
-  StorageEventBus_602313[["StorageEventBus"]]
-  ConflictCandidate_bd19af[["ConflictCandidate"]]
-  ConflictResolution_2372ca[["ConflictResolution"]]
-  TransportSend_b0bfed[["TransportSend"]]
-  SyncManagerOptions_727b18[["SyncManagerOptions"]]
-  SyncState_8b72fd[["SyncState"]]
-  ConflictStrategy_b398cc[["ConflictStrategy"]]
-  PeerInfo_4459b4[["PeerInfo"]]
-  SyncAck_bdc13c[["SyncAck"]]
-  ConflictRecord_ea6972[["ConflictRecord"]]
-  VectorClock_e548b7[["VectorClock"]]
-  SyncMessage_4491ef[["SyncMessage"]]
-  QueueEntry_371759[["QueueEntry"]]
-  SyncQueueOptions_bd1d53[["SyncQueueOptions"]]
-  SyncQueue_62c71f[["SyncQueue"]]
-  PeerSession_feb7c9[["PeerSession"]]
-  DocumentVersion_f5fed1[["DocumentVersion"]]
-  VersionDiff_d26c4d[["VersionDiff"]]
-  VersionHistory_bfa56a[["VersionHistory"]]
+  Summarizer_5cc1c7[["Summarizer"]]
+  LocalSummarizer_5e7729[["LocalSummarizer"]]
+  RemoteSummarizer_c45847[["RemoteSummarizer"]]
+  DocumentReader_f82bbe[["DocumentReader"]]
+  PresenceStatus_e7218b[["PresenceStatus"]]
+  PeerPresence_978ac6[["PeerPresence"]]
+  PresenceTracker_7511b3[["PresenceTracker"]]
+  AppConfig_b64cae[["AppConfig"]]
+  SignalApp_cd03bd[["SignalApp"]]
+  Document_463d21[["Document"]]
+  DocumentLink_97a0b9[["DocumentLink"]]
+  LinkKind_1521cc[["LinkKind"]]
+  SearchQuery_f44774[["SearchQuery"]]
+  SearchResult_8f5020[["SearchResult"]]
+  DocumentChange_3cdf05[["DocumentChange"]]
+  GraphNode_b0f68b[["GraphNode"]]
+  AdjacencyList_459abb[["AdjacencyList"]]
+  GraphBuilder_35e792[["GraphBuilder"]]
+  IndexStats_391638[["IndexStats"]]
+  SearchHit_0bdc14[["SearchHit"]]
+  InvertedIndex_60c710[["InvertedIndex"]]
+  ExportPlugin_55d95f[["ExportPlugin"]]
+  Plugin_d373a0[["Plugin"]]
+  PluginContext_b79750[["PluginContext"]]
+  PluginHost_4815d5[["PluginHost"]]
+  SearchPlugin_8efbd5[["SearchPlugin"]]
+  StorageEventType_4456f9[["StorageEventType"]]
+  StorageEventCreated_ae0513[["StorageEventCreated"]]
+  StorageEventUpdated_dfbbd4[["StorageEventUpdated"]]
+  StorageEventDeleted_c067ec[["StorageEventDeleted"]]
+  StorageEventLinked_b767ad[["StorageEventLinked"]]
+  StorageEvent_7b01ee[["StorageEvent"]]
+  StorageEventBus_4e0c61[["StorageEventBus"]]
+  ConflictCandidate_58d52e[["ConflictCandidate"]]
+  ConflictResolution_6701de[["ConflictResolution"]]
+  TransportSend_1c057c[["TransportSend"]]
+  SyncManagerOptions_fb62f3[["SyncManagerOptions"]]
+  SyncState_011b53[["SyncState"]]
+  ConflictStrategy_68b67f[["ConflictStrategy"]]
+  PeerInfo_b54fa7[["PeerInfo"]]
+  SyncAck_2e1f1f[["SyncAck"]]
+  ConflictRecord_9d0590[["ConflictRecord"]]
+  VectorClock_6a63df[["VectorClock"]]
+  SyncMessage_e5a2fc[["SyncMessage"]]
+  QueueEntry_959bf9[["QueueEntry"]]
+  SyncQueueOptions_8bf68e[["SyncQueueOptions"]]
+  SyncQueue_aefe2f[["SyncQueue"]]
+  PeerSession_182ca4[["PeerSession"]]
+  DocumentVersion_0c5af5[["DocumentVersion"]]
+  VersionDiff_ec5210[["VersionDiff"]]
+  VersionHistory_22c357[["VersionHistory"]]
 
   %% relationships
-  PresenceTracker_932502 -->|"imports"| DocumentStore_8232e3
-  PresenceTracker_932502 -->|"imports"| SyncEngine_b752ca
-  SignalApp_472e03 -->|"imports"| DocumentStore_8232e3
-  SignalApp_472e03 -->|"imports"| StorageEventBus_602313
-  SignalApp_472e03 -->|"imports"| GraphBuilder_a6b39f
-  SignalApp_472e03 -->|"imports"| PluginHost_022d40
-  SignalApp_472e03 -->|"imports"| SyncEngine_b752ca
-  SignalApp_472e03 -->|"imports"| LocalSummarizer_67bd49
-  GraphBuilder_a6b39f -->|"imports"| DocumentStore_8232e3
-  ExportPlugin_b8fce9 -->|"imports"| PluginHost_022d40
-  SearchPlugin_2cf675 -->|"imports"| PluginHost_022d40
-  SearchPlugin_2cf675 -->|"imports"| DocumentStore_8232e3
-  DocumentStore_8232e3 -->|"imports"| StorageEventBus_602313
-  SyncEngine_b752ca -->|"imports"| DocumentStore_8232e3
-  SyncEngine_b752ca -->|"imports"| StorageEventBus_602313
-  SyncManager_184359 -->|"imports"| DocumentStore_8232e3
-  SyncManager_184359 -->|"imports"| StorageEventBus_602313
-  SyncManager_184359 -->|"imports"| SyncEngine_b752ca
-  SyncManager_184359 -->|"imports"| SyncQueue_62c71f
-  SyncManager_184359 -->|"imports"| PeerSession_feb7c9
-  signal_app_f6caef --o|"owns"| DocumentStore_941145
-  signal_app_f6caef --o|"owns"| SyncEngine_985eef
-  signal_app_f6caef --o|"owns"| SyncManager_e25bfd
-  signal_app_f6caef --o|"owns"| DocumentStore_8232e3
-  signal_app_f6caef --o|"owns"| SyncEngine_b752ca
-  signal_app_f6caef --o|"owns"| SyncManager_184359
-  signal_app_f6caef --o|"owns"| LocalSummarizer_67bd49
-  signal_app_f6caef --o|"owns"| PresenceTracker_932502
-  signal_app_f6caef --o|"owns"| SignalApp_472e03
-  signal_app_f6caef --o|"owns"| GraphBuilder_a6b39f
-  signal_app_f6caef --o|"owns"| InvertedIndex_59ab00
-  signal_app_f6caef --o|"owns"| ExportPlugin_b8fce9
-  signal_app_f6caef --o|"owns"| PluginHost_022d40
-  signal_app_f6caef --o|"owns"| SearchPlugin_2cf675
-  signal_app_f6caef --o|"owns"| StorageEventBus_602313
-  signal_app_f6caef --o|"owns"| SyncQueue_62c71f
-  signal_app_f6caef --o|"owns"| PeerSession_feb7c9
-  signal_app_f6caef --o|"owns"| VersionHistory_bfa56a
+  PresenceTracker_7511b3 -->|"imports"| PluginHost_4815d5
+  SignalApp_cd03bd -->|"imports"| DocumentStore_330bdb
+  SignalApp_cd03bd -->|"imports"| StorageEventBus_4e0c61
+  SignalApp_cd03bd -->|"imports"| GraphBuilder_35e792
+  SignalApp_cd03bd -->|"imports"| PluginHost_4815d5
+  SignalApp_cd03bd -->|"imports"| SyncEngine_8eb6ae
+  SignalApp_cd03bd -->|"imports"| PresenceTracker_7511b3
+  SignalApp_cd03bd -->|"imports"| RemoteSummarizer_c45847
+  ExportPlugin_55d95f -->|"imports"| PluginHost_4815d5
+  SearchPlugin_8efbd5 -->|"imports"| PluginHost_4815d5
+  DocumentStore_330bdb -->|"imports"| StorageEventBus_4e0c61
+  SyncEngine_8eb6ae -->|"imports"| StorageEventBus_4e0c61
+  SyncManager_d8b34b -->|"imports"| DocumentStore_330bdb
+  SyncManager_d8b34b -->|"imports"| StorageEventBus_4e0c61
+  SyncManager_d8b34b -->|"imports"| SyncEngine_8eb6ae
+  SyncManager_d8b34b -->|"imports"| SyncQueue_aefe2f
+  SyncManager_d8b34b -->|"imports"| PeerSession_182ca4
+  signal_app_38793f --o|"owns"| DocumentStore_15cbc6
+  signal_app_38793f --o|"owns"| SyncEngine_2fa275
+  signal_app_38793f --o|"owns"| SyncManager_b6cc61
+  signal_app_38793f --o|"owns"| DocumentStore_330bdb
+  signal_app_38793f --o|"owns"| SyncEngine_8eb6ae
+  signal_app_38793f --o|"owns"| SyncManager_d8b34b
+  signal_app_38793f --o|"owns"| LocalSummarizer_5e7729
+  signal_app_38793f --o|"owns"| RemoteSummarizer_c45847
+  signal_app_38793f --o|"owns"| PresenceTracker_7511b3
+  signal_app_38793f --o|"owns"| SignalApp_cd03bd
+  signal_app_38793f --o|"owns"| GraphBuilder_35e792
+  signal_app_38793f --o|"owns"| InvertedIndex_60c710
+  signal_app_38793f --o|"owns"| ExportPlugin_55d95f
+  signal_app_38793f --o|"owns"| PluginHost_4815d5
+  signal_app_38793f --o|"owns"| SearchPlugin_8efbd5
+  signal_app_38793f --o|"owns"| StorageEventBus_4e0c61
+  signal_app_38793f --o|"owns"| SyncQueue_aefe2f
+  signal_app_38793f --o|"owns"| PeerSession_182ca4
+  signal_app_38793f --o|"owns"| VersionHistory_22c357
 
   %% styles
   classDef moduleStyle fill:#1e3a5f,stroke:#4a9eff,color:#e8f4fd
   classDef serviceStyle fill:#1e3d2f,stroke:#4aff8e,color:#e8fdf0
   classDef workflowStyle fill:#3d2f1e,stroke:#ffa54a,color:#fdf0e8
   classDef entityStyle fill:#2f1e3d,stroke:#c54aff,color:#f0e8fd
-  class signal_app_f6caef moduleStyle
-  class DocumentStore_941145,SyncEngine_985eef,SyncManager_e25bfd,DocumentStore_8232e3,SyncEngine_b752ca,SyncManager_184359,app_292a4f serviceStyle
-  class Summarizer_3c3b06,LocalSummarizer_67bd49,PresenceStatus_c8eac9,PeerPresence_6fcd28,PresenceTracker_932502,AppConfig_082c97,SignalApp_472e03,Document_971d43,DocumentLink_e93312,LinkKind_47e6af,SearchQuery_8e5707,SearchResult_d4f61c,DocumentChange_af296a,GraphNode_7b0885,AdjacencyList_4619d5,GraphBuilder_a6b39f,IndexStats_6c14c8,SearchHit_6e7662,InvertedIndex_59ab00,ExportPlugin_b8fce9,Plugin_d31f86,PluginContext_df3580,PluginHost_022d40,SearchPlugin_2cf675,StorageEventType_37e898,StorageEventCreated_c856b0,StorageEventUpdated_037dce,StorageEventDeleted_667a8b,StorageEventLinked_d74a73,StorageEvent_b74059,StorageEventBus_602313,ConflictCandidate_bd19af,ConflictResolution_2372ca,TransportSend_b0bfed,SyncManagerOptions_727b18,SyncState_8b72fd,ConflictStrategy_b398cc,PeerInfo_4459b4,SyncAck_bdc13c,ConflictRecord_ea6972,VectorClock_e548b7,SyncMessage_4491ef,QueueEntry_371759,SyncQueueOptions_bd1d53,SyncQueue_62c71f,PeerSession_feb7c9,DocumentVersion_f5fed1,VersionDiff_d26c4d,VersionHistory_bfa56a entityStyle
+  class signal_app_38793f moduleStyle
+  class DocumentStore_15cbc6,SyncEngine_2fa275,ClockProvider_58defb,SyncManager_b6cc61,DocumentStore_330bdb,SyncEngine_8eb6ae,ClockProvider_a99b7b,SyncManager_d8b34b,app_681d36 serviceStyle
+  class Summarizer_5cc1c7,LocalSummarizer_5e7729,RemoteSummarizer_c45847,DocumentReader_f82bbe,PresenceStatus_e7218b,PeerPresence_978ac6,PresenceTracker_7511b3,AppConfig_b64cae,SignalApp_cd03bd,Document_463d21,DocumentLink_97a0b9,LinkKind_1521cc,SearchQuery_f44774,SearchResult_8f5020,DocumentChange_3cdf05,GraphNode_b0f68b,AdjacencyList_459abb,GraphBuilder_35e792,IndexStats_391638,SearchHit_0bdc14,InvertedIndex_60c710,ExportPlugin_55d95f,Plugin_d373a0,PluginContext_b79750,PluginHost_4815d5,SearchPlugin_8efbd5,StorageEventType_4456f9,StorageEventCreated_ae0513,StorageEventUpdated_dfbbd4,StorageEventDeleted_c067ec,StorageEventLinked_b767ad,StorageEvent_7b01ee,StorageEventBus_4e0c61,ConflictCandidate_58d52e,ConflictResolution_6701de,TransportSend_1c057c,SyncManagerOptions_fb62f3,SyncState_011b53,ConflictStrategy_68b67f,PeerInfo_b54fa7,SyncAck_2e1f1f,ConflictRecord_9d0590,VectorClock_6a63df,SyncMessage_e5a2fc,QueueEntry_959bf9,SyncQueueOptions_8bf68e,SyncQueue_aefe2f,PeerSession_182ca4,DocumentVersion_0c5af5,VersionDiff_ec5210,VersionHistory_22c357 entityStyle
 ```
 
 ## Coupling Table
 
 | Label | Kind | Fan-In | Fan-Out | Total |
 |---|---|---|---|---|
-| signal-app | module | 0 | 18 | 18 |
-| DocumentStore | service | 7 | 1 | 8 |
-| SignalApp | entity | 1 | 6 | 7 |
-| SyncEngine | service | 4 | 2 | 6 |
+| signal-app | module | 0 | 19 | 19 |
+| SignalApp | entity | 1 | 7 | 8 |
 | SyncManager | service | 1 | 5 | 6 |
+| PluginHost | entity | 5 | 0 | 5 |
 | StorageEventBus | entity | 5 | 0 | 5 |
-| PluginHost | entity | 4 | 0 | 4 |
-| PresenceTracker | entity | 1 | 2 | 3 |
-| GraphBuilder | entity | 2 | 1 | 3 |
-| SearchPlugin | entity | 1 | 2 | 3 |
-| LocalSummarizer | entity | 2 | 0 | 2 |
+| DocumentStore | service | 3 | 1 | 4 |
+| SyncEngine | service | 3 | 1 | 4 |
+| PresenceTracker | entity | 2 | 1 | 3 |
+| RemoteSummarizer | entity | 2 | 0 | 2 |
+| GraphBuilder | entity | 2 | 0 | 2 |
 | ExportPlugin | entity | 1 | 1 | 2 |
+| SearchPlugin | entity | 1 | 1 | 2 |
 | SyncQueue | entity | 2 | 0 | 2 |
 | PeerSession | entity | 2 | 0 | 2 |
 | DocumentStore | service | 1 | 0 | 1 |
 | SyncEngine | service | 1 | 0 | 1 |
 | SyncManager | service | 1 | 0 | 1 |
+| LocalSummarizer | entity | 1 | 0 | 1 |
 | InvertedIndex | entity | 1 | 0 | 1 |
 | VersionHistory | entity | 1 | 0 | 1 |
-| app | service | 0 | 0 | 0 |
 
 ## Next Steps
 

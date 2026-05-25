@@ -1,130 +1,134 @@
 [
   {
     "type": "goal",
-    "description": "Provide low-latency, reliable collaborative presence for documents via PresenceTracker so peers can join/leave and focus documents in real time."
+    "description": "Provide robust real-time collaboration for documents via SignalApp, ensuring low-latency presence updates (PresenceTracker, PeerPresence) and consistent document state (DocumentStore, SyncEngine, SyncManager)."
   },
   {
     "type": "goal",
-    "description": "Offer local and remote document summarization (LocalSummarizer, RemoteSummarizer) with a pluggable Summarizer interface and a sensible default (getDefaultSummarizer)."
+    "description": "Support extensible indexing and search across documents using InvertedIndex, GraphBuilder, and SearchPlugin so users can query documents with SearchQuery and receive SearchResult/SearchHit."
   },
   {
     "type": "goal",
-    "description": "Maintain durable, searchable document state with DocumentStore, indexing (InvertedIndex, PersistentSyncQueue) and a SyncEngine to keep peers consistent."
+    "description": "Offer AI-assisted document summarization with pluggable implementations: LocalSummarizer for fast local summaries and RemoteSummarizer for higher-quality remote summaries (Summarizer contract)."
   },
   {
     "type": "goal",
-    "description": "Support third‑party plugins through PluginHost and PluginContext while preventing plugins from introducing unsafe coupling (e.g. via __PLUGIN_USES_PLUGINCONTEXT sentinel)."
+    "description": "Expose a PluginHost/PluginContext model so plugins (ExportPlugin, SearchPlugin) can safely access documents and storage events (StorageEventBus, StorageEvent types) without breaking core invariants."
   },
   {
     "type": "goal",
-    "description": "Keep the signal-app module boundary (app) small and well-documented so module comprehension remains high (module confidence 95%)."
+    "description": "Ensure operational quality: observability, persistent storage durability, async job processing (background summarization/sync), authentication and adequate test coverage as first-class requirements."
   },
   {
     "type": "architecture",
-    "description": "Single-module architecture: signal-app owns domain entities (Summarizer, PresenceTracker, GraphBuilder, storage and sync services) and exposes contracts rather than separate microservices."
+    "description": "Module boundary signal-app contains core runtime: app/* implements services DocumentStore, SyncEngine, SyncManager, ClockProvider and host-level SignalApp which composes these services."
   },
   {
     "type": "architecture",
-    "description": "Pluggable summarization strategy: Summarizer interface with LocalSummarizer (pure) and RemoteSummarizer (network side effects) allows switching between local/remote models."
+    "description": "Contract-driven design: many domain interfaces (Summarizer, DocumentReader, PresenceStatus, InvertedIndex, PluginContext) define behaviors; implementations (LocalSummarizer, RemoteSummarizer, PresenceTracker) are wired in the app module."
   },
   {
     "type": "architecture",
-    "description": "Event-driven persistence: StorageEventBus is used to attach validators and propagate storage events (StorageEventCreated/Updated/Deleted/Linked) across DocumentStore and consumers."
+    "description": "Event-driven storage model: StorageEventBus plus typed StorageEventCreated/Updated/Deleted/Linked form the observable boundary for indexing, plugin notifications, and sync propagation."
   },
   {
     "type": "architecture",
-    "description": "Sync/Indexing pipeline: PersistentSyncQueue and InvertedIndex form the durability + search indexing path; SyncEngine orchestrates peer synchronization."
+    "description": "Sync and conflict model: SyncEngine, SyncManager, VectorClock, ConflictCandidate, and ConflictResolution indicate a vector-clock-based synchronization design with explicit conflict resolution strategies."
   },
   {
     "type": "architecture",
-    "description": "Graph analysis subsystem: GraphBuilder provides buildGraph (async) and findClusters (async) to derive adjacency/cluster views used by features that navigate document relationships."
+    "description": "Plugin isolation: PluginHost and PluginContext are intended to give plugins controlled access to DocumentStore and runtime services (refactor note: Presence refactor uses PluginContext for document access)."
   },
   {
     "type": "observation",
-    "description": "PresenceTracker.join(peerId, documentId?) has detected io side effects and returns PeerPresence; PresenceTracker.setValidator is recorded as pure — validator can be synchronous or async but setValidator itself doesn't perform IO."
+    "description": "LocalSummarizer is implemented as a pure function (LocalSummarizer.summarize) in app/src/ai/summarizer.ts; RemoteSummarizer is asynchronous and has side effects — two distinct runtime profiles for the Summarizer contract."
   },
   {
     "type": "observation",
-    "description": "createValidatorFromStore is intentionally removed/typed as never and documented as a migration sentinel; guidance points to StorageEventBus.attachDocumentValidatorFromEvents + PresenceTracker.setValidator as the supported migration path."
+    "description": "PresenceTracker exposes join(peerId, documentId?) returning PeerPresence and has async side effects; leave() is marked pure in the analysis which may mask necessary cleanup I/O."
   },
   {
     "type": "observation",
-    "description": "RemoteSummarizer and RemoteSummarizer.summarize are annotated with network side effects — remote calls can introduce latency and failure modes independent from LocalSummarizer."
+    "description": "createValidatorFromStore(_store: DocumentStore) performs I/O and is used in presence validation; this ties presence logic directly to DocumentStore visibility/integrity."
   },
   {
     "type": "observation",
-    "description": "Two low-confidence symbols detected: SyncQueue (confidence 45%) and __PLUGIN_USES_PLUGINCONTEXT (confidence 45%) — these are comprehension gaps that may hide runtime coupling or removed APIs."
+    "description": "There is an explicit refactor: '[REFACTOR] fix(presence): refactor to use PluginContext for document access and remove dire' — code changed to route document access through PluginContext but the note 'remove dire' suggests a removed primitive that other modules might still depend on."
   },
   {
     "type": "observation",
-    "description": "Module boundary 'signal-app' contains 20 files and is the primary ownership surface (owners list includes GraphBuilder, PresenceTracker, LocalSummarizer, DocumentStore, SyncEngine, etc.)."
+    "description": "Multiple service nodes are duplicated in the topology (DocumentStore, SyncEngine, ClockProvider, SyncManager appear more than once) — the runtime likely has multiple instances or name collisions in analysis."
   },
   {
     "type": "observation",
-    "description": "GraphBuilder.buildGraph is high-confidence and asynchronous; GraphBuilder.findClusters is present but recently had refactoring/ID changes in the graph export — verify callers still exist."
+    "description": "StorageEvent types (Created, Updated, Deleted, Linked) and StorageEventBus exist but there's no explicit Contract: StorageEventBus implementation node surfaced — potential gap between contract and concrete event broker."
   },
   {
     "type": "observation",
-    "description": "Storage-related invariants exist: guard clauses, try/catch error boundaries and rate-limiting patterns are present (detected across several files), indicating defensive code around IO."
+    "description": "Indexing components (InvertedIndex, GraphBuilder, AdjacencyList, IndexStats) are present; GraphBuilder and inverted index roles are separate which implies offline or async indexing stages."
   },
   {
     "type": "observation",
-    "description": "Lineage includes migration entries that specifically remove createValidatorFromStore and provide migration guidance — the codebase already contains the migration artifact and messaging for consumers."
+    "description": "Decision nodes 'TypeScript adoption' and 'Testing adoption' exist — the project contains an explicit decision to adopt TypeScript and increase test coverage, but 'Test coverage required' is flagged as a constraint indicating coverage is not yet sufficient."
+  },
+  {
+    "type": "observation",
+    "description": "Top-level module signal-app contains ~20 source files; overall graph reports 187 nodes and 220 edges implying substantial unexposed or library code beyond the app module."
   },
   {
     "type": "constraint",
-    "description": "Presence validation must not allow arbitrary sync-time IO to block the join path: validators supplied to PresenceTracker.setValidator may be async but should not make the realtime path unavailable."
+    "description": "Authentication required: all remote operations (RemoteSummarizer calls, SyncEngine transport) must validate credentials/authorization before accessing documents or performing sync."
   },
   {
     "type": "constraint",
-    "description": "DocumentStore and StorageEventBus must preserve event ordering for attachDocumentValidatorFromEvents consumers so presence and index invariants remain consistent."
+    "description": "Persistent storage: DocumentStore must persist document versions and version history; SyncEngine/SyncManager rely on durable storage to compute VectorClock, VersionHistory, and ConflictResolution correctly."
   },
   {
     "type": "constraint",
-    "description": "Plugins must not bypass PluginContext safety; contracts exposed via PluginHost must enforce capability boundaries (no direct access to internal DocumentStore without explicit API)."
+    "description": "Async job processing: background tasks (summarization, indexing, conflict resolution) must be resilient, idempotent, and observable — failures should not cause data loss or inconsistent indices."
   },
   {
     "type": "constraint",
-    "description": "Summarization must tolerate remote failures: RemoteSummarizer network failures should degrade to LocalSummarizer or return controlled errors (avoid unbounded retries blocking user flows)."
+    "description": "Observability: StorageEventBus and SyncManager must emit sufficient events/metrics to reconstruct system state and diagnose sync/conflict incidents (IndexStats, StorageEvent traces)."
   },
   {
     "type": "constraint",
-    "description": "SyncEngine + PersistentSyncQueue durability: queued sync entries must be persisted to survive process restarts to avoid data loss during peer sync."
+    "description": "Input validation boundary and guard clauses: domain invariants (Document, DocumentChange, SearchQuery) must be validated at module boundaries to avoid corrupting InvertedIndex or GraphBuilder state."
   },
   {
     "type": "hypothesis",
-    "description": "If createValidatorFromStore is removed but some older plugins or deployments still expect it, presence checks for migrated documents will fail at runtime (test by enabling legacy plugin and attempting join/focus flows)."
+    "description": "RemoteSummarizer network failures or rate limits will cause visible delays in summarization pipelines; without retries and backpressure the summarization queue could backlog and affect SyncManager."
   },
   {
     "type": "hypothesis",
-    "description": "Relying on RemoteSummarizer in latency-sensitive UI paths will increase user-perceived latency and error rates; replacing long-running calls with LocalSummarizer should reduce tail latency."
+    "description": "PresenceTracker.join/leave race conditions will surface under concurrent peers: if leave() is implemented as a pure function (no I/O) but must update shared state, presence may leak stale PeerPresence entries."
   },
   {
     "type": "hypothesis",
-    "description": "Low-confidence SyncQueue symbol indicates either a stale API or poor type coverage — attempts to rely on SyncQueue implementation details will break across upgrades (validate with integration tests exercising queue persistence/cleanup)."
+    "description": "Index staleness: if StorageEventBus implementation is missing or not hooked into DocumentStore, InvertedIndex and GraphBuilder will be out of sync after DocumentStore updates, causing incorrect SearchResult sets."
   },
   {
     "type": "hypothesis",
-    "description": "If PluginContext assumptions are underspecified (see __PLUGIN_USES_PLUGINCONTEXT sentinel), third-party plugins may inadvertently access internal APIs leading to security or data-integrity issues (fuzz plugin APIs in CI)."
+    "description": "After the refactor to use PluginContext for document access, some plugins or consumers still referencing the removed 'dire' primitive will break at runtime causing plugin initialization failures in PluginHost."
   },
   {
     "type": "hypothesis",
-    "description": "GraphBuilder.findClusters may be unused or diverge from buildGraph results after refactors; features depending on clustering (UI visualizations, recommendations) will show stale/incorrect clusters unless tests cover both methods."
+    "description": "ConflictResolution quality will degrade if SyncEngine instances are duplicated or misconfigured (duplicate DocumentStore/SyncEngine nodes observed); redundant instances may create divergent VectorClock histories."
   },
   {
     "type": "tension",
-    "description": "PresenceTracker.setValidator is documented as a pure setter (no IO) while presence validation in practice may require async/store-backed checks — tension between pure API surface and required async validation semantics."
+    "description": "Decision to adopt TypeScript exists but the analysis shows potential discrepancies (duplicate nodes, contracts with weak implementation mapping) indicating partial or uneven adoption across the codebase."
   },
   {
     "type": "tension",
-    "description": "The codebase purposely removed createValidatorFromStore (migration) to prevent new coupling, but lineage/migration notes and presence APIs still need a clear, testable replacement path (StorageEventBus.attachDocumentValidatorFromEvents) — risk of migration friction."
+    "description": "The project intends plugin isolation via PluginContext/PluginHost, yet presence refactor changed document access to PluginContext and removed a primitive — this may contradict existing plugin expectations and break backward compatibility."
   },
   {
     "type": "tension",
-    "description": "RemoteSummarizer introduces network side effects in a subsystem where LocalSummarizer is pure — this creates contradictory operational expectations for callers (some expect deterministic local behavior, others expect remote accuracy)."
+    "description": "Goal of strong observability and complete StorageEvent tracking conflicts with the observation that StorageEventBus implementation is not clearly present, risking blind spots between DocumentStore and indexing/sync layers."
   },
   {
     "type": "tension",
-    "description": "Plugin extensibility (PluginHost/PluginContext) aims for flexibility but the low-confidence marker __PLUGIN_USES_PLUGINCONTEXT suggests incomplete documentation or unsafe opt-ins, clashing with the stated constraint to prevent plugins from introducing coupling."
+    "description": "A requirement for test coverage and 'Testing adoption' decision contradicts the number of contracts (71) and entities (51) with complex behaviors (sync, conflict, plugins) — the current test surface likely undercovers critical concurrent and IO-heavy logic."
   }
 ]

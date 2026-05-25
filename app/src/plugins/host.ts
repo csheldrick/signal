@@ -4,7 +4,7 @@
 
 import type { Document, SearchQuery, SearchResult } from '../core/types.js';
 
-export { SearchQuery, SearchResult };
+export type { SearchQuery, SearchResult } from '../core/types.js';
 
 export interface Plugin {
   id: string;
@@ -26,6 +26,7 @@ export interface PluginContext {
   listDocuments(): ReadonlyArray<Readonly<Document>>;
   searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResult>>;
   getDocument(id: string): Readonly<Document> | undefined;
+  getClock(): { [peerId: string]: number };
 }
 
 export class PluginHost {
@@ -97,6 +98,20 @@ export class PluginHost {
             links: d.links.map(l => deepFreeze({ ...l })),
             tags: [...d.tags],
           });
+        },
+        getClock: () => {
+          try {
+            // Prefer the host-provided clock if available; fall back to empty map.
+            const maybe = (this.context as any)?.getClock;
+            if (typeof maybe === 'function') {
+              const res = maybe();
+              // Ensure we return a plain object (not frozen by upstream) so callers can read safely.
+              return (res && typeof res === 'object') ? res : {};
+            }
+          } catch (_) {
+            /* swallow errors and provide safe default */
+          }
+          return {};
         },
       };
 

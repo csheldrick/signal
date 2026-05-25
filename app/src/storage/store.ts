@@ -11,6 +11,7 @@ import type {
   DocumentChange,
 } from '../core/types.js';
 import { StorageEventBus } from './events.js';
+export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
 
 export class DocumentStore {

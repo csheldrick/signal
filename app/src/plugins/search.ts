@@ -1,5 +1,5 @@
 // ── Search Plugin ───────────────────────────────────────────
-// ⚠️ DELIBERATE BOUNDARY VIOLATION
+// Search plugin sandboxed to PluginContext (uses PluginContext-only contract)
 // This plugin imports DocumentStore directly instead of using PluginContext.
 // Loom should detect this as a cross-subsystem dependency edge.
 // Weave's ContradictionDetectionOperator should surface it as a tension.
