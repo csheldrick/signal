@@ -205,13 +205,7 @@ export class PresenceTracker {
 
         // Detect Promise-like objects to avoid performing IO on the realtime path.
         if (res !== null && typeof res === 'object' && typeof (res as any).then === 'function') {
-          try {
-            // eslint-disable-next-line no-console
-            console.warn('PresenceTracker.setValidator received an async function; use setAsyncValidator for IO-bound validators.');
-          } catch (_) {
-            /* swallow console errors */
-          }
-          return false;
+          throw new Error('PresenceTracker.setValidator received an async function; async validators must be registered with setAsyncValidator().');
         }
 
         return !!res;
