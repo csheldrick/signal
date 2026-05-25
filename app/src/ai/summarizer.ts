@@ -60,7 +60,11 @@ class RemoteSummarizer implements Summarizer {
     }
 
     try {
-      const result = await this.fetcher(document);
+      const timeoutMs = 300;
+      const result = await Promise.race([
+        this.fetcher(document),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), timeoutMs)),
+      ]);
       if (typeof result !== 'string' || result.length === 0) {
         return this.fallback.summarize(document);
       }
