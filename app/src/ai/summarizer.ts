@@ -9,7 +9,7 @@
 import type { Document } from '../core/types.js';
 
 export interface Summarizer {
-  readonly isRemote?: boolean;
+  readonly isRemote: boolean;
   summarize(document: Document): Promise<string>;
 }
 
