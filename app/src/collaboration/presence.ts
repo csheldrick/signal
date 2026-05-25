@@ -108,7 +108,7 @@ export class PresenceTracker {
   leave(peerId: string): void {
     const existing = this.peers.get(peerId);
     if (existing) {
-      this.peers.set(peerId, { ...existing, status: 'offline', lastSeen: Date.now() });
+      this.peers.delete(peerId);
     }
   }
 
