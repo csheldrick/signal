@@ -80,8 +80,14 @@ export class StorageEventBus {
    * a migration-friendly, testable replacement for direct store access so
    * callers (e.g. PresenceTracker) need not import DocumentStore.
    */
-  attachDocumentValidatorFromEvents(): (id: string) => Promise<boolean> {
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): (id: string) => Promise<boolean> {
     const known = new Set<string>();
+
+    // Seed from provided iterable (e.g., current store snapshot) so callers can validate
+    // existing documents immediately without importing the store directly.
+    if (initial) {
+      for (const id of initial) known.add(id);
+    }
 
     const listener: Listener = (event) => {
       switch (event.type) {

@@ -34,6 +34,8 @@ export class SignalApp {
     this.events = new StorageEventBus();
     this.store = new DocumentStore(this.events);
     this.graph = new GraphBuilder(() => this.store.list());
+    // Seed StorageEventBus validator with current document ids to support presence checks without direct store access
+    this.events.attachDocumentValidatorFromEvents(this.store.list().map(d => d.id));
     this._peerId = config.peerId;
 
 
