@@ -54,8 +54,88 @@ export class SignalApp {
       searchDocuments: (query) => this.store.search(query),
       getDocument: (id) => this.store.read(id),
       getClock: () => ({}),
+
+      onStorageEvent: (type, listener) => {
+        // Provide plugins a readonly/frozen snapshot of events and a disposer.
+        const wrapper = (ev: any) => {
+          try {
+            switch (ev.type) {
+              case 'created': {
+                const d = ev.document;
+                const frozen = Object.freeze({
+                  ...ev,
+                  document: Object.freeze({ ...d, links: d.links.map((l: any) => Object.freeze({ ...l })), tags: [...d.tags] }),
+                });
+                listener(frozen);
+                return;
+              }
+              case 'updated': {
+                const cur = ev.current; const prev = ev.previous;
+                const frozen = Object.freeze({
+                  ...ev,
+                  current: Object.freeze({ ...cur, links: cur.links.map((l: any) => Object.freeze({ ...l })), tags: [...cur.tags] }),
+                  previous: Object.freeze({ ...prev, links: prev.links.map((l: any) => Object.freeze({ ...l })), tags: [...prev.tags] }),
+                });
+                listener(frozen);
+                return;
+              }
+              case 'deleted': {
+                listener(Object.freeze({ ...ev }));
+                return;
+              }
+              case 'linked': {
+                const link = ev.link;
+                listener(Object.freeze({ ...ev, link: Object.freeze({ ...link }) }));
+                return;
+              }
+              default:
+                listener(Object.freeze(ev));
+                return;
+            }
+          } catch (_) {
+            try { listener(ev); } catch (_) { /* swallow */ }
+          }
+        };
+        this.events.on(type as any, wrapper);
+        return () => { this.events.off(type as any, wrapper); };
+      },
+
+      summarizeDocument: async (documentId: string) => {
+        const d = this.store.read(documentId);
+        if (!d) return undefined;
+        // Use the configured summarizer when present; otherwise use a local one.
+        const summarizer = this._summarizer ?? new LocalSummarizer(3);
+        try {
+          return await summarizer.summarize(d);
+        } catch (_) {
+          return undefined;
+        }
+      },
     };
     this.plugins = new PluginHost(pluginContext);
+
+    // Background summarization warm-up: schedule lightweight summarization for created/updated docs
+    // to provide async job processing and warm caches (reduces remote latency on first real request).
+    (this as any)._bgSummarizeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const scheduleSummarize = (docId: string) => {
+      const timers: Map<string, ReturnType<typeof setTimeout>> = (this as any)._bgSummarizeTimers;
+      const prev = timers.get(docId);
+      if (prev) clearTimeout(prev);
+      const t = setTimeout(async () => {
+        timers.delete(docId);
+        try {
+          const doc = this.store.read(docId);
+          if (!doc) return;
+          const s = this._summarizer ?? new LocalSummarizer(3);
+          await s.summarize(doc);
+          try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
+        } catch (_) { /* swallow background errors */ }
+      }, 100);
+      timers.set(docId, t);
+    };
+
+    this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
+    this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId));
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
     this.presence = new PresenceTracker();

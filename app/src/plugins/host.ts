@@ -3,6 +3,7 @@
 // Plugins receive a PluginContext — NOT the store directly.
 
 import type { Document, SearchQuery, SearchResult } from '../core/types.js';
+import type { StorageEvent, StorageEventType } from '../storage/events.js';
 
 export type { SearchQuery, SearchResult } from '../core/types.js';
 
@@ -27,6 +28,19 @@ export interface PluginContext {
   searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResult>>;
   getDocument(id: string): Readonly<Document> | undefined;
   getClock(): { [peerId: string]: number };
+
+  /**
+   * Observe storage events in a readonly, sandboxed way. Returns a dispose
+   * function that removes the listener when called.
+   */
+  onStorageEvent(type: StorageEventType | '*', listener: (event: Readonly<StorageEvent>) => void): () => void;
+
+  /**
+   * Request a readonly summarization for a document id. The host decides
+   * whether network calls are permitted; undefined is returned when the
+   * document is missing or summarization is not available.
+   */
+  summarizeDocument(documentId: string): Promise<string | undefined>;
 }
 
 export class PluginHost {
@@ -112,6 +126,65 @@ export class PluginHost {
             /* swallow errors and provide safe default */
           }
           return {};
+        },
+
+        onStorageEvent: (type: StorageEventType | '*', listener: (event: Readonly<StorageEvent>) => void) => {
+          try {
+            const maybe = (this.context as any)?.onStorageEvent;
+            if (typeof maybe === 'function') {
+              // Wrap to ensure plugins receive a frozen, readonly snapshot tailored by event.type
+              const wrapped = (ev: StorageEvent) => {
+                try {
+                  switch (ev.type) {
+                    case 'created': {
+                      const d = (ev as any).document;
+                      const safe = Object.freeze({ ...ev, document: Object.freeze({ ...d, links: d.links.map((l: any) => Object.freeze({ ...l })), tags: [...d.tags] }) });
+                      listener(safe);
+                      return;
+                    }
+                    case 'updated': {
+                      const prev = (ev as any).previous; const cur = (ev as any).current;
+                      const safe = Object.freeze({ ...ev,
+                        previous: Object.freeze({ ...prev, links: prev.links.map((l: any) => Object.freeze({ ...l })), tags: [...prev.tags] }),
+                        current: Object.freeze({ ...cur, links: cur.links.map((l: any) => Object.freeze({ ...l })), tags: [...cur.tags] }),
+                      });
+                      listener(safe);
+                      return;
+                    }
+                    case 'deleted': {
+                      listener(Object.freeze({ ...ev }));
+                      return;
+                    }
+                    case 'linked': {
+                      const link = (ev as any).link;
+                      listener(Object.freeze({ ...ev, link: Object.freeze({ ...link }) }));
+                      return;
+                    }
+                    default:
+                      listener(Object.freeze(ev));
+                      return;
+                  }
+                } catch (_) {
+                  try { listener(ev as any); } catch (_) { /* swallow */ }
+                }
+              };
+
+              const dispose = maybe(type, wrapped);
+              if (typeof dispose === 'function') return dispose;
+              return () => { try { (this.context as any).off(type, wrapped); } catch (_) {} };
+            }
+          } catch (_) { /* ignore */ }
+          return () => {};
+        },
+
+        summarizeDocument: async (documentId: string) => {
+          try {
+            const maybe = (this.context as any)?.summarizeDocument;
+            if (typeof maybe === 'function') {
+              return await maybe(documentId);
+            }
+          } catch (_) { /* swallow */ }
+          return undefined;
         },
       };
 
