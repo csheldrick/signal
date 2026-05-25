@@ -205,7 +205,15 @@ export class PresenceTracker {
 
         // Detect Promise-like objects to avoid performing IO on the realtime path.
         if (res !== null && typeof res === 'object' && typeof (res as any).then === 'function') {
-          throw new Error('PresenceTracker.setValidator received an async function; async validators must be registered with setAsyncValidator().');
+          try {
+          // eslint-disable-next-line no-console
+          console.warn('PresenceTracker.setValidator received an async validator; treating it as async. Prefer setAsyncValidator() for clarity.');
+        } catch (_) {
+          /* swallow console errors */
+        }
+        // Await the Promise-like result but normalize failures to false.
+        const awaited = await (res as Promise<any>).catch(() => false);
+        return !!awaited;
         }
 
         return !!res;
