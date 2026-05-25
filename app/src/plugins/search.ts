@@ -5,28 +5,30 @@
 // Weave's ContradictionDetectionOperator should surface it as a tension.
 
 import type { Plugin, PluginContext } from './host.js';
-import type { DocumentStore } from '../storage/store.js';  // ← VIOLATION
+  // ← VIOLATION
 import type { SearchQuery, SearchResult } from '../core/types.js';
+
 
 export class SearchPlugin implements Plugin {
   readonly id = 'search';
   readonly name = 'Advanced Search';
-  private store: DocumentStore | undefined;
+  private context: PluginContext | undefined;
+  
 
-  constructor(store: DocumentStore) {
-    this.store = store;
-  }
+  constructor() {}
 
-  activate(_context: PluginContext): void {
-    // Ignores the sandboxed context — uses store directly
+
+  activate(context: PluginContext): void {
+    this.context = context;
   }
 
   deactivate(): void {
-    this.store = undefined;
+    this.context = undefined;
   }
 
   search(query: SearchQuery): SearchResult[] {
-    if (!this.store) return [];
-    return this.store.search(query);
+    
+    if (!this.context) return [];
+    return this.context.searchDocuments(query);
   }
 }

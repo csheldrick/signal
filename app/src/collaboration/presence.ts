@@ -72,7 +72,36 @@ export class PresenceTracker {
       status: 'active',
       lastSeen: Date.now(),
     };
+
+    // Register presence immediately so the realtime join path is never blocked.
     this.peers.set(peerId, presence);
+
+    // If a validator exists, validate in the background with a short timeout.
+    // Do NOT await here; a slow validator must not block the realtime path.
+    if (documentId && this.validator) {
+      const timeoutMs = 100;
+      (async () => {
+        try {
+          const validatorPromise = this.validator!(documentId).catch(() => false);
+          const ok = await Promise.race([
+            validatorPromise,
+            new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
+          ]);
+
+          if (!ok) {
+            // If the document is invalid, clear the documentId for this peer but
+            // keep the presence record so the join event already completed.
+            const existing = this.peers.get(peerId);
+            if (existing && existing.documentId === documentId) {
+              this.peers.set(peerId, { ...existing, documentId: undefined });
+            }
+          }
+        } catch (_) {
+          // Swallow errors to avoid impacting realtime flow.
+        }
+      })();
+    }
+
     return presence;
   }
 
@@ -96,7 +125,19 @@ export class PresenceTracker {
   async focusDocument(peerId: string, documentId: string): Promise<boolean> {
     // If a validator has been provided (possibly async/store-backed or event-driven), use it.
     if (this.validator) {
-      const ok = await this.validator(documentId);
+      // Run validator with a short timeout to avoid blocking the realtime path.
+      const timeoutMs = 100;
+      const validatorPromise = (async () => {
+        try {
+          return await this.validator!(documentId);
+        } catch (_) {
+          return false;
+        }
+      })();
+      const ok = await Promise.race([
+        validatorPromise,
+        new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
+      ]);
       if (!ok) return false;
     } else {
       // Fallback to the synchronous store check for backwards compatibility when no validator is set.
