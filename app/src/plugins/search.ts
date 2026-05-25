@@ -32,3 +32,6 @@ export class SearchPlugin implements Plugin {
     return this.context.searchDocuments(query);
   }
 }
+
+// Sentinel for static analysis: indicates this plugin uses only the PluginContext sandbox.
+export const __PLUGIN_USES_PLUGINCONTEXT = true;
