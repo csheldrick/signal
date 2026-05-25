@@ -55,8 +55,22 @@ export class StorageEventBus {
   }
 
   emit(event: StorageEvent): void {
-    this.listeners.get(event.type)?.forEach(fn => fn(event));
-    this.listeners.get('*')?.forEach(fn => fn(event));
+    // Invoke listeners asynchronously to avoid blocking the emitter and reduce
+    // tight synchronous coupling between storage and its subscribers.
+    const direct = this.listeners.get(event.type);
+    const star = this.listeners.get('*');
+
+    const invoke = () => {
+      direct?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
+      star?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
+    };
+
+    // Schedule on the microtask queue so emit returns immediately.
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(invoke);
+    } else {
+      Promise.resolve().then(invoke);
+    }
   }
 
   /**
