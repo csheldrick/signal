@@ -41,9 +41,25 @@ export function resolveConflict(
   let winner: Document;
 
   switch (strategy) {
-    case 'last-write-wins':
-      winner = remote.updatedAt >= local.updatedAt ? remote : local;
+    case 'last-write-wins': {
+      // Prefer the more recently updated document. If timestamps are equal,
+      // apply a deterministic tie-breaker: prefer the version with larger
+      // serialized content size (more content), then lexicographically by id.
+      if (remote.updatedAt > local.updatedAt) {
+        winner = remote;
+      } else if (remote.updatedAt < local.updatedAt) {
+        winner = local;
+      } else {
+        const remoteSize = JSON.stringify(remote).length;
+        const localSize = JSON.stringify(local).length;
+        if (remoteSize !== localSize) {
+          winner = remoteSize > localSize ? remote : local;
+        } else {
+          winner = remote.id >= local.id ? remote : local;
+        }
+      }
       break;
+    }
 
     case 'first-write-wins':
       winner = local.createdAt <= remote.createdAt ? local : remote;

@@ -50,6 +50,14 @@ export class GraphBuilder {
 
       for (const link of doc.links) {
         edges.get(doc.id)!.add(link.targetId);
+        // Ensure the referenced target exists in the nodes map so graph
+        // traversals and clustering consider referenced-but-missing nodes.
+        if (!nodes.has(link.targetId)) {
+          nodes.set(link.targetId, { id: link.targetId, title: '(missing)', linkCount: 0 });
+        }
+        // Ensure adjacency entry for the target exists so incoming edges are
+        // represented consistently (helps undirected traversals).
+        if (!edges.has(link.targetId)) edges.set(link.targetId, new Set());
       }
     }
 

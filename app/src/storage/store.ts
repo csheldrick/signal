@@ -78,7 +78,7 @@ export class DocumentStore {
     return existed;
   }
 
-  link(sourceId: string, targetId: string, kind: Document['links'][number]['kind']): DocumentLink | undefined {
+  link(sourceId: string, targetId: string, kind: DocumentLink['kind']): DocumentLink | undefined {
     const source = this.documents.get(sourceId);
     const target = this.documents.get(targetId);
     if (!source || !target) return undefined;

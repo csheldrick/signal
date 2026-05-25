@@ -10,6 +10,8 @@ export interface Document {
   links: DocumentLink[];
   createdAt: number;
   updatedAt: number;
+  // Optional version field supports lightweight versioning for sync/merge logic.
+  version?: number;
 }
 
 export interface DocumentLink {

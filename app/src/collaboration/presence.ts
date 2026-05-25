@@ -129,13 +129,43 @@ export class PresenceTracker {
 
   async focusDocument(peerId: string, documentId: string): Promise<boolean> {
     // If the peer is already registered for this documentId, they're already focused.
-    // Return true to indicate success.
+    // Update lastSeen and return true to indicate success.
     const existing = this.peers.get(peerId);
     if (existing && existing.documentId === documentId) {
+      this.peers.set(peerId, { ...existing, lastSeen: Date.now() });
       return true;
     }
-    // Peer registered but not focused on this document — focus is not successful.
-    return false;
+
+    // If the peer is not registered, we cannot focus on their behalf.
+    if (!existing) return false;
+
+    // If there is a validator, validate the target document with a short timeout.
+    // Do NOT block the realtime path for long; mirror the join() behaviour's timeout.
+    if (documentId && this.validator) {
+      const timeoutMs = 100;
+      try {
+        const validatorPromise = this.validator(documentId).catch(() => false);
+        const ok = await Promise.race([
+          validatorPromise,
+          new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
+        ]);
+
+        if (!ok) return false;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // Apply the focus change and mark the peer as active with updated timestamp.
+    const updated: PeerPresence = {
+      ...existing,
+      documentId,
+      status: 'active',
+      lastSeen: Date.now(),
+    };
+
+    this.peers.set(peerId, updated);
+    return true;
   }
 
   /**
@@ -162,7 +192,7 @@ export class PresenceTracker {
       try {
         const res = validate(id);
 
-        if (res !== null && typeof res === 'object' && typeof (res as any).then === 'function') {
+        if (res !== null && (typeof res === 'object' || typeof res === 'function') && typeof (res as any).then === 'function') {
           try {
             // eslint-disable-next-line no-console
             console.warn('PresenceTracker.setValidator received an async validator; running it as async for compatibility. Prefer setAsyncValidator() for IO-bound checks.');
