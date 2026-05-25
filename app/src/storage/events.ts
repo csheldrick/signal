@@ -134,9 +134,18 @@ export class StorageEventBus {
     // Observe all events to maintain an internal existence set.
     this.on('*', listener);
 
-    return async (id: string) => {
+    // Return an async validator function. For callers that wish to stop
+    // observing events (and avoid keeping the listener referenced) a
+    // .dispose() method is attached to the returned function. This keeps
+    // the original callable API stable while providing an explicit teardown
+    // mechanism to avoid unbounded listener growth.
+    const validator = async (id: string) => {
       return known.has(id);
     };
+
+    (validator as any).dispose = () => { this.off('*', listener); };
+
+    return validator;
   }
 
   /**
@@ -171,6 +180,11 @@ export class StorageEventBus {
 
     this.on('*', listener);
 
-    return (id: string) => known.has(id);
+    // Synchronous snapshot validator. We attach an optional .dispose()
+    // method to allow callers to remove the underlying listener when they
+    // no longer need the snapshot, preventing memory and processing leaks.
+    const validator = (id: string) => known.has(id);
+    (validator as any).dispose = () => { this.off('*', listener); };
+    return validator;
   }
 }

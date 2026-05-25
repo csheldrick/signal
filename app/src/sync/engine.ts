@@ -93,8 +93,44 @@ export class SyncEngine {
     }
 
     if (message) {
-      this.outbound.push(message);
+      // Coalesce outbound messages per-document to avoid noisy churn. Behavior:
+      // - delete takes precedence and will replace earlier create/update entries.
+      // - create supersedes prior entries for the same document.
+      // - update will merge into an existing create/update when present; if a
+      //   delete is pending we ignore the update (delete wins).
+      const docId = message.documentId;
+      const idx = this.outbound.findIndex(m => m.documentId === docId);
+
+      if (message.operation === 'delete') {
+        // Remove any prior messages for this doc and append delete.
+        if (idx !== -1) this.outbound.splice(idx, 1);
+        this.outbound.push(message);
+      } else if (message.operation === 'create') {
+        // Create supersedes prior messages for same doc.
+        if (idx !== -1) this.outbound.splice(idx, 1);
+        this.outbound.push(message);
+      } else if (message.operation === 'update') {
+        if (idx !== -1) {
+          const existing = this.outbound[idx];
+          if (existing.operation === 'create' || existing.operation === 'update') {
+            // Replace existing create/update with the newest update payload
+            // and metadata (clock/timestamp/peerId) to reflect latest state.
+            this.outbound[idx] = {
+              ...existing,
+              payload: message.payload,
+              clock: message.clock,
+              timestamp: message.timestamp,
+              peerId: message.peerId,
+            };
+          } else {
+            // existing is delete — keep delete, ignore update
+          }
+        } else {
+          this.outbound.push(message);
+        }
+      }
     }
+
     return message;
   }
 

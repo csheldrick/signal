@@ -80,6 +80,10 @@ export class RemoteSummarizer implements Summarizer {
   private readonly failureWindowMs: number = 10_000; // 10s window
   private readonly cooldownMs: number = 5_000; // 5s cooldown
   private readonly timeoutMs: number = 300;
+  // Track the last remote attempt per-document to apply a small rate limit
+  // which prevents rapid repeated remote attempts for the same document.
+  private lastAttemptAt: Map<string, number> = new Map();
+  private readonly minAttemptIntervalMs: number = 200;
 
   /**
    * Create a RemoteSummarizer.
@@ -125,19 +129,35 @@ export class RemoteSummarizer implements Summarizer {
   async summarize(document: Document): Promise<string> {
     const id = document?.id ?? '';
 
+    const now = this.now();
+
     if (!this.allowNetwork) {
       // Explicit opt-in required for network calls — fallback deterministically.
       return this.fallback.summarize(document);
     }
 
-    // If there's already an in-flight request for this document, return it
-    // to coalesce duplicate concurrent work and reduce remote load.
-    if (id) {
-      const inFlight = RemoteSummarizer.pending.get(id);
-      if (inFlight) return inFlight;
+    // Avoid remote calls for documents without stable ids or for very short
+    // content where a local heuristic summary is sufficient. This prevents
+    // unnecessary network load and reduces remote service pressure.
+    const contentLen = (document.content || '').trim().length;
+    if (!id || contentLen < 50) {
+      return this.fallback.summarize(document);
     }
 
-    const now = this.now();
+    // Rate-limit repeated remote attempts per-document to reduce load and
+    // avoid thrashing a failing/slow remote service.
+    const last = this.lastAttemptAt.get(id) ?? 0;
+    if (now - last < this.minAttemptIntervalMs) {
+      return this.fallback.summarize(document);
+    }
+    this.lastAttemptAt.set(id, now);
+
+    // If there's already an in-flight request for this document, return it
+    // to coalesce duplicate concurrent work and reduce remote load.
+    const inFlight = RemoteSummarizer.pending.get(id);
+    if (inFlight) return inFlight;
+
+    //
     if (this.cooldownUntil && now < this.cooldownUntil) {
       // We're in cooldown due to prior failures; return local summary quickly.
       return this.fallback.summarize(document);
