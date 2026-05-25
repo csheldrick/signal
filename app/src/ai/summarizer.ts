@@ -19,18 +19,43 @@ export class LocalSummarizer implements Summarizer {
   readonly allowsNetwork = false;
   private readonly maxSentences: number;
 
+  private static cache: Map<string, { updatedAt: number; summary: string }> = new Map();
+
   constructor(maxSentences: number = 3) {
     this.maxSentences = maxSentences;
   }
 
   async summarize(document: Document): Promise<string> {
-    const sentences = document.content
+    const id = document?.id ?? '';
+    const updatedAt = (document as any)?.updatedAt ?? 0;
+
+    // Fast-path: return cached summary when document hasn't changed.
+    if (id) {
+      const cached = LocalSummarizer.cache.get(id);
+      if (cached && cached.updatedAt === updatedAt) {
+        return cached.summary;
+      }
+    }
+
+    const sentences = (document.content || '')
       .split(/[.!?]+/)
       .map(s => s.trim())
       .filter(s => s.length > 0);
 
     const selected = sentences.slice(0, this.maxSentences);
-    return selected.join('. ') + (selected.length > 0 ? '.' : '');
+    const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
+
+    if (id) {
+      LocalSummarizer.cache.set(id, { updatedAt, summary });
+      // Simple bounded eviction to avoid unbounded memory growth.
+      if (LocalSummarizer.cache.size > 100) {
+        const it = LocalSummarizer.cache.keys();
+        const first = it.next().value as string | undefined;
+        if (first) LocalSummarizer.cache.delete(first);
+      }
+    }
+
+    return summary;
   }
 }
 
