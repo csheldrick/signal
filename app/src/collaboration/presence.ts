@@ -29,6 +29,8 @@ export interface PeerPresence {
 export class PresenceTracker {
   private peers: Map<string, PeerPresence> = new Map();
 
+  private validator?: (id: string) => Promise<boolean>;
+
   constructor(
     private readonly store: DocumentStore,
     private readonly sync: SyncEngine,
@@ -62,9 +64,16 @@ export class PresenceTracker {
 
   // Reaches into DocumentStore to verify the document exists before registering
   // focus. Also stamps the clock from SyncEngine — the second boundary crossing.
-  focusDocument(peerId: string, documentId: string): boolean {
-    const doc = this.store.read(documentId);
-    if (!doc) return false;
+  async focusDocument(peerId: string, documentId: string): Promise<boolean> {
+    // If a validator has been provided (possibly async/store-backed or event-driven), use it.
+    if (this.validator) {
+      const ok = await this.validator(documentId);
+      if (!ok) return false;
+    } else {
+      // Fallback to the synchronous store check for backwards compatibility when no validator is set.
+      const doc = this.store.read(documentId);
+      if (!doc) return false;
+    }
 
     const clock = this.sync.getClock();
     void clock;
@@ -76,6 +85,10 @@ export class PresenceTracker {
       lastSeen: Date.now(),
     });
     return true;
+  }
+
+  setValidator(validate?: (id: string) => Promise<boolean>): void {
+    this.validator = validate;
   }
 
   summary(): { active: number; idle: number; offline: number } {
