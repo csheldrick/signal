@@ -157,17 +157,40 @@ export class PresenceTracker {
     return true;
   }
 
-  setValidator(validate?: (id: string) => boolean | Promise<boolean>): void {
+  /**
+   * Set a synchronous validator. This setter is pure (no IO) per the public contract.
+   * For async/store-backed validators use setAsyncValidator instead.
+   */
+  setValidator(validate?: (id: string) => boolean): void {
     if (!validate) {
       this.validator = undefined;
       return;
     }
-    // Normalize synchronous or asynchronous validators into an async function
+    // Wrap sync validator into async internal validator without performing IO here.
+    this.validator = async (id: string) => {
+      try {
+        return Boolean(validate(id));
+      } catch (_) {
+        // Treat thrown errors as validation failure but do not propagate to realtime flows.
+        return false;
+      }
+    };
+  }
+
+  /**
+   * Set an asynchronous validator for store-backed or IO-bound checks.
+   * This method is explicit about allowing IO and may perform network/disk operations.
+   */
+  setAsyncValidator(validate?: (id: string) => Promise<boolean> | boolean): void {
+    if (!validate) {
+      this.validator = undefined;
+      return;
+    }
+    // Normalize async or sync inputs into the internal async validator.
     this.validator = async (id: string) => {
       try {
         return await Promise.resolve(validate(id) as Promise<boolean> | boolean);
       } catch (_) {
-        // Treat thrown errors as validation failure but do not propagate to realtime flows.
         return false;
       }
     };
