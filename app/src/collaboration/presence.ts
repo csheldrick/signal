@@ -14,8 +14,19 @@
 // higher pressure than a single-boundary violation (EXP-002) because the
 // ContradictionDetectionOperator fires from two distinct source pairs.
 
-import type { DocumentStore } from '../storage/store.js';
-import type { SyncEngine } from '../sync/engine.js';
+export interface DocumentReader {
+  read(id: string): unknown | undefined;
+}
+
+export interface ClockProvider {
+  getClock(): { [peerId: string]: number };
+}
+
+// Maintain the original type names as local aliases so the rest of the file
+// can remain unchanged. This removes the direct imports and the cross-
+// subsystem coupling while preserving the existing constructor/signature surface.
+export type DocumentStore = DocumentReader;
+export type SyncEngine = ClockProvider;
 
 export type PresenceStatus = 'active' | 'idle' | 'offline';
 
