@@ -34,9 +34,29 @@ export class PluginHost {
     const plugin = this.plugins.get(pluginId);
     if (!plugin || this.enabled.has(pluginId)) return false;
     const safeCtx: PluginContext = Object.freeze({
-      listDocuments: () => this.context.listDocuments(),
-      searchDocuments: (q: SearchQuery) => this.context.searchDocuments(q),
-      getDocument: (id: string) => this.context.getDocument(id),
+      listDocuments: () => this.context.listDocuments().map(d => Object.freeze({
+        ...d,
+        links: d.links.map(l => ({ ...l })),
+        tags: [...d.tags],
+      })),
+      searchDocuments: (q: SearchQuery) => this.context.searchDocuments(q).map(r => ({
+        document: Object.freeze({
+          ...r.document,
+          links: r.document.links.map(l => ({ ...l })),
+          tags: [...r.document.tags],
+        }),
+        score: r.score,
+        highlights: [...r.highlights],
+      })),
+      getDocument: (id: string) => {
+        const d = this.context.getDocument(id);
+        if (!d) return undefined;
+        return Object.freeze({
+          ...d,
+          links: d.links.map(l => ({ ...l })),
+          tags: [...d.tags],
+        });
+      },
     });
     plugin.activate(safeCtx);
     this.enabled.add(pluginId);
