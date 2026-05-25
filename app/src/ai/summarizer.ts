@@ -59,7 +59,7 @@ export class LocalSummarizer implements Summarizer {
   }
 }
 
-class RemoteSummarizer implements Summarizer {
+export class RemoteSummarizer implements Summarizer {
   readonly isRemote = true;
   readonly allowsNetwork: boolean;
   private readonly fetcher: (document: Document) => Promise<string>;

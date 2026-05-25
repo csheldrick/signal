@@ -10,7 +10,7 @@ import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 import { PresenceTracker } from '../collaboration/presence.js';
 
-import { LocalSummarizer } from '../ai/summarizer.js';
+import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
 import type { Document } from '../core/types.js';
 
@@ -34,6 +34,7 @@ export class SignalApp {
   private readonly _peerId: string;
   private _sync?: SyncEngine;
   private _summarizer?: Summarizer;
+  private readonly _allowNetwork: boolean;
 
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
@@ -45,6 +46,7 @@ export class SignalApp {
 
     // Initialize summarizer deterministically to LocalSummarizer by default.
     // Remote summarization is opt-in and must be explicitly enabled.
+    this._allowNetwork = !!config.allowNetwork;
     this._summarizer = new LocalSummarizer();
 
 
@@ -67,6 +69,21 @@ export class SignalApp {
         this._sync?.generateOutbound(event);
       }
     });
+  }
+
+  enableRemoteSummarizer(fetcher: (document: Document) => Promise<string>, options?: { allowNetwork?: boolean; maxSentences?: number }): boolean {
+    // Remote summarization may only be enabled when the app was constructed with allowNetwork.
+    if (!this._allowNetwork) return false;
+    // Construct RemoteSummarizer with the provided fetcher. The options.allowNetwork defaults to true
+    // to allow network calls for this summarizer instance; callers may pass allowNetwork: false to force
+    // local-only behavior for this instance.
+    this._summarizer = new RemoteSummarizer(fetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences });
+    return true;
+  }
+
+  disableRemoteSummarizer(): void {
+    // Revert to the deterministic local summarizer to remove any network side-effects.
+    this._summarizer = new LocalSummarizer();
   }
 
   start(dataPath?: string): void {
