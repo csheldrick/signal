@@ -62,7 +62,7 @@ export class PresenceTracker {
 
   constructor(
     private readonly store: DocumentStore,
-    private readonly sync: SyncEngine,
+    private readonly sync?: SyncEngine,
   ) {}
 
   join(peerId: string, documentId?: string): PeerPresence {
@@ -145,8 +145,8 @@ export class PresenceTracker {
       if (!doc) return false;
     }
 
-    const clock = this.sync.getClock();
-    void clock;
+    // clock stamping removed to avoid direct sync dependency
+    
 
     this.peers.set(peerId, {
       peerId,
