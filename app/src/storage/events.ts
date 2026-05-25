@@ -107,4 +107,39 @@ export class StorageEventBus {
       return known.has(id);
     };
   }
+
+  /**
+   * Attach a synchronous document-existence validator derived from observed
+   * storage events. Returns a synchronous function that consults an internal
+   * Set updated by the same event listener used by the async validator.
+   *
+   * This provides a safe, zero-IO validator suitable for realtime paths that
+   * require a pure (non-Promise) check, while still keeping the event-driven
+   * updates happening in the background.
+   */
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean {
+    const known = new Set<string>();
+
+    if (initial) {
+      for (const id of initial) known.add(id);
+    }
+
+    const listener: Listener = (event) => {
+      switch (event.type) {
+        case 'created':
+          known.add(event.document.id);
+          break;
+        case 'deleted':
+          known.delete(event.documentId);
+          break;
+        case 'updated':
+        case 'linked':
+          break;
+      }
+    };
+
+    this.on('*', listener);
+
+    return (id: string) => known.has(id);
+  }
 }

@@ -59,8 +59,17 @@ export class SignalApp {
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
     this.presence = new PresenceTracker();
+    const initialIds = this.store.list().map(d => d.id);
+
+    // Provide a synchronous snapshot validator for the realtime path so callers
+    // using PresenceTracker.setValidator receive a pure (non-IO) function.
+    // Also attach the async event-driven validator for comprehensive checks.
+    this.presence.setValidator(
+      this.events.attachDocumentValidatorSnapshot(initialIds)
+    );
+
     this.presence.setAsyncValidator(
-      this.events.attachDocumentValidatorFromEvents(this.store.list().map(d => d.id))
+      this.events.attachDocumentValidatorFromEvents(initialIds)
     );
 
     // Wire storage events → sync engine
