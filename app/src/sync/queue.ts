@@ -20,15 +20,19 @@ export interface SyncQueueOptions {
   baseDelayMs?: number;
   /** Hard cap on retry delay ms. Default 30_000. */
   maxDelayMs?: number;
+  /** Maximum number of queued messages. Default 1000. */
+  maxQueueSize?: number;
 }
 
 export class SyncQueue {
   private readonly entries: QueueEntry[] = [];
+  private readonly maxQueueSize: number;
   private readonly maxAttempts: number;
   private readonly baseDelayMs: number;
   private readonly maxDelayMs: number;
 
   constructor(opts: SyncQueueOptions = {}) {
+    this.maxQueueSize = opts.maxQueueSize ?? 1000;
     this.maxAttempts = opts.maxAttempts ?? 5;
     this.baseDelayMs = opts.baseDelayMs ?? 500;
     this.maxDelayMs = opts.maxDelayMs ?? 30_000;
@@ -65,6 +69,10 @@ export class SyncQueue {
         );
         this.entries.splice(existingIdx, 1, entry);
       } else {
+        if (this.entries.length >= this.maxQueueSize) {
+          const removed = this.entries.shift()!;
+          removed.reject(new Error('Queue full — dropped oldest entry'));
+        }
         this.entries.push(entry);
       }
     });
