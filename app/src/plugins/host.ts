@@ -33,7 +33,12 @@ export class PluginHost {
   enable(pluginId: string): boolean {
     const plugin = this.plugins.get(pluginId);
     if (!plugin || this.enabled.has(pluginId)) return false;
-    plugin.activate(this.context);
+    const safeCtx: PluginContext = Object.freeze({
+      listDocuments: () => this.context.listDocuments(),
+      searchDocuments: (q: SearchQuery) => this.context.searchDocuments(q),
+      getDocument: (id: string) => this.context.getDocument(id),
+    });
+    plugin.activate(safeCtx);
     this.enabled.add(pluginId);
     return true;
   }
