@@ -26,6 +26,24 @@ export interface PeerPresence {
   lastSeen: number;
 }
 
+export function createValidatorFromStore(store: DocumentStore): (id: string) => Promise<boolean> {
+  // Backwards-compatible helper: callers that previously relied on
+  // createValidatorFromStore can use this to obtain an async validator
+  // without reaching into internal migration shims. The implementation
+  // is intentionally simple and safe: it checks existence and guards
+  // against unexpected store errors.
+  return async (id: string) => {
+    try {
+      const doc = store.read(id);
+      return doc !== undefined && doc !== null;
+    } catch (err) {
+      // If the store throws for any reason, treat as non-existent but
+      // avoid bubbling errors into realtime presence flows.
+      return false;
+    }
+  };
+}
+
 export class PresenceTracker {
   private peers: Map<string, PeerPresence> = new Map();
 
