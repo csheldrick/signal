@@ -11,11 +11,17 @@ import type { Document } from '../core/types.js';
 export interface Summarizer {
   readonly isRemote: boolean;
   readonly allowsNetwork: boolean;
+  /**
+   * isPure = true indicates calling summarize() performs no external I/O
+   * or side-effects (network/disk). Consumers that require deterministic,
+   * realtime-safe behaviour should prefer implementations with isPure = true.
+   */
+  readonly isPure: boolean;
   summarize(document: Document): Promise<string>;
 }
 
 export class LocalSummarizer implements Summarizer {
-  readonly isRemote = false;
+  readonly isRemote = false; readonly isPure = true;
   readonly allowsNetwork = false;
   private readonly maxSentences: number;
 
@@ -60,7 +66,7 @@ export class LocalSummarizer implements Summarizer {
 }
 
 export class RemoteSummarizer implements Summarizer {
-  readonly isRemote = true;
+  readonly isRemote = true; readonly isPure = false;
   readonly allowsNetwork: boolean;
   private readonly fetcher: (document: Document) => Promise<string>;
   private readonly fallback: LocalSummarizer;

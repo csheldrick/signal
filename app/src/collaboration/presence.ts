@@ -53,7 +53,14 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
 
     try {
       const res = (_store as unknown as DocumentReader).read(id);
-      const resolved = await Promise.resolve(res) as unknown;
+      // Avoid awaiting Promise-like readers on the realtime validation path.
+      // If the provided reader returns a Promise-like value we treat it as
+      // "not found" to prevent IO from being performed synchronously during
+      // presence validation. Callers should migrate to attachDocumentValidatorFromEvents/Async validators.
+      if (res !== null && (typeof res === 'object' || typeof res === 'function') && typeof (res as any).then === 'function') {
+        return false;
+      }
+      const resolved = res as unknown;
       return resolved !== undefined && resolved !== null;
     } catch (_) {
       return false;
@@ -112,9 +119,22 @@ export class PresenceTracker {
     return presence;
   }
 
-  leave(peerId: string): void {
+  async leave(peerId: string): Promise<void> {
     const existing = this.peers.get(peerId);
     if (existing) {
+      // Optional async cleanup hook: plugins may provide a sandboxed
+      // onPeerLeave(peerId, documentId) hook on PluginContext. We invoke
+      // it if present and await it here, but swallow errors to avoid
+      // impacting realtime flows. Callers that need to ensure cleanup can
+      // await the returned Promise.
+      try {
+        if (this.context && typeof (this.context as any).onPeerLeave === 'function') {
+          await Promise.resolve((this.context as any).onPeerLeave(peerId, existing.documentId));
+        }
+      } catch (_) {
+        /* swallow */
+      }
+
       this.peers.delete(peerId);
     }
   }

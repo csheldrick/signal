@@ -40,7 +40,16 @@ export type StorageEvent =
 
 type Listener = (event: StorageEvent) => void;
 
-export class StorageEventBus {
+export interface StorageEventBusContract {
+  on(type: StorageEventType | '*', listener: Listener): void;
+  off(type: StorageEventType | '*', listener: Listener): void;
+  emit(event: StorageEvent): void;
+  emitAsync(event: StorageEvent): void;
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): (id: string) => Promise<boolean> & { dispose?: () => void };
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean & { dispose?: () => void };
+}
+
+export class StorageEventBus implements StorageEventBusContract {
   private listeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
 
   on(type: StorageEventType | '*', listener: Listener): void {
