@@ -9,7 +9,7 @@ import { PluginHost } from '../plugins/host.js';
 import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 
-import { LocalSummarizer, type Summarizer } from '../ai/summarizer.js';
+import type { Summarizer } from '../ai/summarizer.js';
 import type { Document } from '../core/types.js';
 
 export interface AppConfig {
@@ -60,7 +60,7 @@ export class SignalApp {
       this.store.load(dataPath);
     }
     // Lazy-initialize subsystems that are safe to defer until app start
-    if (!this._summarizer) this._summarizer = new LocalSummarizer(3);
+    // summarizer is initialized lazily when first needed (avoid runtime import and coupling)
     if (!this._sync) this._sync = new SyncEngine(this.store, this._peerId);
     this.started = true;
   }
