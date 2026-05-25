@@ -195,7 +195,8 @@ export class PresenceTracker {
         if (result && typeof (result as any).then === 'function') {
           // Don't await — treat as invalid to preserve realtime path invariants.
           // eslint-disable-next-line no-console
-          throw new Error('PresenceTracker.setValidator: async validator provided to setValidator; use setAsyncValidator for async checks.');
+          console.warn('PresenceTracker.setValidator: async validator provided to setValidator; use setAsyncValidator for async checks.');
+          return false;
           return false;
         }
         return Boolean(result);
