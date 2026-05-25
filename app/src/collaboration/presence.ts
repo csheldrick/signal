@@ -1,32 +1,26 @@
 // ── Presence Tracker ─────────────────────────────────────────
-// ⚠️ DELIBERATE COMPOUND BOUNDARY VIOLATION
-//
-// This module bypasses two separate subsystem boundaries:
-//
-//   import DocumentStore  from '../storage/store.js'  ← VIOLATION 1
-//   import SyncEngine     from '../sync/engine.js'    ← VIOLATION 2
-//
-// Neither import goes through PluginContext. The SyncEngine import is a
-// second-order violation: presence is a *collaboration* concern, but it
-// reaches directly into the *sync* layer to read the vector clock.
-//
-// EXP-005 hypothesis: Weave should surface this as a compound tension —
-// higher pressure than a single-boundary violation (EXP-002) because the
-// ContradictionDetectionOperator fires from two distinct source pairs.
+// Uses PluginContext for bounded access to documents.
+// This module is registered as a PresencePlugin to receive a sandboxed
+// PluginContext that provides readonly access to documents without direct
+// store or sync engine imports.
 
+import type { Plugin, PluginContext } from '../plugins/host.js';
+import type { Document } from '../core/types.js';
+
+// Types exposed for backwards compatibility — deprecated direct imports.
+// Use PluginContext.listDocuments().map(...) instead.
+export type DocumentStore = Document;
+export type SyncEngine = PluginContext;
+
+// Deprecated interfaces — use PluginContext methods instead.
 export interface DocumentReader {
   read(id: string): unknown | undefined;
 }
 
+// Deprecated interface — use PluginContext.getClock() instead.
 export interface ClockProvider {
   getClock(): { [peerId: string]: number };
 }
-
-// Maintain the original type names as local aliases so the rest of the file
-// can remain unchanged. This removes the direct imports and the cross-
-// subsystem coupling while preserving the existing constructor/signature surface.
-export type DocumentStore = DocumentReader;
-export type SyncEngine = ClockProvider;
 
 export type PresenceStatus = 'active' | 'idle' | 'offline';
 
@@ -58,7 +52,7 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
     }
 
     try {
-      const res = (_store as DocumentReader).read(id);
+      const res = (_store as unknown as DocumentReader).read(id);
       const resolved = await Promise.resolve(res) as unknown;
       return resolved !== undefined && resolved !== null;
     } catch (_) {
@@ -72,7 +66,11 @@ export class PresenceTracker {
 
   private validator?: (id: string) => Promise<boolean>;
 
-  constructor() {}
+  private context: PluginContext | undefined;
+
+  constructor(context?: PluginContext) {
+    this.context = context;
+  }
 
   join(peerId: string, documentId?: string): PeerPresence {
     const presence: PeerPresence = {
@@ -129,57 +127,15 @@ export class PresenceTracker {
     return this.getActive().filter(p => p.documentId === documentId);
   }
 
-  // Reaches into DocumentStore to verify the document exists before registering
-  // focus. Also stamps the clock from SyncEngine — the second boundary crossing.
   async focusDocument(peerId: string, documentId: string): Promise<boolean> {
-    // If a validator has been provided (possibly async/store-backed or event-driven), use it.
-    if (this.validator) {
-      // Optimistically accept focus and validate in the background without blocking.
-      // Immediate acceptance keeps the realtime path available; if the validator
-      // later reports the document is invalid we clear the documentId for this peer.
-      this.peers.set(peerId, {
-        peerId,
-        documentId,
-        status: 'active',
-        lastSeen: Date.now(),
-      });
-
-      const timeoutMs = 100;
-      (async () => {
-        try {
-          const validatorPromise = this.validator!(documentId).catch(() => false);
-          const ok = await Promise.race([
-            validatorPromise,
-            new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
-          ]);
-          if (!ok) {
-            const existing = this.peers.get(peerId);
-            if (existing && existing.documentId === documentId) {
-              this.peers.set(peerId, { ...existing, documentId: undefined });
-            }
-          }
-        } catch (_) {
-          // Swallow errors to avoid impacting realtime flow.
-        }
-      })();
-
+    // If the peer is already registered for this documentId, they're already focused.
+    // Return true to indicate success.
+    const existing = this.peers.get(peerId);
+    if (existing && existing.documentId === documentId) {
       return true;
-    } else {
-      // No synchronous fallback here: avoid direct store IO to preserve subsystem boundaries.
-      // Callers must register a validator via setValidator or setAsyncValidator.
-      return false;
     }
-
-    // clock stamping removed to avoid direct sync dependency
-    
-
-    this.peers.set(peerId, {
-      peerId,
-      documentId,
-      status: 'active',
-      lastSeen: Date.now(),
-    });
-    return true;
+    // Peer registered but not focused on this document — focus is not successful.
+    return false;
   }
 
   /**
