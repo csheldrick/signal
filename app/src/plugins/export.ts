@@ -7,6 +7,7 @@ import type { Plugin, PluginContext } from './host.js';
 export class ExportPlugin implements Plugin {
   readonly id = 'export';
   readonly name = 'Markdown Export';
+  readonly usesPluginContext = true;
   private context: PluginContext | undefined;
 
   activate(context: PluginContext): void {
@@ -40,5 +41,5 @@ export class ExportPlugin implements Plugin {
   }
 }
 
-export const __PLUGIN_USES_PLUGINCONTEXT = true;
+// sentinel moved to instance property (readonly usesPluginContext = true)
 

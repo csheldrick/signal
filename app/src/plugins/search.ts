@@ -12,6 +12,7 @@ import type { SearchQuery, SearchResult } from '../core/types.js';
 export class SearchPlugin implements Plugin {
   readonly id = 'search';
   readonly name = 'Advanced Search';
+  readonly usesPluginContext = true;
   private context: PluginContext | undefined;
   
 
@@ -33,4 +34,4 @@ export class SearchPlugin implements Plugin {
 }
 
 // Sentinel for static analysis: indicates this plugin uses only the PluginContext sandbox.
-export const __PLUGIN_USES_PLUGINCONTEXT = true;
+// sentinel moved to instance property (readonly usesPluginContext = true)

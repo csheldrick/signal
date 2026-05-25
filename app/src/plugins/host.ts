@@ -7,6 +7,11 @@ import type { Document, SearchQuery, SearchResult } from '../core/types.js';
 export interface Plugin {
   id: string;
   name: string;
+  /**
+   * Explicit opt-in flag indicating the plugin uses only the PluginContext
+   * sandbox. Plugins that access other subsystems MUST NOT set this flag.
+   */
+  readonly usesPluginContext?: boolean;
   activate(context: PluginContext): void;
   deactivate(): void;
 }
@@ -31,6 +36,14 @@ export class PluginHost {
   }
 
   register(plugin: Plugin): void {
+    if (plugin.usesPluginContext !== true) {
+      try {
+        // eslint-disable-next-line no-console
+        console.warn('Plugin registered without explicit usesPluginContext flag; this may indicate cross-subsystem coupling. Add readonly usesPluginContext = true to opt into PluginContext-only contract.');
+      } catch (_) {
+        /* swallow console errors */
+      }
+    }
     this.plugins.set(plugin.id, plugin);
   }
 
