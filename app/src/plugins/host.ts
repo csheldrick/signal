@@ -11,7 +11,7 @@ export interface Plugin {
    * Explicit opt-in flag indicating the plugin uses only the PluginContext
    * sandbox. Plugins that access other subsystems MUST NOT set this flag.
    */
-  readonly usesPluginContext: true;
+  readonly usesPluginContext?: boolean;
   activate(context: PluginContext): void;
   deactivate(): void;
 }
@@ -39,7 +39,7 @@ export class PluginHost {
     if (plugin.usesPluginContext !== true) {
       try {
         // eslint-disable-next-line no-console
-        console.error('Plugin registration rejected: plugin must declare readonly usesPluginContext = true to register.');
+        console.error('Plugin registration rejected: plugin must opt into PluginContext sandbox by declaring readonly usesPluginContext = true.');
       } catch (_) {
         /* swallow console errors */
       }
