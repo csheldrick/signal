@@ -48,8 +48,24 @@ export interface SyncMessage {
 export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   const merged: VectorClock = { ...a };
   for (const [peer, tick] of Object.entries(b)) {
-    merged[peer] = Math.max(merged[peer] ?? 0, tick);
+    // Coerce to finite non-negative numbers; guard against malformed input
+    const safeTick = Number.isFinite(tick as number) ? Math.max(0, tick as number) : 0;
+    merged[peer] = Math.max(merged[peer] ?? 0, safeTick);
   }
+
+  // Remove zero/invalid entries to avoid noise
+  for (const [peer, tick] of Object.entries(merged)) {
+    if ((tick ?? 0) <= 0) delete merged[peer];
+  }
+
+  // Bound size to prevent unbounded growth in large deployments
+  const MAX_CLOCK_ENTRIES = 1000;
+  const entries = Object.entries(merged);
+  if (entries.length > MAX_CLOCK_ENTRIES) {
+    entries.sort(([, aTick], [, bTick]) => (bTick as number) - (aTick as number));
+    return Object.fromEntries(entries.slice(0, MAX_CLOCK_ENTRIES)) as VectorClock;
+  }
+
   return merged;
 }
 

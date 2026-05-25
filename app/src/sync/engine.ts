@@ -7,6 +7,8 @@ interface DocumentStoreLike {
   create(id: string, title: string, content: string, tags?: string[]): unknown;
   update(id: string, changes: { title?: string; content?: string; tags?: string[] }): unknown | undefined;
   delete(id: string): boolean;
+  // Optional events bus compatible with the concrete StorageEventBus implementation
+  events?: import('../storage/events.js').StorageEventBusContract;
 }
 
 import type { StorageEvent } from '../storage/events.js';
@@ -17,6 +19,8 @@ export class SyncEngine {
   private clock: VectorClock = {};
   private readonly peerId: string;
   private outbound: SyncMessage[] = [];
+  // Registry of SyncEngine instances keyed by the concrete store object to detect accidental duplicates.
+  private static _instancesByStore: WeakMap<object, SyncEngine> = new WeakMap<object, SyncEngine>();
 
   constructor(
     private readonly store: DocumentStoreLike,
@@ -24,6 +28,41 @@ export class SyncEngine {
   ) {
     this.peerId = peerId;
     this.clock[peerId] = 0;
+
+    // Register this engine keyed by the concrete store object to detect duplicates.
+    try {
+      const key = (this.store as unknown) as object;
+      const existing = SyncEngine._instancesByStore.get(key);
+      if (existing && existing !== this) {
+        // Throw to make misconfiguration explicit: multiple engines for same store
+        // lead to divergent vector clocks and conflict-resolution issues.
+        throw new Error('SyncEngine: multiple engines bound to the same DocumentStore instance; this may cause divergent VectorClock histories.');
+      }
+      SyncEngine._instancesByStore.set(key, this);
+    } catch (e) {
+      // If registry fails for any reason, log and continue — this is defensive.
+      console.warn('SyncEngine: instance registry unavailable', e);
+    }
+
+    // If the store exposes the event bus with the standard .on() API, subscribe
+    // to all events so a single engine drives outbound message coalescing and
+    // clock progression. This reduces the chance of divergent clocks when
+    // multiple writers exist.
+    try {
+      const bus = this.store?.events;
+      if (bus && typeof bus.on === 'function') {
+        bus.on('*', (e: StorageEvent) => {
+          try {
+            this.generateOutbound(e);
+          } catch (err) {
+            // Keep listener resilient
+            console.error('SyncEngine: error handling storage event', err);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('SyncEngine: failed to subscribe to store events', err);
+    }
   }
 
   applyRemoteChange(message: SyncMessage): boolean {

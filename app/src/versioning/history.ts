@@ -29,6 +29,10 @@ export class VersionHistory {
   private byId: Map<string, DocumentVersion> = new Map();
 
   snapshot(document: Document, author: string): DocumentVersion {
+    if (!author || author.trim() === '') {
+      throw new Error('VersionHistory.snapshot requires a non-empty author (authentication required).');
+    }
+
     const history = this.chains.get(document.id) ?? [];
     const parent = history.at(-1);
 
@@ -42,6 +46,16 @@ export class VersionHistory {
     };
 
     history.push(version);
+
+    // Cap history per-document to avoid unbounded memory growth.
+    const MAX_VERSIONS = 50;
+    if (history.length > MAX_VERSIONS) {
+      const removed = history.splice(0, history.length - MAX_VERSIONS);
+      for (const old of removed) {
+        this.byId.delete(old.versionId);
+      }
+    }
+
     this.chains.set(document.id, history);
     this.byId.set(version.versionId, version);
     return version;

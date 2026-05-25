@@ -48,6 +48,8 @@ export class InvertedIndex {
 
   search(queryText: string): SearchHit[] {
     const queryTerms = this.tokenize(queryText);
+    if (queryTerms.length === 0) return [];
+
     const scores = new Map<string, number>();
 
     for (const term of queryTerms) {
@@ -59,11 +61,18 @@ export class InvertedIndex {
       for (const docId of docs) {
         scores.set(docId, (scores.get(docId) ?? 0) + idf);
       }
+
+      // Defensive: if scores grows very large, bail early to avoid OOM/CPU spikes
+      if (scores.size > 10000) break;
     }
 
-    return [...scores.entries()]
+    const results = [...scores.entries()]
       .map(([documentId, score]) => ({ documentId, score }))
       .sort((a, b) => b.score - a.score);
+
+    // Cap results to keep downstream consumers focused and to reduce pressure
+    const MAX_RESULTS = 100;
+    return results.slice(0, MAX_RESULTS);
   }
 
   terms(): string[] {

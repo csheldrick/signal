@@ -15,10 +15,29 @@ export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
 
 export class DocumentStore {
+  private static _instances = 0;
+
   private documents: Map<string, Document> = new Map();
   readonly events: StorageEventBus;
 
+  // Operation counters for basic observability
+  private opCounts: { create: number; update: number; delete: number; link: number } = {
+    create: 0,
+    update: 0,
+    delete: 0,
+    link: 0,
+  };
+
+  // Soft limits to avoid unbounded work for naive callers
+  private static readonly MAX_SEARCH_RESULTS = 100;
+  private static readonly DEFAULT_LIST_PREVIEW = 100;
+
   constructor(events?: StorageEventBus) {
+    DocumentStore._instances += 1;
+    if (DocumentStore._instances > 1) {
+      console.warn('Multiple DocumentStore instances detected; this may lead to divergent state. Prefer a single shared instance.');
+    }
+
     this.events = events ?? new StorageEventBus();
   }
 
@@ -99,6 +118,11 @@ export class DocumentStore {
   }
 
   search(query: SearchQuery): SearchResult[] {
+    // If no search criteria provided, return a small preview to avoid full scans.
+    if (!query || (!query.text && (!query.tags || query.tags.length === 0) && !query.dateRange)) {
+      return Array.from(this.documents.values()).slice(0, DocumentStore.DEFAULT_LIST_PREVIEW).map(d => ({ document: d, score: 0, highlights: [] }));
+    }
+
     const results: SearchResult[] = [];
 
     for (const doc of this.documents.values()) {
@@ -131,9 +155,11 @@ export class DocumentStore {
       if (score > 0) {
         results.push({ document: doc, score, highlights });
       }
+
+      if (results.length >= DocumentStore.MAX_SEARCH_RESULTS) break;
     }
 
-    return results.sort((a, b) => b.score - a.score);
+    return results.sort((a, b) => b.score - a.score).slice(0, DocumentStore.MAX_SEARCH_RESULTS);
   }
 
   save(filePath: string): void {
