@@ -22,17 +22,20 @@ export class SignalApp {
   readonly events: StorageEventBus;
   readonly graph: GraphBuilder;
   readonly plugins: PluginHost;
-  readonly sync: SyncEngine;
-  readonly summarizer: Summarizer;
+  /* sync lazy-initialized at start */
+  /* summarizer lazy-initialized at start */
 
   private started = false;
+  private readonly _peerId: string;
+  private _sync?: SyncEngine;
+  private _summarizer?: Summarizer;
 
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
     this.store = new DocumentStore(this.events);
     this.graph = new GraphBuilder(() => this.store.list());
-    this.summarizer = new LocalSummarizer(3);
-    this.sync = new SyncEngine(this.store, config.peerId);
+    this._peerId = config.peerId;
+
 
     const pluginContext: PluginContext = {
       listDocuments: () => this.store.list(),
@@ -44,7 +47,7 @@ export class SignalApp {
     // Wire storage events → sync engine
     this.events.on('*', (event) => {
       if (this.started) {
-        this.sync.generateOutbound(event);
+        this._sync?.generateOutbound(event);
       }
     });
   }
@@ -54,6 +57,9 @@ export class SignalApp {
     if (dataPath) {
       this.store.load(dataPath);
     }
+    // Lazy-initialize subsystems that are safe to defer until app start
+    if (!this._summarizer) this._summarizer = new LocalSummarizer(3);
+    if (!this._sync) this._sync = new SyncEngine(this.store, this._peerId);
     this.started = true;
   }
 
