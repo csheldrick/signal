@@ -41,7 +41,18 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
   // Deprecated and intentionally removed. Callers must migrate to the event-driven
   // validator exposed by StorageEventBus.attachDocumentValidatorFromEvents(initialIds)
   // and register it via PresenceTracker.setAsyncValidator().
-  throw new Error('createValidatorFromStore removed: use StorageEventBus.attachDocumentValidatorFromEvents(initialIds) and PresenceTracker.setAsyncValidator() instead.');
+  return async (id: string) => {
+  // Backwards-compatible shim: the original helper converted a store
+  // into an async existence validator. Keep behavior minimal and safe:
+  // - treat exceptions as "not found" (do not throw)
+  // - avoid any direct IO beyond calling the provided reader
+  try {
+    const res = (await Promise.resolve((_store as DocumentReader).read(id))) as unknown;
+    return res !== undefined && res !== null;
+  } catch (_) {
+    return false;
+  }
+};
 }
 
 export class PresenceTracker {
