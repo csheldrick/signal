@@ -19,7 +19,7 @@ export interface AdjacencyList {
 export class GraphBuilder {
   constructor(private readonly store: DocumentStore) {}
 
-  buildGraph(): AdjacencyList {
+  async buildGraph(): Promise<AdjacencyList> {
     const nodes = new Map<string, GraphNode>();
     const edges = new Map<string, Set<string>>();
     const docs = this.store.list();
@@ -40,8 +40,8 @@ export class GraphBuilder {
     return { nodes, edges };
   }
 
-  findClusters(): string[][] {
-    const graph = this.buildGraph();
+  async findClusters(): Promise<string[][]> {
+    const graph = await this.buildGraph();
     const visited = new Set<string>();
     const clusters: string[][] = [];
 
@@ -71,8 +71,8 @@ export class GraphBuilder {
     return clusters;
   }
 
-  findHubs(minLinks: number = 3): GraphNode[] {
-    const graph = this.buildGraph();
+  async findHubs(minLinks: number = 3): Promise<GraphNode[]> {
+    const graph = await this.buildGraph();
     return Array.from(graph.nodes.values())
       .filter(n => n.linkCount >= minLinks)
       .sort((a, b) => b.linkCount - a.linkCount);
