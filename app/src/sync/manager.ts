@@ -38,6 +38,8 @@ export class SyncManager {
   private readonly peerId: string;
   private flushTimer: ReturnType<typeof setInterval> | undefined;
   private transport: TransportSend | undefined;
+  private authValidator?: (peerId: string, message?: SyncMessage) => boolean;
+  private telemetryListeners: Set<(event: { type: string; payload: any }) => void> = new Set();
 
   constructor(
     private readonly store: DocumentStore,
@@ -61,8 +63,23 @@ export class SyncManager {
   // ── Transport wiring ──────────────────────────────────────
 
   /** Attach a transport. The manager will call this whenever it has messages to send. */
-  setTransport(send: TransportSend): void {
+  setTransport(send: TransportSend, authValidator?: (peerId: string, message?: SyncMessage) => boolean): void {
     this.transport = send;
+    this.authValidator = authValidator;
+  }
+
+  /**
+   * Register a telemetry/metrics listener. Returns a disposer to remove it.
+   */
+  onTelemetry(listener: (event: { type: string; payload: any }) => void): () => void {
+    this.telemetryListeners.add(listener);
+    return () => this.telemetryListeners.delete(listener);
+  }
+
+  private emitTelemetry(type: string, payload: any): void {
+    for (const l of this.telemetryListeners) {
+      try { l({ type, payload }); } catch (_) { /* swallow listener errors */ }
+    }
   }
 
   // ── Peer lifecycle ─────────────────────────────────────────
@@ -101,6 +118,13 @@ export class SyncManager {
     let session = this.sessions.get(message.peerId);
     if (!session) {
       session = this.addPeer(message.peerId, message.clock);
+    }
+
+    // Authorization check for inbound messages. If an authValidator exists and
+    // declines the message, we ignore it to avoid applying unauthorized changes.
+    if (this.authValidator && !this.authValidator(message.peerId, message)) {
+      this.emitTelemetry('inbound_rejected', { peerId: message.peerId, message });
+      return;
     }
 
     session.updateClock(message.clock);
@@ -180,6 +204,11 @@ export class SyncManager {
       // results to decide whether to ack or fail the queued entry.
       const sendPromises = recipients.map(s => {
         try {
+          // If an auth validator is present and declines this recipient, reject
+          // immediately to record a delivery failure for that peer.
+          if (this.authValidator && !this.authValidator(s.peerId, entry.message)) {
+            return Promise.reject(new Error('unauthorized'));
+          }
           // transport is non-null here (checked above). Wrap in Promise.resolve
           // to ensure synchronous throws become rejections.
           return Promise.resolve(this.transport!(s.peerId, entry.message));
@@ -193,11 +222,21 @@ export class SyncManager {
       // If every send succeeded, ack the entry once. Otherwise fail once with
       // the first error so the queue's retry/failure policy can handle it.
       const firstReject = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      // Emit per-peer delivery telemetry and decide ack/fail semantics.
+      for (let i = 0; i < recipients.length; i++) {
+        const r = results[i] as PromiseSettledResult<void> | undefined;
+        const peerId = recipients[i].peerId;
+        const success = r && r.status === 'fulfilled';
+        this.emitTelemetry('deliver_attempt', { peerId, message: entry.message, success });
+      }
+
       if (!firstReject) {
         this.queue.ack(entry.message);
+        this.emitTelemetry('queue_ack', { message: entry.message });
       } else {
         const err = firstReject.reason instanceof Error ? firstReject.reason : new Error(String(firstReject.reason));
         this.queue.fail(entry.message, err);
+        this.emitTelemetry('queue_fail', { message: entry.message, error: err });
       }
     }
   }

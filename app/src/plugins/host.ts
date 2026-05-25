@@ -40,8 +40,28 @@ export interface PluginContext {
    * whether network calls are permitted; undefined is returned when the
    * document is missing or summarization is not available.
    */
-  summarizeDocument(documentId: string): Promise<string | undefined>;
+  summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
 }
+
+export const dire: any = (() => {
+  // Backwards-compat stub for removed 'dire' primitive. Accessing it logs a
+  // one-time deprecation warning and returns undefined on property access so
+  // older plugins don't crash at import-time.
+  let warned = false;
+  return new Proxy({}, {
+    get() {
+      try {
+        if (!warned) {
+          // eslint-disable-next-line no-console
+          console.warn("'dire' is deprecated; use PluginContext and PluginHost APIs instead.");
+          warned = true;
+        }
+      } catch (_) { /* swallow console errors */ }
+      return undefined;
+    },
+    apply() { return undefined as any; },
+  });
+})();
 
 export class PluginHost {
   private plugins: Map<string, Plugin> = new Map();
@@ -90,28 +110,46 @@ export class PluginHost {
       }
 
       const ctx: PluginContext = {
-        listDocuments: () => this.context.listDocuments().map(d => deepFreeze({
-          ...d,
-          links: d.links.map(l => deepFreeze({ ...l })),
-          tags: [...d.tags],
-        })),
-        searchDocuments: (q: SearchQuery) => this.context.searchDocuments(q).map(r => deepFreeze({
-          document: deepFreeze({
-            ...r.document,
-            links: r.document.links.map(l => deepFreeze({ ...l })),
-            tags: [...r.document.tags],
-          }),
-          score: r.score,
-          highlights: [...r.highlights],
-        })),
+        listDocuments: () => {
+          // Validate and provide only well-formed document snapshots to plugins.
+          return this.context.listDocuments().map(d => {
+            try {
+              if (!d || typeof d.id !== 'string' || typeof d.title !== 'string' || typeof d.content !== 'string' || !Array.isArray(d.links) || !Array.isArray(d.tags)) return undefined;
+              const safeDoc = {
+                ...d,
+                links: d.links.map(l => ({ ...l })),
+                tags: Array.isArray(d.tags) ? [...d.tags] : [],
+              };
+              return deepFreeze(safeDoc);
+            } catch (_) {
+              return undefined;
+            }
+          }).filter((x): x is Readonly<Document> => !!x);
+        },
+        searchDocuments: (q: SearchQuery) => {
+          try {
+            return this.context.searchDocuments(q).map(r => {
+              const d = r?.document;
+              if (!d || typeof d.id !== 'string' || typeof d.title !== 'string') return undefined;
+              const safeDoc = deepFreeze({
+                ...d,
+                links: Array.isArray(d.links) ? d.links.map((l: any) => deepFreeze({ ...l })) : [],
+                tags: Array.isArray(d.tags) ? [...d.tags] : [],
+              });
+              return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights: Array.isArray(r.highlights) ? [...r.highlights] : [] });
+            }).filter((x): x is Readonly<SearchResult> => !!x);
+          } catch (_) { return []; }
+        },
         getDocument: (id: string) => {
-          const d = this.context.getDocument(id);
-          if (!d) return undefined;
-          return deepFreeze({
-            ...d,
-            links: d.links.map(l => deepFreeze({ ...l })),
-            tags: [...d.tags],
-          });
+          try {
+            const d = this.context.getDocument(id);
+            if (!d || typeof d.id !== 'string' || typeof d.title !== 'string' || typeof d.content !== 'string') return undefined;
+            return deepFreeze({
+              ...d,
+              links: Array.isArray(d.links) ? d.links.map((l: any) => deepFreeze({ ...l })) : [],
+              tags: Array.isArray(d.tags) ? [...d.tags] : [],
+            });
+          } catch (_) { return undefined; }
         },
         getClock: () => {
           try {

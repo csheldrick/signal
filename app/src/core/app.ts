@@ -100,13 +100,38 @@ export class SignalApp {
         return () => { this.events.off(type as any, wrapper); };
       },
 
-      summarizeDocument: async (documentId: string) => {
+      summarizeDocument: async (documentId: string, allowNetwork = false) => {
         const d = this.store.read(documentId);
         if (!d) return undefined;
         // Use the configured summarizer when present; otherwise use a local one.
         const summarizer = this._summarizer ?? new LocalSummarizer(3);
+
+        // Deny network summarization when caller does not explicitly request it.
+        // Plugins will call PluginContext.summarizeDocument without allowNetwork,
+        // so this prevents plugins from causing network calls.
         try {
-          return await summarizer.summarize(d);
+          // If the active summarizer appears to be a RemoteSummarizer and the caller
+          // did not request network, refuse to perform network I/O.
+          if ((summarizer as any)?.constructor && (summarizer as any).constructor.name === 'RemoteSummarizer' && !allowNetwork) {
+            return undefined;
+          }
+
+          // Provide a small retry/backoff wrapper for remote summarization to mitigate
+          // transient network failures and reduce backpressure on upstream queues.
+          const MAX_RETRIES = 3;
+          const BASE_MS = 100;
+
+          const attempt = async (triesLeft: number): Promise<string | undefined> => {
+            try {
+              return await (summarizer as any).summarize(d);
+            } catch (err) {
+              if (triesLeft <= 0) return undefined;
+              await new Promise(res => setTimeout(res, BASE_MS * Math.pow(2, MAX_RETRIES - triesLeft)));
+              return attempt(triesLeft - 1);
+            }
+          };
+
+          return await attempt(MAX_RETRIES);
         } catch (_) {
           return undefined;
         }

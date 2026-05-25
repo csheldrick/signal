@@ -135,7 +135,13 @@ export class PresenceTracker {
         /* swallow */
       }
 
-      this.peers.delete(peerId);
+      // Only delete if the presence record we originally observed hasn't been superseded
+      // by a newer join for the same peerId. Compare the stored record's lastSeen to
+      // avoid deleting a fresh record created after this leave() began.
+      const current = this.peers.get(peerId);
+      if (current && current.lastSeen === existing.lastSeen && current.peerId === existing.peerId) {
+        this.peers.delete(peerId);
+      }
     }
   }
 
