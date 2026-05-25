@@ -66,7 +66,7 @@ export class StorageEventBus {
     };
 
     // Invoke synchronously to preserve ordering for validators/listeners.
-    invoke();
+    Promise.resolve().then(() => invoke());
   }
 
   /**
