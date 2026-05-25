@@ -57,7 +57,14 @@ export class GraphBuilder {
         visited.add(current);
         cluster.push(current);
 
-        const neighbors = graph.edges.get(current);
+        const neighbors = new Set<string>();
+        // Outgoing neighbors
+        const out = graph.edges.get(current);
+        if (out) for (const n of out) neighbors.add(n);
+        // Incoming neighbors (treat graph as undirected for clustering)
+        for (const [src, set] of graph.edges) {
+          if (set.has(current)) neighbors.add(src);
+        }
         if (neighbors) {
           for (const neighbor of neighbors) {
             if (!visited.has(neighbor)) queue.push(neighbor);
