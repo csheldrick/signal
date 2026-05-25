@@ -16,7 +16,7 @@ rm -rf .weave/substrate.db
 
 # 1. Crystallise the Loom structural model
 loom reset -y
-loom onboard
+loom onboard --skip-drift --skip-handoff
 
 # 2. Import the graph into the Weave substrate
 weave import
