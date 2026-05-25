@@ -11,7 +11,7 @@ export interface Plugin {
    * Explicit opt-in flag indicating the plugin uses only the PluginContext
    * sandbox. Plugins that access other subsystems MUST NOT set this flag.
    */
-  readonly usesPluginContext?: boolean;
+  readonly usesPluginContext: true;
   activate(context: PluginContext): void;
   deactivate(): void;
 }
