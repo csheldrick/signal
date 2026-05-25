@@ -47,7 +47,7 @@ export class SignalApp {
     // Initialize summarizer deterministically to LocalSummarizer by default.
     // Remote summarization is opt-in and must be explicitly enabled.
     this._allowNetwork = !!config.allowNetwork;
-    this._summarizer = new LocalSummarizer();
+    this._summarizer = undefined; // lazily created when first used
 
 
     const pluginContext: PluginContext = {
@@ -82,8 +82,8 @@ export class SignalApp {
   }
 
   disableRemoteSummarizer(): void {
-    // Revert to the deterministic local summarizer to remove any network side-effects.
-    this._summarizer = new LocalSummarizer();
+    // Revert to deterministic local behavior. Defer actual LocalSummarizer allocation until first use.
+    this._summarizer = undefined;
   }
 
   start(dataPath?: string): void {
