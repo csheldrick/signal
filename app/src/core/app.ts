@@ -8,6 +8,7 @@ import { GraphBuilder } from '../graph/builder.js';
 import { PluginHost } from '../plugins/host.js';
 import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
+import { PresenceTracker } from '../collaboration/presence.js';
 
 import { LocalSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
@@ -25,6 +26,7 @@ export class SignalApp {
   readonly events: StorageEventBus;
   readonly graph: GraphBuilder;
   readonly plugins: PluginHost;
+  readonly presence: PresenceTracker;
   /* sync lazy-initialized at start */
   /* summarizer lazy-initialized at start */
 
@@ -52,6 +54,12 @@ export class SignalApp {
       getDocument: (id) => this.store.read(id),
     };
     this.plugins = new PluginHost(pluginContext);
+
+    // PresenceTracker uses the StorageEventBus validator (no direct store access)
+    this.presence = new PresenceTracker(this.store, undefined);
+    this.presence.setAsyncValidator(
+      this.events.attachDocumentValidatorFromEvents(this.store.list().map(d => d.id))
+    );
 
     // Wire storage events → sync engine
     this.events.on('*', (event) => {
