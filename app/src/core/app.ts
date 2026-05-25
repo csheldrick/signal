@@ -10,7 +10,7 @@ import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 
 import type { Summarizer } from '../ai/summarizer.js';
-import { LocalSummarizer } from '../ai/summarizer.js';
+import type { Document } from '../core/types.js';
 
 export interface AppConfig {
   dataPath: string;
@@ -31,7 +31,16 @@ export class SignalApp {
     this.events = new StorageEventBus();
     this.store = new DocumentStore(this.events);
     this.graph = new GraphBuilder(this.store);
-    this.summarizer = new LocalSummarizer(3);
+    this.summarizer = {
+      isRemote: false,
+      async summarize(document: Document): Promise<string> {
+        const mod = await import('../ai/summarizer.js');
+        const impl = new mod.LocalSummarizer(3);
+        // Replace the placeholder with the concrete instance for subsequent calls.
+        (this as unknown as { summarizer: Summarizer }).summarizer = impl;
+        return impl.summarize(document);
+      },
+    };
     this.sync = new SyncEngine(this.store, config.peerId);
 
     const pluginContext: PluginContext = {
