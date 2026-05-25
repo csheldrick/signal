@@ -9,12 +9,15 @@ import { PluginHost } from '../plugins/host.js';
 import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 
+import { LocalSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
 import type { Document } from '../core/types.js';
 
 export interface AppConfig {
   dataPath: string;
   peerId: string;
+  /** Allow remote summarization (must be explicitly enabled) */
+  allowNetwork?: boolean;
 }
 
 export class SignalApp {
@@ -37,6 +40,10 @@ export class SignalApp {
     // Seed StorageEventBus validator with current document ids to support presence checks without direct store access
     this.events.attachDocumentValidatorFromEvents(this.store.list().map(d => d.id));
     this._peerId = config.peerId;
+
+    // Initialize summarizer deterministically to LocalSummarizer by default.
+    // Remote summarization is opt-in and must be explicitly enabled.
+    this._summarizer = new LocalSummarizer();
 
 
     const pluginContext: PluginContext = {
