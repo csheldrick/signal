@@ -160,19 +160,44 @@ export class SyncManager {
    * Called automatically by the flush loop; also available for manual flush.
    */
   async flush(): Promise<void> {
+    // No transport attached or no sessions — nothing to send.
     if (!this.transport || this.sessions.size === 0) return;
 
     const due = this.queue.peek();
     for (const entry of due) {
+      // Collect sessions eligible to receive this message.
+      const recipients: PeerSession[] = [];
       for (const session of this.sessions.values()) {
         if (session.state === 'idle' || session.state === 'resolved') {
-          try {
-            await this.transport(session.peerId, entry.message);
-            this.queue.ack(entry.message);
-          } catch (err) {
-            this.queue.fail(entry.message, err instanceof Error ? err : new Error(String(err)));
-          }
+          recipients.push(session);
         }
+      }
+
+      if (recipients.length === 0) continue;
+
+      // Send to all eligible recipients in parallel. Use Promise.allSettled so
+      // one failure does not short-circuit other sends and we can inspect
+      // results to decide whether to ack or fail the queued entry.
+      const sendPromises = recipients.map(s => {
+        try {
+          // transport is non-null here (checked above). Wrap in Promise.resolve
+          // to ensure synchronous throws become rejections.
+          return Promise.resolve(this.transport!(s.peerId, entry.message));
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      });
+
+      const results = await Promise.allSettled(sendPromises);
+
+      // If every send succeeded, ack the entry once. Otherwise fail once with
+      // the first error so the queue's retry/failure policy can handle it.
+      const firstReject = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      if (!firstReject) {
+        this.queue.ack(entry.message);
+      } else {
+        const err = firstReject.reason instanceof Error ? firstReject.reason : new Error(String(firstReject.reason));
+        this.queue.fail(entry.message, err);
       }
     }
   }

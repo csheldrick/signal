@@ -117,10 +117,6 @@
   },
   {
     "type": "tension",
-    "description": "Decision to adopt TypeScript exists but the analysis shows potential discrepancies (duplicate nodes, contracts with weak implementation mapping) indicating partial or uneven adoption across the codebase."
-  },
-  {
-    "type": "tension",
     "description": "The project intends plugin isolation via PluginContext/PluginHost, yet presence refactor changed document access to PluginContext and removed a primitive — this may contradict existing plugin expectations and break backward compatibility."
   },
   {
