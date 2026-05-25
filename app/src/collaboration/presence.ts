@@ -156,9 +156,9 @@ export class PresenceTracker {
 
       return true;
     } else {
-      // Fallback to the synchronous store check for backwards compatibility when no validator is set.
-      const doc = this.store.read(documentId);
-      if (!doc) return false;
+      // No synchronous fallback here: avoid direct store IO to preserve subsystem boundaries.
+      // Callers must register a validator via setValidator or setAsyncValidator.
+      return false;
     }
 
     // clock stamping removed to avoid direct sync dependency
