@@ -191,28 +191,31 @@ export class PresenceTracker {
    * returns a Promise-like value we treat it as invalid here (return false)
    * and emit a warning so callers migrate to setAsyncValidator.
    */
-  setValidator(validate?: (id: string) => boolean): void {
+  setValidator(validate?: (id: string) => boolean | Promise<boolean>): void {
     if (!validate) {
       this.validator = undefined;
       return;
     }
 
-    // Wrap the synchronous validator into the internal async validator.
-    // Treat exceptions as validation failures and do not let them bubble.
+    // Accept either synchronous or Promise-returning validators for
+    // backwards-compatibility. If an async validator is provided we emit a
+    // warning recommending setAsyncValidator(), but we still accept it and
+    // wrap it into the internal async validator so presence checks remain
+    // functional without crashing.
     this.validator = async (id: string) => {
       try {
         const res = validate(id);
 
-        // Detect Promise-like objects to avoid performing IO on the realtime path.
         if (res !== null && typeof res === 'object' && typeof (res as any).then === 'function') {
           try {
             // eslint-disable-next-line no-console
-            console.warn('PresenceTracker.setValidator received an async validator; treating it as invalid. Prefer setAsyncValidator() for IO-bound checks.');
+            console.warn('PresenceTracker.setValidator received an async validator; running it as async for compatibility. Prefer setAsyncValidator() for IO-bound checks.');
           } catch (_) {
             /* swallow console errors */
           }
-          // Do NOT await promise-like values on the realtime path. Treat them as validation failure.
-          return false;
+          // Await the promise-like validator result but protect against rejection.
+          const awaited = await (res as Promise<boolean>).catch(() => false);
+          return !!awaited;
         }
 
         return !!res;
