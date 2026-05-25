@@ -125,20 +125,36 @@ export class PresenceTracker {
   async focusDocument(peerId: string, documentId: string): Promise<boolean> {
     // If a validator has been provided (possibly async/store-backed or event-driven), use it.
     if (this.validator) {
-      // Run validator with a short timeout to avoid blocking the realtime path.
+      // Optimistically accept focus and validate in the background without blocking.
+      // Immediate acceptance keeps the realtime path available; if the validator
+      // later reports the document is invalid we clear the documentId for this peer.
+      this.peers.set(peerId, {
+        peerId,
+        documentId,
+        status: 'active',
+        lastSeen: Date.now(),
+      });
+
       const timeoutMs = 100;
-      const validatorPromise = (async () => {
+      (async () => {
         try {
-          return await this.validator!(documentId);
+          const validatorPromise = this.validator!(documentId).catch(() => false);
+          const ok = await Promise.race([
+            validatorPromise,
+            new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
+          ]);
+          if (!ok) {
+            const existing = this.peers.get(peerId);
+            if (existing && existing.documentId === documentId) {
+              this.peers.set(peerId, { ...existing, documentId: undefined });
+            }
+          }
         } catch (_) {
-          return false;
+          // Swallow errors to avoid impacting realtime flow.
         }
       })();
-      const ok = await Promise.race([
-        validatorPromise,
-        new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
-      ]);
-      if (!ok) return false;
+
+      return true;
     } else {
       // Fallback to the synchronous store check for backwards compatibility when no validator is set.
       const doc = this.store.read(documentId);
