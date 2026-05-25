@@ -6,7 +6,7 @@
 
 import type { Plugin, PluginContext } from './host.js';
 
-import type { SearchQuery, SearchResult } from '../core/types.js';
+import type { SearchQuery, SearchResult } from './host.js';
 
 
 export class SearchPlugin implements Plugin {

@@ -4,6 +4,8 @@
 
 import type { Document, SearchQuery, SearchResult } from '../core/types.js';
 
+export { SearchQuery, SearchResult };
+
 export interface Plugin {
   id: string;
   name: string;
