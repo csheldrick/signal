@@ -60,10 +60,7 @@ export class PresenceTracker {
 
   private validator?: (id: string) => Promise<boolean>;
 
-  constructor(
-    private readonly store: DocumentStore,
-    private readonly sync?: SyncEngine,
-  ) {}
+  constructor() {}
 
   join(peerId: string, documentId?: string): PeerPresence {
     const presence: PeerPresence = {

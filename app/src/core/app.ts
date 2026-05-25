@@ -56,7 +56,7 @@ export class SignalApp {
     this.plugins = new PluginHost(pluginContext);
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
-    this.presence = new PresenceTracker(this.store, undefined);
+    this.presence = new PresenceTracker();
     this.presence.setAsyncValidator(
       this.events.attachDocumentValidatorFromEvents(this.store.list().map(d => d.id))
     );
