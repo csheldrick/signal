@@ -174,24 +174,22 @@ export class PresenceTracker {
   }
 
   /**
-   * Set a validator. Accepts either a synchronous validator (id => boolean)
-   * or an asynchronous one (id => Promise<boolean>). This unifies the
-   * previously separate sync/async setters into a single explicit API to
-   * avoid accidental misuse and to make the validator contract clear to
-   * callers (they may perform IO if needed).
+   * Set a synchronous validator (id => boolean).
+   * This setter is for pure, non-IO validators used on the realtime path.
+   * For async/store-backed validators use setAsyncValidator().
    */
-  setValidator(validate?: (id: string) => Promise<boolean> | boolean): void {
+  setValidator(validate?: (id: string) => boolean): void {
     if (!validate) {
       this.validator = undefined;
       return;
     }
 
-    // Normalize sync or async validator into the internal async validator.
-    // Callers are allowed to perform IO; errors are treated as validation
-    // failures to preserve realtime flow invariants.
+    // Normalize the synchronous validator into the internal async validator.
+    // Failures are treated as validation failures and do not throw.
     this.validator = async (id: string) => {
       try {
-        return await Promise.resolve((validate as any)(id) as Promise<boolean> | boolean);
+        const res = validate(id);
+        return !!res;
       } catch (_) {
         return false;
       }
@@ -202,15 +200,14 @@ export class PresenceTracker {
    * Set an asynchronous validator for store-backed or IO-bound checks.
    * This method is explicit about allowing IO and may perform network/disk operations.
    */
-  setAsyncValidator(validate?: (id: string) => Promise<boolean> | boolean): void {
+  setAsyncValidator(validate?: (id: string) => Promise<boolean>): void {
     if (!validate) {
       this.validator = undefined;
       return;
     }
-    // Normalize async or sync inputs into the internal async validator.
     this.validator = async (id: string) => {
       try {
-        return await Promise.resolve(validate(id) as Promise<boolean> | boolean);
+        return await validate(id);
       } catch (_) {
         return false;
       }
