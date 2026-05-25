@@ -39,10 +39,12 @@ export class PluginHost {
     if (plugin.usesPluginContext !== true) {
       try {
         // eslint-disable-next-line no-console
-        console.warn('Plugin registered without explicit usesPluginContext flag; this may indicate cross-subsystem coupling. Add readonly usesPluginContext = true to opt into PluginContext-only contract.');
+        console.error('Plugin registration rejected: plugin must declare readonly usesPluginContext = true to register.');
       } catch (_) {
         /* swallow console errors */
       }
+      // Do not register plugins that do not explicitly opt into the PluginContext-only contract.
+      return;
     }
     this.plugins.set(plugin.id, plugin);
   }
