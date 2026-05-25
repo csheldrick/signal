@@ -17,7 +17,23 @@ export interface AdjacencyList {
 }
 
 export class GraphBuilder {
+  private lastSignature: string | undefined;
+  private cachedGraph: AdjacencyList | undefined;
+
   constructor(private readonly listDocuments: () => Document[]) {}
+
+  private computeSignature(docs: Document[]): string {
+    // Stable short signature: id and updatedAt are sufficient to detect content changes
+    return docs.map(d => `${d.id}:${d.updatedAt}`).join('|');
+  }
+
+  private cloneAdjacency(adj: AdjacencyList): AdjacencyList {
+    const nodes = new Map<string, GraphNode>();
+    for (const [k, v] of adj.nodes) nodes.set(k, { ...v });
+    const edges = new Map<string, Set<string>>();
+    for (const [k, s] of adj.edges) edges.set(k, new Set(s));
+    return { nodes, edges };
+  }
 
   async buildGraph(): Promise<AdjacencyList> {
     const nodes = new Map<string, GraphNode>();
