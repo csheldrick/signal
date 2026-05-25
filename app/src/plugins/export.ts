@@ -39,3 +39,6 @@ export class ExportPlugin implements Plugin {
     return lines.join('\n');
   }
 }
+
+export const __PLUGIN_USES_PLUGINCONTEXT = true;
+

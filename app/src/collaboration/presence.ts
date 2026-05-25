@@ -37,39 +37,11 @@ export interface PeerPresence {
   lastSeen: number;
 }
 
-export function createValidatorFromStore(store: DocumentStore): (id: string) => Promise<boolean> {
-  // Backwards-compatible shim: prefer StorageEventBus.attachDocumentValidatorFromEvents()
-  // and PresenceTracker.setAsyncValidator(), but provide a safe compatibility layer
-  // that calls store.read synchronously when available. This avoids breaking callers
-  // while signalling deprecation.
-  let warned = false;
-  return async (id: string) => {
-    if (!warned) {
-      // eslint-disable-next-line no-console
-      console.warn('createValidatorFromStore is deprecated: use StorageEventBus.attachDocumentValidatorFromEvents() and PresenceTracker.setAsyncValidator() instead. Falling back to a compatibility shim.');
-      warned = true;
-    }
-
-    try {
-      // Defensive: handle both sync and (unexpected) async read implementations.
-      const maybe = (store as any)?.read ? (store as any).read(id) : undefined;
-
-      if (maybe && typeof (maybe as any).then === 'function') {
-        // If read returned a Promise unexpectedly, await with safe failure semantics.
-        try {
-          const awaited = await (maybe as Promise<unknown>);
-          return awaited !== undefined && awaited !== null;
-        } catch (_) {
-          return false;
-        }
-      }
-
-      return maybe !== undefined && maybe !== null;
-    } catch (_) {
-      // Any errors treated as validation failure to preserve realtime flow.
-      return false;
-    }
-  };
+export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
+  // Deprecated and intentionally removed. Callers must migrate to the event-driven
+  // validator exposed by StorageEventBus.attachDocumentValidatorFromEvents(initialIds)
+  // and register it via PresenceTracker.setAsyncValidator().
+  throw new Error('createValidatorFromStore removed: use StorageEventBus.attachDocumentValidatorFromEvents(initialIds) and PresenceTracker.setAsyncValidator() instead.');
 }
 
 export class PresenceTracker {
