@@ -5,10 +5,11 @@
 import type { Document } from '../core/types.js';
 
 export interface Summarizer {
+  readonly isRemote?: boolean;
   summarize(document: Document): Promise<string>;
 }
 
-export class LocalSummarizer implements Summarizer {
+export class LocalSummarizer implements Summarizer { readonly isRemote = false;
   private readonly maxSentences: number;
 
   constructor(maxSentences: number = 3) {
