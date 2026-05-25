@@ -1,0 +1,21 @@
+{
+  "graphId": "acaec868-17b8-4c27-a695-1faf9596a085",
+  "name": "signal",
+  "type": "application",
+  "dbPath": ".loom/loom.db",
+  "exclude": [
+    ".github/",
+    ".weave/",
+    ".loom/",
+    ".context/",
+    "scripts/"
+  ],
+  "agentRules": {
+    "copilot": false,
+    "agentsMd": false,
+    "cursor": false,
+    "claude": false,
+    "appendMode": true
+  },
+  "createdAt": "2026-05-25T03:43:00.291Z"
+}
