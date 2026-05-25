@@ -26,8 +26,7 @@ export class SearchPlugin implements Plugin {
     this.context = undefined;
   }
 
-  search(query: SearchQuery): SearchResult[] {
-    
+  search(query: SearchQuery): ReadonlyArray<SearchResult> {
     if (!this.context) return [];
     return this.context.searchDocuments(query);
   }

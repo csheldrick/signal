@@ -12,9 +12,13 @@ export interface Plugin {
 }
 
 export interface PluginContext {
-  listDocuments(): Document[];
-  searchDocuments(query: SearchQuery): SearchResult[];
-  getDocument(id: string): Document | undefined;
+  /**
+   * Plugins receive readonly snapshots to prevent accidental mutation of
+   * core application state and to make the sandbox contract explicit.
+   */
+  listDocuments(): ReadonlyArray<Readonly<Document>>;
+  searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResult>>;
+  getDocument(id: string): Readonly<Document> | undefined;
 }
 
 export class PluginHost {
