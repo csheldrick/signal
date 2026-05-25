@@ -66,6 +66,9 @@ export class RemoteSummarizer implements Summarizer {
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;
 
+  // Coalesce concurrent summaries per-document to avoid duplicated remote work
+  private static pending: Map<string, Promise<string>> = new Map();
+
   // Simple failure tracking to avoid repeated remote attempts when the
   // remote service is failing or slow. After maxFailures within failureWindowMs
   // the summarizer will enter a short cooldown and return local summaries.
@@ -120,9 +123,18 @@ export class RemoteSummarizer implements Summarizer {
   }
 
   async summarize(document: Document): Promise<string> {
+    const id = document?.id ?? '';
+
     if (!this.allowNetwork) {
       // Explicit opt-in required for network calls — fallback deterministically.
       return this.fallback.summarize(document);
+    }
+
+    // If there's already an in-flight request for this document, return it
+    // to coalesce duplicate concurrent work and reduce remote load.
+    if (id) {
+      const inFlight = RemoteSummarizer.pending.get(id);
+      if (inFlight) return inFlight;
     }
 
     const now = this.now();
@@ -131,26 +143,38 @@ export class RemoteSummarizer implements Summarizer {
       return this.fallback.summarize(document);
     }
 
-    try {
-      const result = await Promise.race([
-        this.fetcher(document),
-        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
-      ]);
+    // Encapsulate the remote attempt so we can register it in the pending map
+    const op = (async (): Promise<string> => {
+      try {
+        const result = await Promise.race([
+          this.fetcher(document),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
+        ]);
 
-      if (typeof result !== 'string' || result.length === 0) {
-        // Treat invalid/empty responses as failures
+        if (typeof result !== 'string' || result.length === 0) {
+          // Treat invalid/empty responses as failures
+          this.recordFailure();
+          return this.fallback.summarize(document);
+        }
+
+        // Successful remote summary — reset failure tracking
+        this.recordSuccess();
+        return result;
+      } catch (err) {
+        // On any remote failure, record it and return a safe local summary.
         this.recordFailure();
         return this.fallback.summarize(document);
       }
+    })();
 
-      // Successful remote summary — reset failure tracking
-      this.recordSuccess();
-      return result;
-    } catch (err) {
-      // On any remote failure, record it and return a safe local summary.
-      this.recordFailure();
-      return this.fallback.summarize(document);
+    if (id) {
+      // Publish in-flight promise so concurrent callers reuse it
+      RemoteSummarizer.pending.set(id, op);
+      // Ensure we cleanup the pending entry regardless of outcome
+      op.finally(() => { RemoteSummarizer.pending.delete(id); }).catch(() => { /* swallow */ });
     }
+
+    return op;
   }
 }
 

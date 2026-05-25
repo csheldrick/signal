@@ -63,8 +63,12 @@ export class StorageEventBus {
     const star = this.listeners.get('*');
 
     const invoke = () => {
-      direct?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
-      star?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
+      // Copy current listeners to arrays to avoid issues when listeners are
+      // added/removed during iteration and to keep invocation deterministic.
+      const directArr = direct ? Array.from(direct) : [];
+      const starArr = star ? Array.from(star) : [];
+      for (const fn of directArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
+      for (const fn of starArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
     };
 
     // Invoke synchronously to preserve ordering for validators/listeners.
@@ -83,8 +87,12 @@ export class StorageEventBus {
     const star = this.listeners.get('*');
 
     const invoke = () => {
-      direct?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
-      star?.forEach(fn => { try { fn(event); } catch (_) { /* swallow listener errors */ } });
+      // Copy current listeners to arrays to avoid issues when listeners are
+      // added/removed during iteration and to keep invocation deterministic.
+      const directArr = direct ? Array.from(direct) : [];
+      const starArr = star ? Array.from(star) : [];
+      for (const fn of directArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
+      for (const fn of starArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
     };
 
     // Preserve previous (historical) non-blocking behavior for callers that
