@@ -30,7 +30,7 @@ export class SignalApp {
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
     this.store = new DocumentStore(this.events);
-    this.graph = new GraphBuilder(this.store);
+    this.graph = new GraphBuilder(() => this.store.list());
     this.summarizer = new LocalSummarizer(3);
     this.sync = new SyncEngine(this.store, config.peerId);
 

@@ -3,7 +3,7 @@
 // Imports from core/types and storage — creates cross-module edges.
 
 import type { Document, DocumentLink } from '../core/types.js';
-import type { DocumentStore } from '../storage/store.js';
+
 
 export interface GraphNode {
   id: string;
@@ -17,12 +17,12 @@ export interface AdjacencyList {
 }
 
 export class GraphBuilder {
-  constructor(private readonly store: DocumentStore) {}
+  constructor(private readonly listDocuments: () => Document[]) {}
 
   async buildGraph(): Promise<AdjacencyList> {
     const nodes = new Map<string, GraphNode>();
     const edges = new Map<string, Set<string>>();
-    const docs = this.store.list();
+    const docs = this.listDocuments();
 
     for (const doc of docs) {
       nodes.set(doc.id, {
