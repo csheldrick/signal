@@ -10,11 +10,13 @@ import type { Document } from '../core/types.js';
 
 export interface Summarizer {
   readonly isRemote: boolean;
+  readonly allowsNetwork: boolean;
   summarize(document: Document): Promise<string>;
 }
 
 export class LocalSummarizer implements Summarizer {
   readonly isRemote = false;
+  readonly allowsNetwork = false;
   private readonly maxSentences: number;
 
   constructor(maxSentences: number = 3) {
@@ -34,6 +36,7 @@ export class LocalSummarizer implements Summarizer {
 
 class RemoteSummarizer implements Summarizer {
   readonly isRemote = true;
+  readonly allowsNetwork: boolean;
   private readonly fetcher: (document: Document) => Promise<string>;
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;
@@ -50,6 +53,7 @@ class RemoteSummarizer implements Summarizer {
   ) {
     this.fetcher = fetcher;
     this.allowNetwork = options?.allowNetwork ?? false;
+    this.allowsNetwork = this.allowNetwork;
     this.fallback = new LocalSummarizer(options?.maxSentences ?? 3);
   }
 
