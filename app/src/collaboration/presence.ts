@@ -75,8 +75,32 @@ export class PresenceTracker {
 
   private context: PluginContext | undefined;
 
+  private cleanupTimer?: ReturnType<typeof setInterval>;
+  private static readonly INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor(context?: PluginContext) {
     this.context = context;
+
+    // Periodically mark stale peers as offline to prevent unbounded growth and
+    // reduce continuous work for presence-consuming subsystems. This keeps the
+    // realtime path light and lets downstream listeners treat 'offline' as a
+    // stable state that can be garbage-collected if needed.
+    try {
+      this.cleanupTimer = setInterval(() => {
+        try {
+          const now = Date.now();
+          for (const [peerId, p] of this.peers.entries()) {
+            if (now - p.lastSeen > PresenceTracker.INACTIVITY_MS && p.status !== 'offline') {
+              this.peers.set(peerId, { ...p, status: 'offline' });
+            }
+          }
+        } catch (_) {
+          /* swallow cleanup errors */
+        }
+      }, 60 * 1000);
+    } catch (_) {
+      // If timers are not available for any reason (test envs), degrade silently.
+    }
   }
 
   join(peerId: string, documentId?: string): PeerPresence {

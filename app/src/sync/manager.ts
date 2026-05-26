@@ -51,13 +51,13 @@ export class SyncManager {
     this.engine = new SyncEngine(store, opts.peerId);
     this.queue = new SyncQueue();
 
-    // Auto-enqueue on every local store mutation.
-    store.events.on('*', (event: StorageEvent) => {
-      const message = this.engine.generateOutbound(event);
-      if (message) {
-        void this.queue.enqueue(message);
-      }
-    });
+    // Outbound generation is driven by the SyncEngine. Rather than subscribing
+    // directly to store.events and enqueueing immediately (which can cause
+    // duplicate enqueues and high synchronous fan-out when many listeners exist),
+    // we centralize draining the engine's outbound buffer during flush(). This
+    // provides a single controlled point for backpressure and avoids duplicate
+    // work when other engines/listeners are present.
+    // (Previously this block subscribed to store.events and enqueued directly.)
   }
 
   // ── Transport wiring ──────────────────────────────────────
@@ -184,6 +184,25 @@ export class SyncManager {
    * Called automatically by the flush loop; also available for manual flush.
    */
   async flush(): Promise<void> {
+    // First, drain any outbound messages produced by the SyncEngine into the queue
+    // so outbound generation is coalesced and controlled by the manager's flush
+    // cadence instead of being enqueued directly by every storage event.
+    try {
+      const outbound = this.engine.drainOutbound();
+      for (const msg of outbound) {
+        try {
+          // Awaiting enqueue keeps the queue's internal retry/backoff semantics from
+          // being bypassed and avoids unbounded parallel enqueueing.
+          await this.queue.enqueue(msg);
+        } catch (err) {
+          this.emitTelemetry('queue_enqueue_failed', { message: msg, error: err });
+        }
+      }
+    } catch (err) {
+      // Ensure unexpected engine errors don't crash the flush loop.
+      this.emitTelemetry('engine_drain_error', { error: err });
+    }
+
     // No transport attached or no sessions — nothing to send.
     if (!this.transport || this.sessions.size === 0) return;
 

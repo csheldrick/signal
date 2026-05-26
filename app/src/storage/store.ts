@@ -125,7 +125,10 @@ export class DocumentStore {
 
       for (const c of changed) {
         this.opCounts.update++;
-        this.events.emit({
+        // Use async emit for the cascade of per-document updates caused by a
+        // delete to avoid syncing large numbers of listeners synchronously and
+        // creating huge realtime bursts (e.g. graph/index rebuilds).
+        this.events.emitAsync({
           type: 'updated',
           documentId: c.current.id,
           previous: c.previous,
@@ -135,7 +138,9 @@ export class DocumentStore {
       }
 
       this.opCounts.delete++;
-      this.events.emit({ type: 'deleted', documentId: id, timestamp: Date.now() });
+      // Emit deletion asynchronously to avoid immediate heavy downstream processing
+      // that can cause subsystem overload when many listeners are registered.
+      this.events.emitAsync({ type: 'deleted', documentId: id, timestamp: Date.now() });
     }
     return existed;
   }
@@ -236,7 +241,10 @@ export class DocumentStore {
       // documents without directly importing the store.
       this.documents.set(doc.id, cloneDocument(doc));
       this.opCounts.create++;
-      this.events.emit({ type: 'created', document: cloneDocument(doc), timestamp: Date.now() });
+      // Use async emit during load to avoid firing many synchronous created events
+      // while the system is still initializing. Consumers that need to observe
+      // created events synchronously should use the store API directly.
+      this.events.emitAsync({ type: 'created', document: cloneDocument(doc), timestamp: Date.now() });
     }
   }
 }
