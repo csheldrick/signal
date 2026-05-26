@@ -88,6 +88,7 @@ export class SyncEngine {
         // incoming events and flushing them in a microtask. This reduces
         // synchronous cost on the storage path and coalesces bursts.
         const buffer: StorageEvent[] = [];
+        const MAX_BUFFERED_EVENTS = 500;
         let scheduled = false;
         const flush = () => {
           if (scheduled) return;
@@ -111,6 +112,12 @@ export class SyncEngine {
         // listeners routed through the '*' slot.
         const pushAndFlush = (ev: StorageEvent) => {
           try {
+            // Keep the buffer bounded; drop oldest events when overloaded to
+            // avoid unbounded memory/CPU cost. This is a pragmatic trade-off to
+            // maintain responsiveness under bursty load.
+            if (buffer.length >= MAX_BUFFERED_EVENTS) {
+              buffer.shift();
+            }
             buffer.push(ev);
             flush();
           } catch (err) {

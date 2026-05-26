@@ -3,7 +3,7 @@
 // Depends on: sync/protocol.
 
 import type { PeerInfo, SyncMessage, SyncState, VectorClock } from './protocol.js';
-import { mergeClocks } from './protocol.js';
+import { mergeClocks, clocksEqual } from './protocol.js';
 
 export class PeerSession {
   private _clock: VectorClock;
@@ -82,16 +82,8 @@ export class PeerSession {
     // Leave state as 'resolved' so callers can observe and transition when appropriate.
   }
 
-  private clocksEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
-    if (a === b) return true;
-    if (!a || !b) return false;
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    if (aKeys.length !== bKeys.length) return false;
-    for (const k of aKeys) {
-      if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
-    }
-    return true;
+  private clocksEqual(a: VectorClock | undefined, b: VectorClock | undefined): boolean {
+  return clocksEqual(a, b);
   }
 
   // ── Inbound buffer ─────────────────────────────────────────

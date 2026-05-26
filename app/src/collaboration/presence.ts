@@ -346,7 +346,17 @@ export class PresenceTracker {
                   // nothing to schedule
                 } else {
                   // Add to the batch; latest entry for a peerId wins
-                  this.leaveBatch.set(peerId, existing.documentId);
+                  try {
+                    const MAX_LEAVE_BATCH = 200;
+                    if (this.leaveBatch.size >= MAX_LEAVE_BATCH) {
+                      // Batch full: avoid unbounded growth. Invoke the hook immediately
+                      // for this peer as a best-effort, swallowing errors to keep the
+                      // realtime path non-blocking.
+                      try { hook(peerId, existing.documentId); } catch (_) { /* swallow */ }
+                    } else {
+                      this.leaveBatch.set(peerId, existing.documentId);
+                    }
+                  } catch (_) { /* swallow */ }
 
                   if (!this.leaveBatchScheduled) {
                     this.leaveBatchScheduled = true;

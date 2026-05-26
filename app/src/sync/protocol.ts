@@ -75,6 +75,18 @@ export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   return merged;
 }
 
+export function clocksEqual(a: VectorClock | undefined, b: VectorClock | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
+  }
+  return true;
+}
+
 export function isAncestor(ancestor: VectorClock, descendant: VectorClock): boolean {
   for (const [peer, tick] of Object.entries(ancestor)) {
     const safeTick = Number.isFinite(tick as number) ? Math.max(0, tick as number) : 0;

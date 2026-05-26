@@ -47,9 +47,9 @@ export interface PluginContext {
 export const dire: Record<string, unknown> = Object.freeze({});
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 16; // lowered to reduce plugin subsystem fan-out and resource pressure
+  private static readonly MAX_REGISTERED_PLUGINS = 12; // tightened to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
-  private static readonly MAX_ENABLED_PLUGINS = 8;
+  private static readonly MAX_ENABLED_PLUGINS = 6;
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
   // listener per plugin. This consolidates upstream listeners and
@@ -225,7 +225,7 @@ export class PluginHost {
                 // avoid unbounded growth of pluginEventManagers (each distinct
                 // type can hold many listeners). If the cap is reached, avoid
                 // adding another manager and fall back to a no-op behaviour.
-                const MAX_EVENT_TYPES = 16;
+                const MAX_EVENT_TYPES = 12;
                 if (this.pluginEventManagers.size >= MAX_EVENT_TYPES) {
                   try { console.warn('PluginHost: event manager type limit reached; registering noop listener'); } catch (_) {}
                   mgr = { upstreamDispose: undefined, listeners: new Set() };

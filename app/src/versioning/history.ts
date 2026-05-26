@@ -48,7 +48,7 @@ export class VersionHistory {
     history.push(version);
 
     // Cap history per-document to avoid unbounded memory growth.
-    const MAX_VERSIONS = 20;
+    const MAX_VERSIONS = 10;
     if (history.length > MAX_VERSIONS) {
       const removed = history.splice(0, history.length - MAX_VERSIONS);
       for (const old of removed) {
@@ -96,11 +96,12 @@ export class VersionHistory {
     const fromLines = new Set(fromContent.split('\n'));
     const toLines = toContent.split('\n');
 
+    const MAX_DIFF_ITEMS = 100;
+    const addedFull = toLines.filter(l => !fromLines.has(l) && l.trim() !== '');
+    const removedFull = [...fromLines].filter(l => !toLines.includes(l) && l.trim() !== '');
     return {
-      added: toLines.filter(l => !fromLines.has(l) && l.trim() !== ''),
-      removed: [...fromLines].filter(
-        l => !toLines.includes(l) && l.trim() !== '',
-      ),
+      added: addedFull.slice(0, MAX_DIFF_ITEMS),
+      removed: removedFull.slice(0, MAX_DIFF_ITEMS),
       unchanged: toLines.filter(l => fromLines.has(l)).length,
     };
   }

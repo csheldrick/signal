@@ -2,7 +2,8 @@
 // Ordered, deduplicated outbound message queue with exponential-backoff retry.
 // Depends on: sync/protocol.
 
-import type { SyncMessage } from './protocol.js';
+import type { SyncMessage, VectorClock } from './protocol.js';
+import { clocksEqual } from './protocol.js';
 
 export interface QueueEntry {
   message: SyncMessage;
@@ -20,7 +21,7 @@ export interface SyncQueueOptions {
   baseDelayMs?: number;
   /** Hard cap on retry delay ms. Default 30_000. */
   maxDelayMs?: number;
-  /** Maximum number of queued messages. Default 1000. */
+  /** Maximum number of queued messages. Default 500. */
   maxQueueSize?: number;
 }
 
@@ -152,15 +153,7 @@ export class SyncQueue {
     this.index.clear();
   }
 
-  private clocksEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
-    if (a === b) return true;
-    if (!a || !b) return false;
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    if (aKeys.length !== bKeys.length) return false;
-    for (const k of aKeys) {
-      if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
-    }
-    return true;
+  private clocksEqual(a: VectorClock | undefined, b: VectorClock | undefined): boolean {
+    return clocksEqual(a, b);
   }
 }
