@@ -129,7 +129,9 @@ export class RemoteSummarizer implements Summarizer {
     fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>,
     options?: { allowNetwork?: boolean; maxSentences?: number; authToken?: string },
   ) {
+    // Store the raw fetcher reference so summarize() can call it with explicit opts
     this.fetcher = fetcher;
+
     // Require auth token if network is requested; otherwise disable network for safety.
     let effectiveAllow = options?.allowNetwork ?? false;
     this.authToken = options?.authToken;
@@ -137,6 +139,21 @@ export class RemoteSummarizer implements Summarizer {
       try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } catch (_) { /* swallow */ }
       effectiveAllow = false;
     }
+
+    // Defensive runtime check: ensure the provided fetcher accepts an options parameter
+    // so we can actually deliver the authToken. Many older fetchers accepted a single
+    // document arg and would ignore opts; detect that shape via function.length and
+    // disable network in that case to avoid silently calling a fetcher without auth.
+    try {
+      if (effectiveAllow && typeof fetcher === 'function' && (fetcher as any).length < 2) {
+        try { console.warn('RemoteSummarizer: provided fetcher does not accept options (auth token cannot be injected); network disabled for safety'); } catch (_) { /* swallow */ }
+        effectiveAllow = false;
+      }
+    } catch (_) {
+      // In case feature-detection fails for any reason, fall back to the safer behavior
+      effectiveAllow = false;
+    }
+
     this.allowNetwork = effectiveAllow;
     this.allowsNetwork = effectiveAllow;
     this.fallback = new LocalSummarizer(options?.maxSentences ?? 3);
