@@ -122,15 +122,17 @@ export class SignalApp {
         const d = this.store.read(documentId);
         if (!d) return undefined;
         // Use the configured summarizer when present; otherwise use a local one.
-        const summarizer = this._summarizer ?? new LocalSummarizer(3);
+        const summarizer: Summarizer = this._summarizer ?? new LocalSummarizer(3);
 
         // Deny network summarization when caller does not explicitly request it.
         // Plugins will call PluginContext.summarizeDocument without allowNetwork,
         // so this prevents plugins from causing network calls.
         try {
-          // If the active summarizer appears to be a RemoteSummarizer and the caller
-          // did not request network, refuse to perform network I/O.
-          if ((summarizer as any)?.constructor && (summarizer as any).constructor.name === 'RemoteSummarizer' && !allowNetwork) {
+          // Use explicit Summarizer contract flags rather than fragile constructor.name checks.
+          // If the active summarizer is remote but neither it nor the caller allow
+          // network I/O, refuse to perform remote summarization.
+          const sSumm: Summarizer = summarizer;
+          if (sSumm.isRemote && !sSumm.allowsNetwork && !allowNetwork) {
             return undefined;
           }
 
@@ -169,7 +171,7 @@ export class SignalApp {
         try {
           const doc = this.store.read(docId);
           if (!doc) return;
-          const s = this._summarizer ?? new LocalSummarizer(3);
+          const s = new LocalSummarizer(3);
           await s.summarize(doc);
           try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
         } catch (_) { /* swallow background errors */ }
@@ -195,12 +197,9 @@ export class SignalApp {
       this.events.attachDocumentValidatorFromEvents(initialIds)
     );
 
-    // Wire storage events → sync engine
-    this.events.on('*', (event) => {
-      if (this.started) {
-        this._sync?.generateOutbound(event);
-      }
-    });
+    // Storage events are forwarded to the SyncEngine internally when appropriate.
+    // Avoid registering a second, duplicate forwarder here to prevent duplicate
+    // outbound message generation (the SyncEngine subscribes to store events itself).
   }
 
   enableRemoteSummarizer(fetcher: (document: Document) => Promise<string>, options?: { allowNetwork?: boolean; maxSentences?: number }): boolean {

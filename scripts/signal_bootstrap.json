@@ -114,17 +114,5 @@
   {
     "type": "hypothesis",
     "description": "ConflictResolution quality will degrade if SyncEngine instances are duplicated or misconfigured (duplicate DocumentStore/SyncEngine nodes observed); redundant instances may create divergent VectorClock histories."
-  },
-  {
-    "type": "tension",
-    "description": "The project intends plugin isolation via PluginContext/PluginHost, yet presence refactor changed document access to PluginContext and removed a primitive — this may contradict existing plugin expectations and break backward compatibility."
-  },
-  {
-    "type": "tension",
-    "description": "Goal of strong observability and complete StorageEvent tracking conflicts with the observation that StorageEventBus implementation is not clearly present, risking blind spots between DocumentStore and indexing/sync layers."
-  },
-  {
-    "type": "tension",
-    "description": "A requirement for test coverage and 'Testing adoption' decision contradicts the number of contracts (71) and entities (51) with complex behaviors (sync, conflict, plugins) — the current test surface likely undercovers critical concurrent and IO-heavy logic."
   }
 ]
