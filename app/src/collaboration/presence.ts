@@ -185,8 +185,15 @@ export class PresenceTracker {
       // impacting realtime flows. Callers that need to ensure cleanup can
       // await the returned Promise.
       try {
+        // Schedule optional plugin cleanup in the background instead of awaiting
+        // it here. Awaiting onPeerLeave can make many concurrent leave() calls
+        // expensive and increase pressure on presence-related subsystems.
         if (this.context && typeof (this.context as any).onPeerLeave === 'function') {
-          await Promise.resolve((this.context as any).onPeerLeave(peerId, existing.documentId));
+          try {
+            Promise.resolve().then(() => {
+              try { (this.context as any).onPeerLeave(peerId, existing.documentId); } catch (_) { /* swallow */ }
+            });
+          } catch (_) { /* swallow scheduling errors */ }
         }
       } catch (_) {
         /* swallow */

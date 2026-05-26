@@ -68,12 +68,33 @@ export class SyncEngine {
     try {
       const bus = this.store?.events;
       if (bus && typeof bus.on === 'function') {
+        // Decouple heavy sync processing from the storage emitter by buffering
+        // incoming events and flushing them in a microtask. This reduces
+        // synchronous cost on the storage path and coalesces bursts.
+        const buffer: StorageEvent[] = [];
+        let scheduled = false;
+        const flush = () => {
+          if (scheduled) return;
+          scheduled = true;
+          Promise.resolve().then(() => {
+            scheduled = false;
+            const toProcess = buffer.splice(0);
+            for (const ev of toProcess) {
+              try {
+                this.generateOutbound(ev);
+              } catch (err) {
+                try { console.error('SyncEngine: error handling storage event', err); } catch (_) { /* swallow */ }
+              }
+            }
+          }).catch(err => { try { console.error('SyncEngine: flush error', err); } catch (_) {} });
+        };
+
         bus.on('*', (e: StorageEvent) => {
           try {
-            this.generateOutbound(e);
+            buffer.push(e);
+            flush();
           } catch (err) {
-            // Keep listener resilient
-            console.error('SyncEngine: error handling storage event', err);
+            try { console.error('SyncEngine: error buffering storage event', err); } catch (_) { /* swallow */ }
           }
         });
       }

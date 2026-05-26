@@ -114,5 +114,49 @@
   {
     "type": "hypothesis",
     "description": "ConflictResolution quality will degrade if SyncEngine instances are duplicated or misconfigured (duplicate DocumentStore/SyncEngine nodes observed); redundant instances may create divergent VectorClock histories."
+  },
+  {
+    "type": "goal",
+    "description": "Implement offline-first document sync via an OfflineSyncQueue (app/src/sync/offline-queue.ts) that buffers DocumentChange mutations when the transport is unavailable, persists them durably, and drains them in causal order when the peer reconnects — ensuring no mutations are lost across network interruptions."
+  },
+  {
+    "type": "goal",
+    "description": "Provide a SyncSessionTracker (app/src/sync/session-tracker.ts) that manages per-peer sync session lifecycle: session open/close, heartbeat emission, stale-session detection via configurable timeout, and a SyncSessionEvent bus so SyncManager and PresenceTracker share a single authoritative view of active sessions."
+  },
+  {
+    "type": "goal",
+    "description": "Introduce a DocumentSnapshotService (app/src/storage/snapshot-service.ts) that periodically compacts document history into versioned snapshots, bounds VectorClock vector size, and exposes a SnapshotStore contract so SyncEngine can use the latest snapshot as a fast-forward base during conflict resolution."
+  },
+  {
+    "type": "observation",
+    "description": "No offline mutation buffer currently exists between DocumentStore and SyncEngine; if the transport drops mid-session, in-flight DocumentChange records are discarded and re-creation depends on the user repeating edits — a data-loss surface that OfflineSyncQueue would close."
+  },
+  {
+    "type": "observation",
+    "description": "VectorClock vectors grow unboundedly as peers join and leave; without periodic snapshot compaction the clock comparison cost in ConflictResolution grows O(n) with peer count, which will become a bottleneck in long-running collaborative sessions."
+  },
+  {
+    "type": "observation",
+    "description": "SyncManager has no session-level state today — it treats every sync attempt as stateless. A SyncSessionTracker would let it distinguish a reconnecting peer (needs delta replay from last known clock) from a first-time peer (needs full snapshot), eliminating redundant full-sync transfers."
+  },
+  {
+    "type": "constraint",
+    "description": "OfflineSyncQueue must persist buffered mutations to durable storage (same DocumentStore backend) with a monotonic sequence number so drain order is deterministic and idempotent on replay; duplicate application of a mutation must be a no-op, not a conflict."
+  },
+  {
+    "type": "constraint",
+    "description": "SyncSessionTracker must emit SyncSessionOpened, SyncSessionHeartbeat, SyncSessionStale, and SyncSessionClosed events on StorageEventBus so downstream consumers (PresenceTracker, SyncManager, observability layer) can react without polling."
+  },
+  {
+    "type": "constraint",
+    "description": "DocumentSnapshotService must write snapshots atomically (write-then-swap, never partial) and retain at least the two most recent snapshots so a rollback is always possible without a full history replay; snapshot creation must not block live document writes."
+  },
+  {
+    "type": "hypothesis",
+    "description": "Without OfflineSyncQueue, mobile or flaky-network clients will produce silent edit loss: SyncEngine will report success (local apply) but the mutation will never reach peers, causing invisible divergence that ConflictResolution cannot detect because the missing change was never transmitted."
+  },
+  {
+    "type": "hypothesis",
+    "description": "A DocumentSnapshotService that snapshots on a fixed wall-clock interval (e.g. every 5 minutes) will be insufficient under burst-edit workloads; snapshot frequency should be change-count-triggered (e.g. every N DocumentChange events) to keep VectorClock bounds tight regardless of edit rate."
   }
 ]

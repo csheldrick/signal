@@ -57,10 +57,32 @@ export class StorageEventBus implements StorageEventBusContract {
   private asyncScheduled: boolean = false;
 
   on(type: StorageEventType | '*', listener: Listener): void {
+    // Prevent unbounded listener growth which can cause heavy synchronous
+    // fan-out and subsystem overload. Enforce soft caps and refuse to add new
+    // listeners when global or per-type limits are exceeded.
+    const MAX_TOTAL_LISTENERS = 1000;
+    const MAX_PER_TYPE = 250;
+
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
-    this.listeners.get(type)!.add(listener);
+
+    // Compute current totals conservatively.
+    let total = 0;
+    for (const s of this.listeners.values()) total += s.size;
+
+    const set = this.listeners.get(type)!;
+    if (set.size >= MAX_PER_TYPE) {
+      try { console.warn(`StorageEventBus: listener limit reached for type '${String(type)}' — ignoring new listener`); } catch (_) {}
+      return;
+    }
+
+    if (total >= MAX_TOTAL_LISTENERS) {
+      try { console.warn('StorageEventBus: global listener limit reached — ignoring new listener'); } catch (_) {}
+      return;
+    }
+
+    set.add(listener);
   }
 
   off(type: StorageEventType | '*', listener: Listener): void {
@@ -92,7 +114,7 @@ export class StorageEventBus implements StorageEventBusContract {
     // Threshold chosen conservatively; tune if necessary. When exceeded we
     // schedule a microtask so the emitter yields control briefly but preserves
     // listener invocation order relative to this emit call.
-    const SYNC_LISTENER_THRESHOLD = 4; // lowered to yield earlier for large listener sets
+    const SYNC_LISTENER_THRESHOLD = 2; // yield earlier to reduce synchronous fan-out under load
     if (totalListeners > SYNC_LISTENER_THRESHOLD) {
       Promise.resolve().then(() => invoke());
     } else {

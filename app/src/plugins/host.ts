@@ -65,6 +65,7 @@ export const dire: Record<string, unknown> = (() => {
 })();
 
 export class PluginHost {
+  private static readonly MAX_REGISTERED_PLUGINS = 200;
   private plugins: Map<string, Plugin> = new Map();
   private enabled: Set<string> = new Set();
   private context: PluginContext;
@@ -81,6 +82,9 @@ export class PluginHost {
       throw new Error(`Plugin '${plugin.id}' must opt into the PluginContext sandbox (set usesPluginContext = true) to register.`);
     }
 
+    if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {
+      throw new Error(`PluginHost: cannot register plugin '${plugin.id}': plugin registration limit reached`);
+    }
     this.plugins.set(plugin.id, plugin);
   }
 
