@@ -7,6 +7,7 @@
 import type { Plugin, PluginContext } from './host.js';
 
 import type { SearchQuery, SearchResult } from './host.js';
+import { normalizeSearchQuery } from '../core/types.js';
 
 
 export class SearchPlugin implements Plugin {
@@ -66,7 +67,8 @@ export class SearchPlugin implements Plugin {
     }
 
     try {
-      return this.context.searchDocuments(safeQuery);
+      const normalizedQuery = normalizeSearchQuery(safeQuery);
+      return this.context.searchDocuments(normalizedQuery);
     } catch (_) {
       // Protect callers from upstream errors in search implementations.
       return [];

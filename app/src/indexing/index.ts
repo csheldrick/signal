@@ -25,6 +25,9 @@ export class InvertedIndex {
   private static readonly MAX_DOCS_PER_TERM: number = 10000;
   // Cached stats to avoid frequent recomputation under high read pressure.
   private cachedStats: IndexStats | null = null;
+  private lastStatsTs: number = 0;
+  private static readonly STATS_TTL_MS = 500;
+  private searchCache: Map<string, { ts: number; results: SearchHit[] }> = new Map();
   private statsDirty: boolean = true;
 
   index(documentId: string, text: string): void {
@@ -91,6 +94,16 @@ export class InvertedIndex {
   }
 
   search(queryText: string): SearchHit[] {
+    // Small short-lived cache to avoid redoing identical hot searches repeatedly.
+    let key = String(queryText || '');
+    try {
+      const now = Date.now();
+      const c = this.searchCache.get(key);
+      if (c && (now - c.ts) < 500) {
+        return c.results.slice();
+      }
+    } catch (_) { /* swallow cache errors */ }
+
     const queryTerms = this.tokenize(queryText);
     if (queryTerms.length === 0) return [];
 
@@ -115,8 +128,10 @@ export class InvertedIndex {
       .sort((a, b) => b.score - a.score);
 
     // Cap results to keep downstream consumers focused and to reduce pressure
-    const MAX_RESULTS = 100;
-    return results.slice(0, MAX_RESULTS);
+    const MAX_RESULTS = 50;
+    const out = results.slice(0, MAX_RESULTS);
+    try { this.searchCache.set(key, { ts: Date.now(), results: out }); } catch (_) {}
+    return out;
   }
 
   terms(): string[] {
@@ -125,7 +140,8 @@ export class InvertedIndex {
 
   stats(): IndexStats {
     // Serve cached stats when available to avoid recomputation on hot paths.
-    if (!this.statsDirty && this.cachedStats) return this.cachedStats;
+    const now = Date.now();
+    if (!this.statsDirty && this.cachedStats && (now - this.lastStatsTs) < InvertedIndex.STATS_TTL_MS) return this.cachedStats;
 
     const docCount = this.docTerms.size;
     const computed: IndexStats = {
@@ -135,6 +151,7 @@ export class InvertedIndex {
     };
 
     this.cachedStats = computed;
+    this.lastStatsTs = Date.now();
     this.statsDirty = false;
     return computed;
   }

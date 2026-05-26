@@ -26,7 +26,17 @@ export class GraphBuilder {
 
   private computeSignature(docs: Array<DocumentSnapshot>): string {
     // Stable short signature: id and updatedAt are sufficient to detect content changes
-    return docs.map(d => `${d.id}:${d.updatedAt}`).join('|');
+    // Build a compact numeric signature rather than concatenating many strings
+    // This reduces temporary string allocation and GC pressure for large doc sets.
+    let hash = 2166136261 >>> 0;
+    for (const d of docs) {
+      const id = String(d.id || '');
+      for (let i = 0; i < id.length; i++) {
+        hash = Math.imul(hash ^ id.charCodeAt(i), 16777619) >>> 0;
+      }
+      hash = (hash ^ (d.updatedAt | 0)) >>> 0;
+    }
+    return String(hash);
   }
 
   private cloneAdjacency(adj: AdjacencyList): AdjacencyList {

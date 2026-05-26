@@ -49,6 +49,7 @@ export const dire: Record<string, unknown> = Object.freeze({});
 export class PluginHost {
   private static readonly MAX_REGISTERED_PLUGINS = 16; // lowered to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
+  private static readonly MAX_ENABLED_PLUGINS = 8;
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
   // listener per plugin. This consolidates upstream listeners and
@@ -84,6 +85,13 @@ export class PluginHost {
   enable(pluginId: string): boolean {
     const plugin = this.plugins.get(pluginId);
     if (!plugin || this.enabled.has(pluginId)) return false;
+
+    // Prevent enabling too many plugins concurrently to avoid fan-out pressure.
+    if (this.enabled.size >= PluginHost.MAX_ENABLED_PLUGINS) {
+      try { console.warn('PluginHost: enabled plugin limit reached; refusing enable'); } catch (_) {}
+      return false;
+    }
+
     const safeCtx: PluginContext = (() => {
       // Non-generic deepFreeze helper to avoid TS generic parsing issues inside method bodies.
       function deepFreeze(obj: any): any {
@@ -164,7 +172,7 @@ export class PluginHost {
                 tags: Array.isArray(d.tags) ? [...d.tags] : [],
               });
               return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights });
-            }).filter((x): x is Readonly<SearchResult> => !!x).slice(0, 20);
+            }).filter((x): x is Readonly<SearchResult> => !!x).slice(0, 10);
 
             searchCache.set(key, { ts: now, results });
             return results;
@@ -322,7 +330,15 @@ export class PluginHost {
 
       return Object.freeze(ctx);
     })();
-    plugin.activate(safeCtx);
+
+    // Activate plugin inside try/catch to avoid leaving an inconsistent enabled state
+    try {
+      plugin.activate(safeCtx);
+    } catch (err) {
+      try { console.error(`PluginHost: activation failed for plugin '${pluginId}'`, err); } catch (_) {}
+      return false;
+    }
+
     this.enabled.add(pluginId);
     return true;
   }

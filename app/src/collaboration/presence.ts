@@ -76,7 +76,7 @@ export class PresenceTracker {
   private static readonly MAX_PEERS = 1000;
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
-  private static readonly MAX_PENDING_VALIDATIONS = 200;
+  private static readonly MAX_PENDING_VALIDATIONS = 50;
 
   private evictIfNeeded(): void {
     try {
@@ -157,6 +157,8 @@ export class PresenceTracker {
   // Cache in-flight validations per document id to deduplicate concurrent
   // validations (reduces redundant IO and CPU when many peers target the same doc).
   private pendingValidations: Map<string, Promise<boolean>> = new Map();
+  private lastClockTs: number = 0;
+  private lastClock: { [peerId: string]: number } = {};
 
   private cleanupTimer?: ReturnType<typeof setInterval>;
   private static readonly INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
@@ -186,6 +188,15 @@ export class PresenceTracker {
     }
   }
 
+  stopCleanupTimer(): void {
+    try {
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = undefined;
+      }
+    } catch (_) { /* swallow */ }
+  }
+
   join(peerId: string, documentId?: string): PeerPresence {
     const presence: PeerPresence = {
       peerId,
@@ -204,7 +215,19 @@ export class PresenceTracker {
     // the sandboxed PluginContext so session owners can record vector-clock
     // baselines without importing the concrete store.
     try {
-      const clock = this.context && typeof (this.context as any).getClock === 'function' ? (this.context as any).getClock() : undefined;
+      const clock = (() => {
+        try {
+          const now = Date.now();
+          if (this.lastClockTs && (now - this.lastClockTs) < 500) return { ...this.lastClock };
+          const maybe = this.context && typeof (this.context as any).getClock === 'function' ? (this.context as any).getClock() : undefined;
+          if (maybe && typeof maybe === 'object') {
+            this.lastClock = { ...maybe };
+            this.lastClockTs = now;
+            return { ...maybe };
+          }
+        } catch (_) { /* swallow */ }
+        return undefined;
+      })();
       try { (this as any).sessionTracker?.openSession(peerId, clock); } catch (_) { /* swallow */ }
     } catch (_) { /* swallow */ }
 
