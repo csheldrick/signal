@@ -68,13 +68,25 @@ export type DeprecatedDocumentChange = DocumentChange;
 export function isValidDocumentSnapshot(obj: any): obj is DocumentSnapshot {
   if (!obj || typeof obj !== 'object') return false;
   try {
-    return typeof obj.id === 'string' &&
-      typeof obj.title === 'string' &&
-      typeof obj.content === 'string' &&
-      Array.isArray(obj.tags) &&
-      Array.isArray(obj.links) &&
-      typeof obj.createdAt === 'number' &&
-      typeof obj.updatedAt === 'number';
+    if (typeof obj.id !== 'string') return false;
+    if (typeof obj.title !== 'string') return false;
+    if (typeof obj.content !== 'string') return false;
+
+    if (!Array.isArray(obj.tags)) return false;
+    if (obj.tags.some((t: any) => typeof t !== 'string')) return false;
+
+    if (!Array.isArray(obj.links)) return false;
+    for (const l of obj.links) {
+      if (!l || typeof l !== 'object') return false;
+      if (typeof l.sourceId !== 'string' || typeof l.targetId !== 'string') return false;
+      if (typeof l.kind !== 'string') return false;
+      const kinds: LinkKind[] = ['reference', 'related', 'derived_from', 'blocks'];
+      if (!kinds.includes(l.kind as LinkKind)) return false;
+    }
+
+    if (!Number.isFinite(obj.createdAt) || !Number.isFinite(obj.updatedAt)) return false;
+
+    return true;
   } catch (_) {
     return false;
   }
@@ -82,9 +94,26 @@ export function isValidDocumentSnapshot(obj: any): obj is DocumentSnapshot {
 
 export function validateDocumentChange(ch?: DocumentChange): boolean {
   if (!ch || typeof ch !== 'object') return true; // empty change allowed
-  if (ch.title !== undefined && typeof ch.title !== 'string') return false;
-  if (ch.content !== undefined && typeof ch.content !== 'string') return false;
-  if (ch.tags !== undefined && (!Array.isArray(ch.tags) || ch.tags.some(t => typeof t !== 'string'))) return false;
+
+  // Title: must be string if present and within reasonable length
+  if (ch.title !== undefined) {
+    if (typeof ch.title !== 'string') return false;
+    if (ch.title.length > 5000) return false; // reject pathological titles
+  }
+
+  // Content: must be string if present and not excessively large
+  if (ch.content !== undefined) {
+    if (typeof ch.content !== 'string') return false;
+    if (ch.content.length > 200_000) return false; // protect downstream subsystems
+  }
+
+  // Tags: must be array of short strings with a sensible cap
+  if (ch.tags !== undefined) {
+    if (!Array.isArray(ch.tags)) return false;
+    if (ch.tags.length > 100) return false;
+    if (ch.tags.some(t => typeof t !== 'string' || t.length > 100)) return false;
+  }
+
   return true;
 }
 

@@ -232,7 +232,15 @@ export class SignalApp {
     // Background summarization warm-up: schedule lightweight summarization for created/updated docs
     // to provide async job processing and warm caches (reduces remote latency on first real request).
     (this as any)._bgSummarizeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    // Background summarization is useful in production but creates timers and
+    // potential network activity that hinder test adoption and increase
+    // subsystem fan-out. Allow disabling in test environments or via an
+    // explicit global opt-out to make the subsystem safe for test runs.
     const scheduleSummarize = (docId: string) => {
+      const disabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
+        (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE);
+      if (disabled) return;
+
       const timers: Map<string, ReturnType<typeof setTimeout>> = (this as any)._bgSummarizeTimers;
       const prev = timers.get(docId);
       if (prev) clearTimeout(prev);
