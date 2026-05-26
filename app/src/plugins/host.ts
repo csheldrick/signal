@@ -161,7 +161,7 @@ export class PluginHost {
             })();
 
             const results = raw.map(r => {
-              const d = r?.document;
+              const d = (r && typeof r === 'object') ? ((r as any).document && typeof (r as any).document === 'object' ? (r as any).document : r) : undefined;
               if (!d || typeof d.id !== 'string' || typeof d.title !== 'string') return undefined;
               // Limit highlights and snippet sizes to reduce plugin payloads and memory churn.
               const rawHighlights = Array.isArray(r.highlights) ? r.highlights : [];

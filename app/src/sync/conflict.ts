@@ -26,7 +26,36 @@ export interface ConflictResolution {
 export type ConflictCandidateRecord = ConflictCandidate;
 
 export function isConflict(localClock: VectorClock, remoteClock: VectorClock): boolean {
-  return isConcurrent(localClock, remoteClock);
+  // Defensive wrapper around isConcurrent to avoid throwing or misclassifying
+  // when vector clocks are malformed or contain non-numeric entries.
+  try {
+    if (!localClock || typeof localClock !== 'object' || !remoteClock || typeof remoteClock !== 'object') {
+      return false;
+    }
+
+    const sanitize = (c: VectorClock): VectorClock => {
+      const out: any = {};
+      for (const k of Object.keys(c || {})) {
+        const v = (c as any)[k];
+        if (Number.isFinite(v)) {
+          out[k] = v as number;
+        } else if (typeof v === 'string' && /^\d+$/.test(v)) {
+          out[k] = Number(v);
+        } else {
+          // Unknown/missing entries default to 0 which represents no causality from that peer.
+          out[k] = 0;
+        }
+      }
+      return out as VectorClock;
+    };
+
+    return isConcurrent(sanitize(localClock), sanitize(remoteClock));
+  } catch (_) {
+    // Fail-safe: in case of unexpected input shapes or runtime errors, do not treat
+    // the situation as a conflict — this avoids escalation into heavier conflict
+    // resolution paths and prevents throwing from core sync logic.
+    return false;
+  }
 }
 
 /**

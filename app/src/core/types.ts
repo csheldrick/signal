@@ -121,6 +121,30 @@ export function validateDocumentChange(ch?: DocumentChange): boolean {
   return true;
 }
 
+/**
+ * Normalize a DocumentChange into a safe, bounded shape suitable for passing
+ * into heavier subsystems. Returns undefined when the input is invalid.
+ * This helps avoid pathological updates (huge strings/arrays) that can overload
+ * downstream subsystems (indexing, sync, graph builders).
+ */
+export function normalizeDocumentChange(ch?: DocumentChange): DocumentChange | undefined {
+  if (ch === undefined || ch === null) return undefined;
+  if (!validateDocumentChange(ch)) return undefined;
+
+  const out: DocumentChange = {};
+  if (typeof ch.title === 'string') {
+    out.title = ch.title.length > 5000 ? ch.title.slice(0, 5000) : ch.title;
+  }
+  if (typeof ch.content === 'string') {
+    out.content = ch.content.length > 200_000 ? ch.content.slice(0, 200_000) : ch.content;
+  }
+  if (Array.isArray(ch.tags)) {
+    out.tags = ch.tags.slice(0, 100).map(t => (typeof t === 'string' ? (t.length > 100 ? t.slice(0, 100) : t) : String(t)));
+  }
+
+  return out;
+}
+
 export function createDocumentSnapshot(doc: Document): DocumentSnapshot {
   return {
     id: doc.id,

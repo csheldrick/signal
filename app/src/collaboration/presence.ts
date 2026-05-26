@@ -154,8 +154,16 @@ export class PresenceTracker {
       const bus = (globalThis as any).__SIGNAL_STORAGE_EVENT_BUS;
       const emitSafe = (ev: any) => {
         try {
-          if (bus && typeof (bus as any).emit === 'function') {
-            try { (bus as any).emit(ev); } catch (_) { /* swallow bus errors */ }
+          if (bus) {
+            try {
+              // Prefer non-blocking async emission when available to avoid
+              // synchronous fan-out on session lifecycle events.
+              if (typeof (bus as any).emitAsync === 'function') {
+                try { (bus as any).emitAsync(ev); } catch (_) { /* swallow bus errors */ }
+              } else if (typeof (bus as any).emit === 'function') {
+                try { (bus as any).emit(ev); } catch (_) { /* swallow bus errors */ }
+              }
+            } catch (_) { /* swallow bus errors */ }
           }
         } catch (_) { /* swallow */ }
       };

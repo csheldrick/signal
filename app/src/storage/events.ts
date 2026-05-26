@@ -57,7 +57,9 @@ type Listener = (event: Readonly<StorageEvent>) => void;
 
 export interface StorageEventBusContract {
   on(type: StorageEventType | '*', listener: Listener): void;
+  onAsync(type: StorageEventType | '*', listener: Listener): void;
   off(type: StorageEventType | '*', listener: Listener): void;
+  offAsync(type: StorageEventType | '*', listener: Listener): void;
   emit(event: StorageEvent): void;
   emitAsync(event: StorageEvent): void;
   attachDocumentValidatorFromEvents(initial?: Iterable<string>): (id: string) => Promise<boolean> & { dispose?: () => void };
@@ -69,7 +71,13 @@ export interface StorageEventBusContract {
 export class StorageEventBus implements StorageEventBusContract {
   private listeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
   private asyncQueue: StorageEvent[] = [];
-  private asyncScheduled: boolean = false; private trace: StorageEvent[] = [];
+  private asyncScheduled: boolean = false;
+  private trace: StorageEvent[] = [];
+  // Async listeners are intended for consumers that must not run synchronously
+  // on the emitter's call path (e.g. plugins, background summarizers, session
+  // lifecycle observers). They are invoked in microtasks/macrotasks depending
+  // on load and are included in emitAsync flushes.
+  private asyncListeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
 
   on(type: StorageEventType | '*', listener: Listener): void {
     // Prevent unbounded listener growth which can cause heavy synchronous
@@ -102,6 +110,23 @@ export class StorageEventBus implements StorageEventBusContract {
 
   off(type: StorageEventType | '*', listener: Listener): void {
     this.listeners.get(type)?.delete(listener);
+  }
+
+  onAsync(type: StorageEventType | '*', listener: Listener): void {
+    // Lazily create the set for async listeners
+    if (!this.asyncListeners.has(type)) {
+      this.asyncListeners.set(type, new Set());
+    }
+
+    const set = this.asyncListeners.get(type)!;
+
+    // No strict global caps for async listeners here; async listeners are
+    // intentionally lighter-weight. Consumers should still avoid '*' abuse.
+    set.add(listener);
+  }
+
+  offAsync(type: StorageEventType | '*', listener: Listener): void {
+    this.asyncListeners.get(type)?.delete(listener);
   }
 
   emit(event: StorageEvent): void {
@@ -174,10 +199,16 @@ export class StorageEventBus implements StorageEventBusContract {
       for (const ev of queue) {
         const direct = this.listeners.get(ev.type);
         const star = this.listeners.get('*');
+        const asyncDirect = this.asyncListeners.get(ev.type);
+        const asyncStar = this.asyncListeners.get('*');
         const directArr = direct ? Array.from(direct) : [];
         const starArr = star ? Array.from(star) : [];
+        const asyncDirectArr = asyncDirect ? Array.from(asyncDirect) : [];
+        const asyncStarArr = asyncStar ? Array.from(asyncStar) : [];
         for (const fn of directArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
         for (const fn of starArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
+        for (const fn of asyncDirectArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
+        for (const fn of asyncStarArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
       }
     }, 0);
   }

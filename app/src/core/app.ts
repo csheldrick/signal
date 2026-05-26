@@ -187,7 +187,12 @@ export class SignalApp {
             try { listener(ev); } catch (_) { /* swallow */ }
           }
         };
-        this.events.on(type as any, wrapper);
+        if (typeof (this.events as any).onAsync === 'function') {
+          (this.events as any).onAsync(type as any, wrapper);
+        } else {
+          // Fallback to on() for older buses; prefer async registration when available
+          this.events.on(type as any, wrapper);
+        }
         return () => { this.events.off(type as any, wrapper); };
       },
 
