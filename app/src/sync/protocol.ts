@@ -71,7 +71,8 @@ export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
 
 export function isAncestor(ancestor: VectorClock, descendant: VectorClock): boolean {
   for (const [peer, tick] of Object.entries(ancestor)) {
-    if ((descendant[peer] ?? 0) < tick) return false;
+    const safeTick = Number.isFinite(tick as number) ? Math.max(0, tick as number) : 0;
+    if ((descendant[peer] ?? 0) < safeTick) return false;
   }
   return true;
 }

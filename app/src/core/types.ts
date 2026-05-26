@@ -59,3 +59,41 @@ export interface DocumentChange {
   content?: string;
   tags?: string[];
 }
+
+// Utility: create a lightweight, readonly-friendly DocumentSnapshot from a Document.
+// Encourages passing snapshots across subsystem boundaries to avoid accidental
+// mutation and to reduce memory pressure.
+export function createDocumentSnapshot(doc: Document): DocumentSnapshot {
+  return {
+    id: doc.id,
+    title: doc.title,
+    content: doc.content,
+    tags: Array.isArray(doc.tags) ? [...doc.tags] : [],
+    links: Array.isArray(doc.links) ? doc.links.map(l => ({ ...l })) : [],
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+}
+
+// Normalize SearchQuery inputs to clamp pathological extremes. This protects
+// downstream index/search subsystems from extremely large queries.
+export function normalizeSearchQuery(q?: SearchQuery): SearchQuery {
+  if (!q) return {};
+  const out: SearchQuery = {};
+  if (typeof q.text === 'string') {
+    const t = q.text.trim();
+    out.text = t.length > 500 ? t.slice(0, 500) : t;
+  }
+
+  if (Array.isArray(q.tags) && q.tags.length > 0) {
+    out.tags = q.tags.slice(0, 50);
+  }
+
+  if (q.dateRange && typeof q.dateRange === 'object') {
+    const from = Number.isFinite(q.dateRange.from) ? q.dateRange.from : 0;
+    const to = Number.isFinite(q.dateRange.to) ? q.dateRange.to : Date.now();
+    out.dateRange = { from: Math.min(from, to), to: Math.max(from, to) };
+  }
+
+  return out;
+}

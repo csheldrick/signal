@@ -27,7 +27,14 @@ export class InvertedIndex {
     }
 
     const terms = this.tokenize(text);
-    const termSet = new Set(terms);
+    // Prevent pathological per-document term explosions by bounding retained
+    // unique terms per document. This keeps index memory and CPU work predictable.
+    const MAX_TERMS_PER_DOC = 10000;
+    let termSet = new Set(terms);
+    if (termSet.size > MAX_TERMS_PER_DOC) {
+      // Keep first N unique terms deterministically.
+      termSet = new Set(Array.from(termSet).slice(0, MAX_TERMS_PER_DOC));
+    }
     this.docTerms.set(documentId, termSet);
     this.totalTerms += termSet.size;
 

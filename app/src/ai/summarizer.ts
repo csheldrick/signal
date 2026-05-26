@@ -74,7 +74,34 @@ export class RemoteSummarizer implements Summarizer {
   private readonly authToken?: string;
 
   // Coalesce concurrent summaries per-document to avoid duplicated remote work
-  private static pending: Map<string, Promise<string>> = new Map();
+  private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
+  private static readonly MAX_PENDING_ENTRIES = 1000;
+
+  private static getPending(id: string): Promise<string> | undefined {
+    const entry = RemoteSummarizer.pending.get(id);
+    if (!entry) return undefined;
+    // Evict very old entries to avoid memory leaks
+    if (Date.now() - entry.ts > 30_000) {
+      RemoteSummarizer.pending.delete(id);
+      return undefined;
+    }
+    return entry.promise;
+  }
+
+  private static setPending(id: string, p: Promise<string>): void {
+    RemoteSummarizer.pending.set(id, { promise: p, ts: Date.now() });
+    if (RemoteSummarizer.pending.size > RemoteSummarizer.MAX_PENDING_ENTRIES) {
+      const entries = [...RemoteSummarizer.pending.entries()].sort(([, a], [, b]) => a.ts - b.ts);
+      const toRemove = RemoteSummarizer.pending.size - RemoteSummarizer.MAX_PENDING_ENTRIES;
+      for (let i = 0; i < toRemove; i++) {
+        RemoteSummarizer.pending.delete(entries[i][0]);
+      }
+    }
+  }
+
+  private static clearPending(id: string): void {
+    RemoteSummarizer.pending.delete(id);
+  }
 
   // Simple failure tracking to avoid repeated remote attempts when the
   // remote service is failing or slow. After maxFailures within failureWindowMs
@@ -103,9 +130,15 @@ export class RemoteSummarizer implements Summarizer {
     options?: { allowNetwork?: boolean; maxSentences?: number; authToken?: string },
   ) {
     this.fetcher = fetcher;
-    this.allowNetwork = options?.allowNetwork ?? false;
+    // Require auth token if network is requested; otherwise disable network for safety.
+    let effectiveAllow = options?.allowNetwork ?? false;
     this.authToken = options?.authToken;
-    this.allowsNetwork = this.allowNetwork;
+    if (effectiveAllow && !this.authToken) {
+      try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } catch (_) { /* swallow */ }
+      effectiveAllow = false;
+    }
+    this.allowNetwork = effectiveAllow;
+    this.allowsNetwork = effectiveAllow;
     this.fallback = new LocalSummarizer(options?.maxSentences ?? 3);
   }
 
@@ -162,7 +195,7 @@ export class RemoteSummarizer implements Summarizer {
 
     // If there's already an in-flight request for this document, return it
     // to coalesce duplicate concurrent work and reduce remote load.
-    const inFlight = RemoteSummarizer.pending.get(id);
+    const inFlight = RemoteSummarizer.getPending(id);
     if (inFlight) return inFlight;
 
     //
@@ -197,9 +230,9 @@ export class RemoteSummarizer implements Summarizer {
 
     if (id) {
       // Publish in-flight promise so concurrent callers reuse it
-      RemoteSummarizer.pending.set(id, op);
+      RemoteSummarizer.setPending(id, op);
       // Ensure we cleanup the pending entry regardless of outcome
-      op.finally(() => { RemoteSummarizer.pending.delete(id); });
+      op.finally(() => { RemoteSummarizer.clearPending(id); });
     }
 
     return op;

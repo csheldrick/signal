@@ -70,6 +70,32 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
 
 export class PresenceTracker {
   private peers: Map<string, PeerPresence> = new Map();
+  private static readonly MAX_PEERS = 2000;
+
+  private evictIfNeeded(): void {
+    try {
+      if (this.peers.size < PresenceTracker.MAX_PEERS) return;
+      // Prefer removing offline peers first
+      for (const [k, p] of this.peers.entries()) {
+        if (p.status === 'offline') {
+          this.peers.delete(k);
+          return;
+        }
+      }
+      // Otherwise evict the least recently seen
+      let oldestKey: string | undefined;
+      let oldestTime = Infinity;
+      for (const [k, p] of this.peers.entries()) {
+        if (p.lastSeen < oldestTime) {
+          oldestTime = p.lastSeen;
+          oldestKey = k;
+        }
+      }
+      if (oldestKey) this.peers.delete(oldestKey);
+    } catch (_) {
+      /* swallow */
+    }
+  }
 
   private validator?: (id: string) => Promise<boolean>;
 
@@ -112,6 +138,7 @@ export class PresenceTracker {
     };
 
     // Register presence immediately so the realtime join path is never blocked.
+    this.evictIfNeeded();
     this.peers.set(peerId, presence);
 
     // If a validator exists, validate in the background with a short timeout.
