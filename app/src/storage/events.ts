@@ -2,21 +2,21 @@
 // Event types for storage mutations. Other modules subscribe
 // to these events, creating depends_on edges in the graph.
 
-import type { Document, DocumentLink } from '../core/types.js';
+import type { DocumentSnapshot, DocumentLink } from '../core/types.js';
 
 export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
 
 export interface StorageEventCreated {
   type: 'created';
-  document: Document;
+  document: DocumentSnapshot;
   timestamp: number;
 }
 
 export interface StorageEventUpdated {
   type: 'updated';
   documentId: string;
-  previous: Document;
-  current: Document;
+  previous: DocumentSnapshot;
+  current: DocumentSnapshot;
   timestamp: number;
 }
 
@@ -53,6 +53,8 @@ export type DeprecatedStorageEventCreated = StorageEventCreated;
 
 export class StorageEventBus implements StorageEventBusContract {
   private listeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
+  private asyncQueue: StorageEvent[] = [];
+  private asyncScheduled: boolean = false;
 
   on(type: StorageEventType | '*', listener: Listener): void {
     if (!this.listeners.has(type)) {
@@ -106,21 +108,27 @@ export class StorageEventBus implements StorageEventBusContract {
    * to have observed the event before the emitter returns (background dispatch).
    */
   emitAsync(event: StorageEvent): void {
-    const direct = this.listeners.get(event.type);
-    const star = this.listeners.get('*');
+    // Enqueue the event and schedule a single macrotask to flush the queue.
+    // This batches many emitAsync calls into a single dispatch and uses a
+    // macrotask (setTimeout) to yield to the event loop, preventing large
+    // numbers of microtasks from overwhelming the runtime.
+    this.asyncQueue.push(event);
+    if (this.asyncScheduled) return;
+    this.asyncScheduled = true;
 
-    const invoke = () => {
-      // Copy current listeners to arrays to avoid issues when listeners are
-      // added/removed during iteration and to keep invocation deterministic.
-      const directArr = direct ? Array.from(direct) : [];
-      const starArr = star ? Array.from(star) : [];
-      for (const fn of directArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
-      for (const fn of starArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
-    };
+    setTimeout(() => {
+      const queue = this.asyncQueue.splice(0);
+      this.asyncScheduled = false;
 
-    // Preserve previous (historical) non-blocking behavior for callers that
-    // intentionally opt into async dispatch.
-    Promise.resolve().then(() => invoke());
+      for (const ev of queue) {
+        const direct = this.listeners.get(ev.type);
+        const star = this.listeners.get('*');
+        const directArr = direct ? Array.from(direct) : [];
+        const starArr = star ? Array.from(star) : [];
+        for (const fn of directArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
+        for (const fn of starArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
+      }
+    }, 0);
   }
 
   /**

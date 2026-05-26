@@ -10,6 +10,7 @@ import type {
   SearchResult,
   DocumentChange,
 } from '../core/types.js';
+import { createDocumentSnapshot } from '../core/types.js';
 import { StorageEventBus } from './events.js';
 export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
@@ -69,7 +70,7 @@ export class DocumentStore {
     const stored = cloneDocument(doc);
     this.documents.set(id, stored);
     this.opCounts.create++;
-    this.events.emit({ type: 'created', document: cloneDocument(stored), timestamp: now });
+    this.events.emit({ type: 'created', document: createDocumentSnapshot(stored), timestamp: now });
     return cloneDocument(stored);
   }
 
@@ -98,8 +99,8 @@ export class DocumentStore {
     this.events.emit({
       type: 'updated',
       documentId: id,
-      previous: previousSnapshot,
-      current: cloneDocument(updated),
+      previous: createDocumentSnapshot(previousSnapshot),
+      current: createDocumentSnapshot(updated),
       timestamp: now,
     });
     return cloneDocument(updated);
@@ -131,8 +132,8 @@ export class DocumentStore {
         this.events.emitAsync({
           type: 'updated',
           documentId: c.current.id,
-          previous: c.previous,
-          current: c.current,
+          previous: createDocumentSnapshot(c.previous),
+          current: createDocumentSnapshot(c.current),
           timestamp: Date.now(),
         });
       }
@@ -163,8 +164,8 @@ export class DocumentStore {
     this.events.emit({
       type: 'updated',
       documentId: sourceId,
-      previous,
-      current,
+      previous: createDocumentSnapshot(previous),
+      current: createDocumentSnapshot(current),
       timestamp: Date.now(),
     });
 
@@ -244,7 +245,7 @@ export class DocumentStore {
       // Use async emit during load to avoid firing many synchronous created events
       // while the system is still initializing. Consumers that need to observe
       // created events synchronously should use the store API directly.
-      this.events.emitAsync({ type: 'created', document: cloneDocument(doc), timestamp: Date.now() });
+      this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(doc), timestamp: Date.now() });
     }
   }
 }
