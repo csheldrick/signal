@@ -127,13 +127,25 @@ export class StorageEventBus implements StorageEventBusContract {
     // For small listener sets preserve synchronous semantics to maintain
     // ordering guarantees expected by validators/listeners.
     const totalListeners = (direct ? direct.size : 0) + (star ? star.size : 0);
-    // Threshold chosen conservatively; tune if necessary. When exceeded we
-    // schedule a microtask so the emitter yields control briefly but preserves
-    // listener invocation order relative to this emit call.
-    const SYNC_LISTENER_THRESHOLD = 2; // yield earlier to reduce synchronous fan-out under load
-    if (totalListeners > SYNC_LISTENER_THRESHOLD) {
+    // Thresholds chosen to reduce synchronous fan-out under load while
+    // preserving ordering guarantees for small listener sets. We use two
+    // tiers: a microtask yield for moderate listener counts and a macrotask
+    // (setTimeout) when listener counts are very large to allow the event
+    // loop to recover and avoid long-running synchronous bursts.
+    const MICROTASK_YIELD_THRESHOLD = 2; // previous conservative threshold
+    const MACROTASK_YIELD_THRESHOLD = 20; // when exceeded, use setTimeout to yield more
+
+    if (totalListeners > MACROTASK_YIELD_THRESHOLD) {
+      // Very large listener counts: schedule a macrotask to avoid saturating
+      // the microtask queue and give other I/O a chance to run.
+      setTimeout(() => invoke(), 0);
+    } else if (totalListeners > MICROTASK_YIELD_THRESHOLD) {
+      // Moderate listener counts: yield via a microtask to preserve
+      // ordering relative to the emitter but avoid blocking the emitter call.
       Promise.resolve().then(() => invoke());
     } else {
+      // Small listener sets: preserve synchronous invocation for deterministic
+      // semantics expected by validators/listeners.
       invoke();
     }
   }

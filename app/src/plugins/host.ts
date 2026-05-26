@@ -63,7 +63,7 @@ export const dire: Record<string, unknown> = (() => {
 })();
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 200;
+  private static readonly MAX_REGISTERED_PLUGINS = 100; // lowered to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream

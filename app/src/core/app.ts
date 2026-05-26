@@ -292,26 +292,20 @@ export class SignalApp {
     // Also attach the async event-driven validator for comprehensive checks.
     // Use a single shared existence set and one listener for both sync and async
     // validators to avoid registering two separate '*' listeners which increases fan-out.
-    const known = new Set<string>(initialIds);
-    const listener = (ev: any) => {
-      switch (ev.type) {
-        case 'created':
-          known.add(ev.document.id);
-          break;
-        case 'deleted':
-          known.delete(ev.documentId);
-          break;
-        default:
-          break;
-      }
-    };
-    this.events.on('*', listener);
+    // Use the StorageEventBus-provided snapshot validator to avoid creating
+    // an ad-hoc '*' listener here. The snapshot validator maintains an
+    // internal Set and exposes a synchronous validator with a dispose method;
+    // reuse it for both sync and async presence validation to avoid duplicating
+    // listeners that increase StorageEventBus fan-out.
+    const snapshotValidator = this.events.attachDocumentValidatorSnapshot(initialIds);
 
-    const syncValidator = (id: string) => known.has(id);
-    (syncValidator as any).dispose = () => { this.events.off('*', listener); };
+    const syncValidator = snapshotValidator;
+    const asyncValidator = async (id: string) => snapshotValidator(id);
 
-    const asyncValidator = async (id: string) => known.has(id);
-    (asyncValidator as any).dispose = () => { this.events.off('*', listener); };
+    // Ensure disposers release the underlying bus listener when presence no
+    // longer needs validation.
+    (syncValidator as any).dispose = () => { try { (snapshotValidator as any).dispose && (snapshotValidator as any).dispose(); } catch (_) {} };
+    (asyncValidator as any).dispose = () => { try { (snapshotValidator as any).dispose && (snapshotValidator as any).dispose(); } catch (_) {} };
 
     this.presence.setValidator(syncValidator);
     this.presence.setAsyncValidator(asyncValidator);

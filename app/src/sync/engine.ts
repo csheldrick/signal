@@ -103,14 +103,27 @@ export class SyncEngine {
           }).catch(err => { try { console.error('SyncEngine: flush error', err); } catch (_) {} });
         };
 
-        bus.on('*', (e: StorageEvent) => {
+        // Avoid registering a wildcard listener which increases star-listener
+        // fan-out on the StorageEventBus. Subscribe only to concrete event
+        // types that the SyncEngine cares about to limit the number of
+        // listeners routed through the '*' slot.
+        const pushAndFlush = (ev: StorageEvent) => {
           try {
-            buffer.push(e);
+            buffer.push(ev);
             flush();
           } catch (err) {
             try { console.error('SyncEngine: error buffering storage event', err); } catch (_) { /* swallow */ }
           }
-        });
+        };
+
+        try { bus.on('created', pushAndFlush); } catch (_) {}
+        try { bus.on('updated', pushAndFlush); } catch (_) {}
+        try { bus.on('deleted', pushAndFlush); } catch (_) {}
+        try { bus.on('linked', pushAndFlush); } catch (_) {};
+
+        // Note: we intentionally avoid a single '*' listener to keep the
+        // StorageEventBus's star-listener arrays small and reduce per-emit
+        // invocation breadth.
       }
     } catch (err) {
       console.warn('SyncEngine: failed to subscribe to store events', err);
