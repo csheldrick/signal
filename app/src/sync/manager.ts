@@ -42,6 +42,12 @@ export class SyncManager {
   private readonly queue: SyncQueue;
   private readonly sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
   private readonly snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
+  // Observability for sessions: track last-seen and stale state and emit
+  // lifecycle events on the store event bus so downstream consumers can
+  // react without polling. These are best-effort and do not throw.
+  private sessionLastSeen: Map<string, number> = new Map();
+  private sessionStale: Map<string, boolean> = new Map();
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
   private readonly sessions: Map<string, PeerSession> = new Map();
   private readonly conflictLog: ConflictRecord[] = [];
   private readonly conflictStrategy: ConflictStrategy;
@@ -83,6 +89,69 @@ export class SyncManager {
       }
     }
     this.queue = new SyncQueue();
+
+    // Session lifecycle observability: emit lifecycle events on the store's
+    // event bus so downstream consumers (PresenceTracker, SyncManager internals,
+    // observability tools) can react without polling. We emit both a new
+    // PascalCase event name and the legacy snake_case name for backwards
+    // compatibility with existing listeners. All emissions are best-effort and
+    // non-blocking.
+    try {
+      // initialize timers/maps
+      this.sessionLastSeen = new Map<string, number>();
+      this.sessionStale = new Map<string, boolean>();
+      const HEARTBEAT_INTERVAL_MS = 30_000; // heartbeat cadence
+      const STALE_MS = 60_000; // consider a session stale after 60s of inactivity
+
+      this.heartbeatTimer = setInterval(() => {
+        try {
+          const now = Date.now();
+          const busAny: any = (this.store as any).events;
+
+          for (const peerId of Array.from(this.sessions.keys())) {
+            // Ensure we have a baseline last-seen for newly added sessions
+            if (!this.sessionLastSeen.has(peerId)) this.sessionLastSeen.set(peerId, now);
+
+            // Emit heartbeat events (new and legacy forms)
+            const heartbeat = { type: 'SyncSessionHeartbeat', peerId, timestamp: now } as any;
+            const heartbeatLegacy = { type: 'sync_session_heartbeat', peerId, timestamp: now } as any;
+            try {
+              if (busAny && typeof busAny.emitAsync === 'function') {
+                try { busAny.emitAsync(heartbeat); } catch (_) {}
+                try { busAny.emitAsync(heartbeatLegacy); } catch (_) {}
+              } else if (busAny && typeof busAny.emit === 'function') {
+                try { busAny.emit(heartbeat); } catch (_) {}
+                try { busAny.emit(heartbeatLegacy); } catch (_) {}
+              }
+            } catch (_) { /* swallow */ }
+
+            // Stale detection
+            try {
+              const last = this.sessionLastSeen.get(peerId) ?? 0;
+              const wasStale = this.sessionStale.get(peerId) ?? false;
+              if (!wasStale && now - last > STALE_MS) {
+                this.sessionStale.set(peerId, true);
+                const stale = { type: 'SyncSessionStale', peerId, timestamp: now } as any;
+                const staleLegacy = { type: 'sync_session_stale', peerId, timestamp: now } as any;
+                try {
+                  if (busAny && typeof busAny.emitAsync === 'function') {
+                    try { busAny.emitAsync(stale); } catch (_) {}
+                    try { busAny.emitAsync(staleLegacy); } catch (_) {}
+                  } else if (busAny && typeof busAny.emit === 'function') {
+                    try { busAny.emit(stale); } catch (_) {}
+                    try { busAny.emit(staleLegacy); } catch (_) {}
+                  }
+                } catch (_) { /* swallow */ }
+              } else if (wasStale && now - last <= STALE_MS) {
+                // recovered from stale
+                this.sessionStale.set(peerId, false);
+              }
+            } catch (_) { /* swallow per-session stale logic errors */ }
+          }
+        } catch (_) { /* swallow heartbeat loop errors */ }
+      }, HEARTBEAT_INTERVAL_MS);
+    } catch (_) { /* swallow timer creation errors for test/env compatibility */ }
+
     // Attach optional external hooks (readonly assignment allowed in constructor)
     this.sessionTracker = opts.sessionTracker;
     this.snapshotService = opts.snapshotService;
