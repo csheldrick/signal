@@ -42,7 +42,7 @@ export interface SearchQuery {
 }
 
 export interface SearchResult {
-  document: Document;
+  document: DocumentSnapshot;
   score: number;
   highlights: string[];
 }

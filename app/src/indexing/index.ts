@@ -18,11 +18,18 @@ export class InvertedIndex {
   private posting: Map<string, Set<string>> = new Map();
   private docTerms: Map<string, Set<string>> = new Map();
 
+  private totalTerms: number = 0;
+
   index(documentId: string, text: string): void {
-    this.remove(documentId);
+    // If doc already indexed, remove previous terms so totals remain accurate
+    if (this.docTerms.has(documentId)) {
+      this.remove(documentId);
+    }
+
     const terms = this.tokenize(text);
     const termSet = new Set(terms);
     this.docTerms.set(documentId, termSet);
+    this.totalTerms += termSet.size;
 
     for (const term of termSet) {
       let list = this.posting.get(term);
@@ -40,10 +47,14 @@ export class InvertedIndex {
 
     for (const term of terms) {
       const list = this.posting.get(term);
-      list?.delete(documentId);
-      if (list?.size === 0) this.posting.delete(term);
+      if (list) {
+        list.delete(documentId);
+        if (list.size === 0) this.posting.delete(term);
+      }
     }
+
     this.docTerms.delete(documentId);
+    this.totalTerms = Math.max(0, this.totalTerms - terms.size);
   }
 
   search(queryText: string): SearchHit[] {
@@ -80,12 +91,11 @@ export class InvertedIndex {
   }
 
   stats(): IndexStats {
-    const totalTerms = [...this.docTerms.values()].reduce((n, t) => n + t.size, 0);
     const docCount = this.docTerms.size;
     return {
       termCount: this.posting.size,
       documentCount: docCount,
-      avgTermsPerDoc: docCount === 0 ? 0 : totalTerms / docCount,
+      avgTermsPerDoc: docCount === 0 ? 0 : this.totalTerms / docCount,
     };
   }
 

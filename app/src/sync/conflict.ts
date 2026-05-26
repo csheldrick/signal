@@ -50,8 +50,10 @@ export function resolveConflict(
       } else if (remote.updatedAt < local.updatedAt) {
         winner = local;
       } else {
-        const remoteSize = JSON.stringify(remote).length;
-        const localSize = JSON.stringify(local).length;
+        const remoteSize =
+          (remote.content ? remote.content.length : 0) + (remote.title ? remote.title.length : 0);
+        const localSize =
+          (local.content ? local.content.length : 0) + (local.title ? local.title.length : 0);
         if (remoteSize !== localSize) {
           winner = remoteSize > localSize ? remote : local;
         } else {

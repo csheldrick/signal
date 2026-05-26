@@ -63,7 +63,7 @@ export class PeerSession {
    */
   updateClock(incoming: VectorClock): boolean {
     const merged = mergeClocks(this._clock, incoming);
-    const advanced = JSON.stringify(merged) !== JSON.stringify(this._clock);
+    const advanced = !this.clocksEqual(merged, this._clock);
     this._clock = merged;
     this._lastSeen = Date.now();
     return advanced;
@@ -77,8 +77,19 @@ export class PeerSession {
 
   markResolved(): void {
     this._state = 'resolved';
-    // Revert to idle after resolution so the session can accept new messages.
-    this._state = 'idle';
+    // Leave state as 'resolved' so callers can observe and transition when appropriate.
+  }
+
+  private clocksEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const k of aKeys) {
+      if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
+    }
+    return true;
   }
 
   // ── Inbound buffer ─────────────────────────────────────────
