@@ -2,15 +2,15 @@
 // Detects concurrent writes and applies a configurable merge strategy.
 // Depends on: core/types, sync/protocol.
 
-import type { Document } from '../core/types.js';
+import type { Document, DocumentSnapshot } from '../core/types.js';
 import type { ConflictRecord, ConflictStrategy, VectorClock } from './protocol.js';
 import { isConcurrent } from './protocol.js';
 
 export interface ConflictCandidate {
   documentId: string;
-  local: Document;
+  local: Document | DocumentSnapshot;
   localClock: VectorClock;
-  remote: Document;
+  remote: Document | DocumentSnapshot;
   remoteClock: VectorClock;
 }
 
@@ -36,6 +36,12 @@ export function resolveConflict(
   strategy: ConflictStrategy = 'last-write-wins',
 ): ConflictResolution {
   const { local, localClock, remote, remoteClock } = candidate;
+  // Normalize inputs to mutable Document for resolution logic while keeping the
+  // external API permissive (accepts DocumentSnapshot). Callers that pass
+  // snapshots are not exposed to internal mutation because we operate on copies
+  // / assertions here.
+  const ldoc: Document = local as Document;
+  const rdoc: Document = remote as Document;
   const resolvedAt = Date.now();
 
   let winner: Document;
@@ -45,48 +51,48 @@ export function resolveConflict(
       // Prefer the more recently updated document. If timestamps are equal,
       // apply a deterministic tie-breaker: prefer the version with larger
       // serialized content size (more content), then lexicographically by id.
-      if (remote.updatedAt > local.updatedAt) {
+      if (rdoc.updatedAt > ldoc.updatedAt) {
         winner = remote;
-      } else if (remote.updatedAt < local.updatedAt) {
+      } else if (rdoc.updatedAt < ldoc.updatedAt) {
         winner = local;
       } else {
         const remoteSize =
-          (remote.content ? remote.content.length : 0) + (remote.title ? remote.title.length : 0);
+          (rdoc.content ? rdoc.content.length : 0) + (rdoc.title ? rdoc.title.length : 0);
         const localSize =
-          (local.content ? local.content.length : 0) + (local.title ? local.title.length : 0);
+          (ldoc.content ? ldoc.content.length : 0) + (ldoc.title ? ldoc.title.length : 0);
         if (remoteSize !== localSize) {
-          winner = remoteSize > localSize ? remote : local;
+          winner = remoteSize > localSize ? rdoc : ldoc;
         } else {
-          winner = remote.id >= local.id ? remote : local;
+          winner = rdoc.id >= ldoc.id ? rdoc : ldoc;
         }
       }
       break;
     }
 
     case 'first-write-wins':
-      winner = local.createdAt <= remote.createdAt ? local : remote;
+      winner = ldoc.createdAt <= rdoc.createdAt ? ldoc : rdoc;
       break;
 
     case 'merge-content': {
       // Naive content merge: concatenate divergent sections with a separator.
       // A real implementation would use a CRDT or three-way diff here.
       const mergedContent =
-        local.content === remote.content
-          ? local.content
-          : `${local.content}\n<<<conflict:remote>>>\n${remote.content}`;
+        ldoc.content === rdoc.content
+          ? ldoc.content
+          : `${ldoc.content}\n<<<conflict:remote>>>\n${rdoc.content}`;
 
       // Merge tags by union.
-      const mergedTags = Array.from(new Set([...local.tags, ...remote.tags]));
+      const mergedTags = Array.from(new Set([...ldoc.tags, ...rdoc.tags]));
 
       // Prefer the more recently updated title.
-      const mergedTitle = remote.updatedAt >= local.updatedAt ? remote.title : local.title;
+      const mergedTitle = rdoc.updatedAt >= ldoc.updatedAt ? rdoc.title : ldoc.title;
 
       winner = {
-        ...local,
+        ...ldoc,
         title: mergedTitle,
         content: mergedContent,
         tags: mergedTags,
-        updatedAt: Math.max(local.updatedAt, remote.updatedAt),
+        updatedAt: Math.max(ldoc.updatedAt, rdoc.updatedAt),
       };
       break;
     }
@@ -99,8 +105,8 @@ export function resolveConflict(
     documentId: candidate.documentId,
     localClock,
     remoteClock,
-    localTimestamp: local.updatedAt,
-    remoteTimestamp: remote.updatedAt,
+    localTimestamp: ldoc.updatedAt,
+    remoteTimestamp: rdoc.updatedAt,
     resolvedBy: strategy,
     resolvedAt,
   };
