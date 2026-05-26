@@ -21,7 +21,11 @@ export class ExportPlugin implements Plugin {
   exportToMarkdown(): string {
     if (!this.context) return '';
 
-    const docs = this.context.listDocuments();
+    const docs = this.context.listDocuments().map(d => ({
+      ...d,
+      links: Array.isArray((d as any).links) ? (d as any).links.map((l: any) => ({ ...l })) : [],
+      tags: Array.isArray((d as any).tags) ? [...(d as any).tags] : [],
+    }));
     const lines: string[] = [];
 
     for (const doc of docs) {

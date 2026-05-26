@@ -53,10 +53,41 @@ export class SignalApp {
     this._summarizer = undefined; // lazily created when first used
 
 
+    // Provide safe, defensive clones to plugins so they cannot mutate internal store state.
+    const cloneDoc = (d: any) => {
+      if (!d) return d;
+      return {
+        ...d,
+        links: Array.isArray(d.links) ? d.links.map((l: any) => ({ ...l })) : [],
+        tags: Array.isArray(d.tags) ? [...d.tags] : [],
+      };
+    };
+
     const pluginContext: PluginContext = {
-      listDocuments: () => this.store.list(),
-      searchDocuments: (query) => this.store.search(query),
-      getDocument: (id) => this.store.read(id),
+      listDocuments: () => {
+        try {
+          const list = this.store.list();
+          return Array.isArray(list) ? list.map((d: any) => cloneDoc(d)) : [];
+        } catch (_) {
+          return [];
+        }
+      },
+      searchDocuments: (query) => {
+        try {
+          const res = this.store.search(query) as any[];
+          return Array.isArray(res) ? res.map(r => cloneDoc(r)) : [];
+        } catch (_) {
+          return [];
+        }
+      },
+      getDocument: (id) => {
+        try {
+          const d = this.store.read(id) as any;
+          return d ? cloneDoc(d) : undefined;
+        } catch (_) {
+          return undefined;
+        }
+      },
       getClock: () => {
         try {
           // Prefer the active SyncEngine clock when available so plugins receive
