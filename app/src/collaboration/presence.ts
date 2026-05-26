@@ -6,6 +6,7 @@
 
 import type { Plugin, PluginContext } from '../plugins/host.js';
 import type { DocumentSnapshot } from '../core/types.js';
+import { getSignalStorageEventBus } from '../core/globals.js';
 
 // Types exposed for backwards compatibility — deprecated direct imports.
 // Use PluginContext.listDocuments().map(...) instead.
@@ -151,7 +152,7 @@ export class PresenceTracker {
         return;
       }
 
-      const bus = (globalThis as any).__SIGNAL_STORAGE_EVENT_BUS;
+      const bus = getSignalStorageEventBus();
       const emitSafe = (ev: any) => {
         try {
           if (bus) {
