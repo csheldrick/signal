@@ -27,6 +27,12 @@ export interface ClockProvider {
 
 export type PresenceStatus = 'active' | 'idle' | 'offline';
 
+export const PRESENCE_STATUS = {
+  ACTIVE: 'active' as PresenceStatus,
+  IDLE: 'idle' as PresenceStatus,
+  OFFLINE: 'offline' as PresenceStatus,
+} as const;
+
 export interface PeerPresence {
   peerId: string;
   documentId: string | undefined;

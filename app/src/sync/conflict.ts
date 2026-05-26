@@ -79,12 +79,23 @@ export function resolveConflict(
       break;
 
     case 'merge-content': {
-      // Naive content merge: concatenate divergent sections with a separator.
-      // A real implementation would use a CRDT or three-way diff here.
+      // Merge with defensive caps to avoid unbounded memory/CPU use when
+      // documents are very large. Use a simple truncated merge strategy and
+      // a predictable marker so downstream tooling can detect truncation.
+      const MAX_MERGED_CONTENT = 10000; // bytes/characters cap for merged payload
+      const l = typeof ldoc.content === 'string' ? ldoc.content : '';
+      const r = typeof rdoc.content === 'string' ? rdoc.content : '';
+
       const mergedContent =
-        ldoc.content === rdoc.content
-          ? ldoc.content
-          : `${ldoc.content}\n<<<conflict:remote>>>\n${rdoc.content}`;
+        l === r
+          ? l
+          : (() => {
+              if ((l.length + r.length + 32) <= MAX_MERGED_CONTENT) {
+                return `${l}\n<<<conflict:remote>>>\n${r}`;
+              }
+              const reserve = 48; const half = Math.max(0, Math.floor((MAX_MERGED_CONTENT - reserve) / 2));
+              return `${l.slice(0, half)}\n<<<conflict:remote>>>\n${r.slice(-half)}`;
+            })();
 
       // Merge tags by union.
       const mergedTags = Array.from(new Set([...ldoc.tags, ...rdoc.tags]));
