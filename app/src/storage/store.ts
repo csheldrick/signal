@@ -66,10 +66,11 @@ export class DocumentStore {
       createdAt: now,
       updatedAt: now,
     };
-    this.documents.set(id, doc);
+    const stored = cloneDocument(doc);
+    this.documents.set(id, stored);
     this.opCounts.create++;
-    this.events.emit({ type: 'created', document: cloneDocument(doc), timestamp: now });
-    return doc;
+    this.events.emit({ type: 'created', document: cloneDocument(stored), timestamp: now });
+    return cloneDocument(stored);
   }
 
   read(id: string): Document | undefined {
@@ -177,7 +178,7 @@ export class DocumentStore {
   search(query: SearchQuery): SearchResult[] {
     // If no search criteria provided, return a small preview to avoid full scans.
     if (!query || (!query.text && (!query.tags || query.tags.length === 0) && !query.dateRange)) {
-      return Array.from(this.documents.values()).slice(0, DocumentStore.DEFAULT_LIST_PREVIEW).map(d => ({ document: d, score: 0, highlights: [] }));
+      return Array.from(this.documents.values()).slice(0, DocumentStore.DEFAULT_LIST_PREVIEW).map(d => ({ document: cloneDocument(d), score: 0, highlights: [] }));
     }
 
     const results: SearchResult[] = [];
@@ -233,7 +234,7 @@ export class DocumentStore {
       // Insert the document into the in-memory store and emit a 'created' event
       // so existing event-driven validators and consumers can discover loaded
       // documents without directly importing the store.
-      this.documents.set(doc.id, doc);
+      this.documents.set(doc.id, cloneDocument(doc));
       this.opCounts.create++;
       this.events.emit({ type: 'created', document: cloneDocument(doc), timestamp: Date.now() });
     }

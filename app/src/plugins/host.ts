@@ -74,20 +74,13 @@ export class PluginHost {
   }
 
   register(plugin: Plugin): void {
+    // Enforce explicit opt-in for the PluginContext sandbox. Legacy plugins
+    // that do not set usesPluginContext === true must be migrated. This
+    // prevents accidental sandbox escapes and makes the boundary explicit.
     if (plugin.usesPluginContext !== true) {
-      try {
-        // eslint-disable-next-line no-console
-        console.warn('Plugin registration: plugin did not opt into PluginContext sandbox. Registering for backward compatibility. This is deprecated — prefer readonly usesPluginContext = true.');
-      } catch (_) {
-        /* swallow console errors */
-      }
-      // For backward compatibility we still register legacy plugins, but we
-      // issue a deprecation warning so callers migrate to the sandboxed
-      // PluginContext contract. This reduces breaking changes while keeping
-      // the migration path explicit.
-      this.plugins.set(plugin.id, plugin);
-      return;
+      throw new Error(`Plugin '${plugin.id}' must opt into the PluginContext sandbox (set usesPluginContext = true) to register.`);
     }
+
     this.plugins.set(plugin.id, plugin);
   }
 
@@ -220,11 +213,13 @@ export class PluginHost {
           return () => {};
         },
 
-        summarizeDocument: async (documentId: string) => {
+        summarizeDocument: async (documentId: string, allowNetwork: boolean = false) => {
           try {
             const maybe = (this.context as any)?.summarizeDocument;
             if (typeof maybe === 'function') {
-              return await maybe(documentId);
+              // Forward the allowNetwork flag so plugins can explicitly opt-in
+              // to remote summarization and the host can enforce network policy.
+              return await maybe(documentId, allowNetwork);
             }
           } catch (_) { /* swallow */ }
           return undefined;
