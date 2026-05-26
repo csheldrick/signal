@@ -174,19 +174,27 @@ export class PresenceTracker {
       // Reuse any in-flight validation for this document to avoid duplicate work.
       let pending = this.pendingValidations.get(documentId);
       if (!pending) {
-        pending = (async () => {
-          try { return await validator(documentId); } catch (_) { return false; }
-        })();
-        // Ensure cleanup once settled.
-        pending.then(() => this.pendingValidations.delete(documentId)).catch(() => this.pendingValidations.delete(documentId));
-        // Enforce a cap on pending validations to avoid unbounded growth. Evict the oldest entry when over the cap.
-        try {
-          if (this.pendingValidations.size >= PresenceTracker.MAX_PENDING_VALIDATIONS) {
-            const oldestKey = this.pendingValidations.keys().next().value;
-            if (oldestKey) this.pendingValidations.delete(oldestKey);
-          }
-        } catch (_) { /* swallow eviction errors */ }
-        this.pendingValidations.set(documentId, pending);
+        // If we're already at capacity for pending validations avoid creating
+        // another in-flight validator to reduce overload on IO-bound paths.
+        // Fall back to a resolved 'false' so the join() path stays non-blocking
+        // and the presence record can be created immediately.
+        if (this.pendingValidations.size >= PresenceTracker.MAX_PENDING_VALIDATIONS) {
+          pending = Promise.resolve(false);
+        } else {
+          pending = (async () => {
+            try { return await validator(documentId); } catch (_) { return false; }
+          })();
+          // Ensure cleanup once settled.
+          pending.then(() => this.pendingValidations.delete(documentId)).catch(() => this.pendingValidations.delete(documentId));
+          // Enforce a cap on pending validations to avoid unbounded growth. Evict the oldest entry when over the cap.
+          try {
+            if (this.pendingValidations.size >= PresenceTracker.MAX_PENDING_VALIDATIONS) {
+              const oldestKey = this.pendingValidations.keys().next().value;
+              if (oldestKey) this.pendingValidations.delete(oldestKey);
+            }
+          } catch (_) { /* swallow eviction errors */ }
+          this.pendingValidations.set(documentId, pending);
+        }
       }
 
       (async () => {

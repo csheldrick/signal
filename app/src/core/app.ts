@@ -313,14 +313,28 @@ export class SignalApp {
     // Lazy-initialize subsystems that are safe to defer until app start
     // summarizer is initialized lazily when first needed (avoid runtime import and coupling)
     if (!this._sync) {
-      // Attempt to create the SyncEngine for this store. If another
-      // component already created an engine for the same DocumentStore
-      // instance the SyncEngine constructor will throw a specific error
-      // ("multiple engines bound to the same DocumentStore instance").
-      // Do not swallow that error here — allow it to propagate so callers
-      // can observe and handle the misconfiguration. Failing fast avoids
-      // silent divergence and makes the system behaviour explicit.
-      this._sync = new SyncEngine(this.store, this._peerId);
+      // Reuse the same engine instance that SyncManager uses when possible to
+      // avoid creating duplicate SyncEngine instances for the same
+      // DocumentStore. SyncManager caches the engine on the store under a
+      // private non-enumerable property named '__signal_sync_engine__'.
+      const ENGINE_KEY = '__signal_sync_engine__';
+      const cached = (this.store as any)[ENGINE_KEY] as SyncEngine | undefined;
+      if (cached) {
+        this._sync = cached;
+      } else {
+        // Create a new engine and publish it to the store for other callers
+        // to reuse. If another caller created one between the cached check
+        // and define attempt the SyncEngine constructor will throw and the
+        // caller can observe/handle the misconfiguration (failing fast).
+        const created = new SyncEngine(this.store, this._peerId);
+        try {
+          Object.defineProperty(this.store, ENGINE_KEY, { value: created, enumerable: false, configurable: true });
+        } catch (_){
+          // Fallback for environments that restrict defineProperty.
+          (this.store as any)[ENGINE_KEY] = created;
+        }
+        this._sync = created;
+      }
     }
     this.started = true;
   }

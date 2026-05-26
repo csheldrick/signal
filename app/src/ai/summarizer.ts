@@ -75,7 +75,7 @@ export class RemoteSummarizer implements Summarizer {
 
   // Coalesce concurrent summaries per-document to avoid duplicated remote work
   private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
-  private static readonly MAX_PENDING_ENTRIES = 1000;
+  private static readonly MAX_PENDING_ENTRIES = 200;
 
   private static getPending(id: string): Promise<string> | undefined {
     const entry = RemoteSummarizer.pending.get(id);
