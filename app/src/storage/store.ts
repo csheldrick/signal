@@ -14,6 +14,20 @@ import { StorageEventBus } from './events.js';
 export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
 
+// Helper clones to prevent leaking internal mutable store objects to callers
+function cloneLink(l: import('../core/types.js').DocumentLink): import('../core/types.js').DocumentLink {
+  return { ...l };
+}
+
+function cloneDocument(d: import('../core/types.js').Document): import('../core/types.js').Document {
+  return {
+    ...d,
+    tags: Array.isArray(d.tags) ? [...d.tags] : [],
+    links: Array.isArray(d.links) ? d.links.map(cloneLink) : [],
+  };
+}
+
+
 export class DocumentStore {
   private static _instances = 0;
 
@@ -53,12 +67,14 @@ export class DocumentStore {
       updatedAt: now,
     };
     this.documents.set(id, doc);
-    this.events.emit({ type: 'created', document: doc, timestamp: now });
+    this.opCounts.create++;
+    this.events.emit({ type: 'created', document: cloneDocument(doc), timestamp: now });
     return doc;
   }
 
   read(id: string): Document | undefined {
-    return this.documents.get(id);
+    const d = this.documents.get(id);
+    return d ? cloneDocument(d) : undefined;
   }
 
   update(id: string, changes: DocumentChange): Document | undefined {
@@ -71,27 +87,53 @@ export class DocumentStore {
       ...changes,
       links: existing.links,
       updatedAt: now,
+      version: (existing.version ?? 0) + 1,
     };
+
+    // Preserve previous snapshot for the event, store the new document, then emit clones
+    const previousSnapshot = cloneDocument(existing);
     this.documents.set(id, updated);
+    this.opCounts.update++;
     this.events.emit({
       type: 'updated',
       documentId: id,
-      previous: existing,
-      current: updated,
+      previous: previousSnapshot,
+      current: cloneDocument(updated),
       timestamp: now,
     });
-    return updated;
+    return cloneDocument(updated);
   }
 
   delete(id: string): boolean {
     const existed = this.documents.delete(id);
     if (existed) {
-      // Remove links referencing deleted document
+      // When a document is deleted, remove links referencing it and emit
+      // update events for any documents whose links changed so downstream
+      // consumers (indexer, sync) can maintain a consistent view.
+      const changed: Array<{ previous: Document; current: Document }> = [];
       for (const doc of this.documents.values()) {
-        doc.links = doc.links.filter(
-          l => l.sourceId !== id && l.targetId !== id,
-        );
+        const prevLinks = doc.links.slice();
+        const filtered = doc.links.filter(l => l.sourceId !== id && l.targetId !== id);
+        if (filtered.length !== doc.links.length) {
+          const previous = { ...doc, links: prevLinks.map(cloneLink) } as Document;
+          doc.links = filtered;
+          const current = cloneDocument(doc);
+          changed.push({ previous, current });
+        }
       }
+
+      for (const c of changed) {
+        this.opCounts.update++;
+        this.events.emit({
+          type: 'updated',
+          documentId: c.current.id,
+          previous: c.previous,
+          current: c.current,
+          timestamp: Date.now(),
+        });
+      }
+
+      this.opCounts.delete++;
       this.events.emit({ type: 'deleted', documentId: id, timestamp: Date.now() });
     }
     return existed;
@@ -103,18 +145,33 @@ export class DocumentStore {
     if (!source || !target) return undefined;
 
     const link: DocumentLink = { sourceId, targetId, kind };
+    const previous = cloneDocument(source);
     source.links.push(link);
-    this.events.emit({ type: 'linked', link, timestamp: Date.now() });
-    return link;
+    const current = cloneDocument(source);
+
+    // Emit both a linked event and a corresponding updated event for consumers
+    // that observe document mutations via 'updated' events.
+    this.opCounts.link++;
+    this.events.emit({ type: 'linked', link: { ...link }, timestamp: Date.now() });
+    this.opCounts.update++;
+    this.events.emit({
+      type: 'updated',
+      documentId: sourceId,
+      previous,
+      current,
+      timestamp: Date.now(),
+    });
+
+    return { ...link };
   }
 
   getLinks(documentId: string): DocumentLink[] {
     const doc = this.documents.get(documentId);
-    return doc ? [...doc.links] : [];
+    return doc ? doc.links.map(l => ({ ...l })) : [];
   }
 
   list(): Document[] {
-    return Array.from(this.documents.values());
+    return Array.from(this.documents.values()).map(d => cloneDocument(d));
   }
 
   search(query: SearchQuery): SearchResult[] {
@@ -153,7 +210,7 @@ export class DocumentStore {
       }
 
       if (score > 0) {
-        results.push({ document: doc, score, highlights });
+        results.push({ document: cloneDocument(doc), score, highlights });
       }
 
       if (results.length >= DocumentStore.MAX_SEARCH_RESULTS) break;
@@ -173,7 +230,12 @@ export class DocumentStore {
     const docs = JSON.parse(raw) as Document[];
     this.documents.clear();
     for (const doc of docs) {
+      // Insert the document into the in-memory store and emit a 'created' event
+      // so existing event-driven validators and consumers can discover loaded
+      // documents without directly importing the store.
       this.documents.set(doc.id, doc);
+      this.opCounts.create++;
+      this.events.emit({ type: 'created', document: cloneDocument(doc), timestamp: Date.now() });
     }
   }
 }

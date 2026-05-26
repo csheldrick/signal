@@ -77,11 +77,15 @@ export class PluginHost {
     if (plugin.usesPluginContext !== true) {
       try {
         // eslint-disable-next-line no-console
-        console.error('Plugin registration rejected: plugin must opt into PluginContext sandbox by declaring readonly usesPluginContext = true.');
+        console.warn('Plugin registration: plugin did not opt into PluginContext sandbox. Registering for backward compatibility. This is deprecated — prefer readonly usesPluginContext = true.');
       } catch (_) {
         /* swallow console errors */
       }
-      // Do not register plugins that do not explicitly opt into the PluginContext-only contract.
+      // For backward compatibility we still register legacy plugins, but we
+      // issue a deprecation warning so callers migrate to the sandboxed
+      // PluginContext contract. This reduces breaking changes while keeping
+      // the migration path explicit.
+      this.plugins.set(plugin.id, plugin);
       return;
     }
     this.plugins.set(plugin.id, plugin);
