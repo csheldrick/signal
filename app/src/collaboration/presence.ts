@@ -77,6 +77,9 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
 export class PresenceTracker {
   private peers: Map<string, PeerPresence> = new Map();
   private static readonly MAX_PEERS = 2000;
+  // Cap the number of concurrent in-flight document validations to prevent
+  // unbounded memory growth when many peers reference different documents.
+  private static readonly MAX_PENDING_VALIDATIONS = 500;
 
   private evictIfNeeded(): void {
     try {
@@ -169,6 +172,13 @@ export class PresenceTracker {
         })();
         // Ensure cleanup once settled.
         pending.then(() => this.pendingValidations.delete(documentId)).catch(() => this.pendingValidations.delete(documentId));
+        // Enforce a cap on pending validations to avoid unbounded growth. Evict the oldest entry when over the cap.
+        try {
+          if (this.pendingValidations.size >= PresenceTracker.MAX_PENDING_VALIDATIONS) {
+            const oldestKey = this.pendingValidations.keys().next().value;
+            if (oldestKey) this.pendingValidations.delete(oldestKey);
+          }
+        } catch (_) { /* swallow eviction errors */ }
         this.pendingValidations.set(documentId, pending);
       }
 
@@ -211,9 +221,9 @@ export class PresenceTracker {
         // expensive and increase pressure on presence-related subsystems.
         if (this.context && typeof (this.context as any).onPeerLeave === 'function') {
           try {
-            Promise.resolve().then(() => {
-              try { (this.context as any).onPeerLeave(peerId, existing.documentId); } catch (_) { /* swallow */ }
-            });
+            // Schedule optional plugin cleanup on a macrotask to avoid creating
+            // a large microtask storm when many leaves occur concurrently.
+            try { setTimeout(() => { try { (this.context as any).onPeerLeave(peerId, existing.documentId); } catch (_) { /* swallow */ } }, 0); } catch (_) { /* swallow scheduling errors */ }
           } catch (_) { /* swallow scheduling errors */ }
         }
       } catch (_) {
@@ -264,6 +274,13 @@ export class PresenceTracker {
           try { return await validator(documentId); } catch (_) { return false; }
         })();
         pending.then(() => this.pendingValidations.delete(documentId)).catch(() => this.pendingValidations.delete(documentId));
+        // Enforce a cap on pending validations to avoid unbounded growth. Evict the oldest entry when over the cap.
+        try {
+          if (this.pendingValidations.size >= PresenceTracker.MAX_PENDING_VALIDATIONS) {
+            const oldestKey = this.pendingValidations.keys().next().value;
+            if (oldestKey) this.pendingValidations.delete(oldestKey);
+          }
+        } catch (_) { /* swallow eviction errors */ }
         this.pendingValidations.set(documentId, pending);
       }
 

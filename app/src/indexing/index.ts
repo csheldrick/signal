@@ -21,6 +21,9 @@ export class InvertedIndex {
   private docTerms: Map<string, Set<string>> = new Map();
 
   private totalTerms: number = 0;
+  // Cached stats to avoid frequent recomputation under high read pressure.
+  private cachedStats: IndexStats | null = null;
+  private statsDirty: boolean = true;
 
   index(documentId: string, text: string): void {
     // If doc already indexed, remove previous terms so totals remain accurate
@@ -39,6 +42,8 @@ export class InvertedIndex {
     }
     this.docTerms.set(documentId, termSet);
     this.totalTerms += termSet.size;
+    // Mark cached stats dirty due to mutation.
+    this.statsDirty = true;
 
     for (const term of termSet) {
       let list = this.posting.get(term);
@@ -64,6 +69,8 @@ export class InvertedIndex {
 
     this.docTerms.delete(documentId);
     this.totalTerms = Math.max(0, this.totalTerms - terms.size);
+    // Mark cached stats dirty due to mutation.
+    this.statsDirty = true;
   }
 
   search(queryText: string): SearchHit[] {
@@ -100,12 +107,19 @@ export class InvertedIndex {
   }
 
   stats(): IndexStats {
+    // Serve cached stats when available to avoid recomputation on hot paths.
+    if (!this.statsDirty && this.cachedStats) return this.cachedStats;
+
     const docCount = this.docTerms.size;
-    return {
+    const computed: IndexStats = {
       termCount: this.posting.size,
       documentCount: docCount,
       avgTermsPerDoc: docCount === 0 ? 0 : this.totalTerms / docCount,
     };
+
+    this.cachedStats = computed;
+    this.statsDirty = false;
+    return computed;
   }
 
   private tokenize(text: string): string[] {

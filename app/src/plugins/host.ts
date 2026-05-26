@@ -118,6 +118,11 @@ export class PluginHost {
 
       const searchCache = new Map<string, { ts: number; results: ReadonlyArray<Readonly<SearchResultSnapshot>> }>();
 
+      // Small TTL-backed clock cache to reduce repeated deep-clone work for plugin callers.
+      let lastClockTs = 0;
+      let lastClock: { [peerId: string]: number } = {};
+      const CLOCK_CACHE_TTL = 500; // milliseconds
+
       const ctx: PluginContext = {
         listDocuments: () => {
           // Validate and provide only well-formed document snapshots to plugins.
@@ -161,13 +166,16 @@ export class PluginHost {
             const results = raw.map(r => {
               const d = r?.document;
               if (!d || typeof d.id !== 'string' || typeof d.title !== 'string') return undefined;
+              // Limit highlights and snippet sizes to reduce plugin payloads and memory churn.
+              const rawHighlights = Array.isArray(r.highlights) ? r.highlights : [];
+              const highlights = rawHighlights.slice(0, 3).map(h => typeof h === 'string' ? (h.length > 200 ? h.slice(0, 200) : h) : String(h));
               const safeDoc = deepFreeze({
                 ...d,
                 links: Array.isArray(d.links) ? d.links.map((l: any) => deepFreeze({ ...l })) : [],
                 tags: Array.isArray(d.tags) ? [...d.tags] : [],
               });
-              return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights: Array.isArray(r.highlights) ? [...r.highlights] : [] });
-            }).filter((x): x is Readonly<SearchResult> => !!x);
+              return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights });
+            }).filter((x): x is Readonly<SearchResult> => !!x).slice(0, 20);
 
             searchCache.set(key, { ts: now, results });
             return results;
@@ -186,12 +194,19 @@ export class PluginHost {
         },
         getClock: () => {
           try {
+            const now = Date.now();
+            if (now - lastClockTs < CLOCK_CACHE_TTL) {
+              return { ...lastClock };
+            }
             // Prefer the host-provided clock if available; fall back to empty map.
             const maybe = (this.context as any)?.getClock;
             if (typeof maybe === 'function') {
               const res = maybe();
               // Ensure we return a plain object (not frozen by upstream) so callers can read safely.
-              return (res && typeof res === 'object') ? { ...res } : {};
+              const copy = (res && typeof res === 'object') ? { ...res } : {};
+              lastClock = copy;
+              lastClockTs = now;
+              return copy;
             }
           } catch (_) {
             /* swallow errors and provide safe default */
