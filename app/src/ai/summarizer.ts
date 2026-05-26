@@ -71,6 +71,7 @@ export class RemoteSummarizer implements Summarizer {
   private readonly fetcher: (document: Document) => Promise<string>;
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;
+  private readonly authToken?: string;
 
   // Coalesce concurrent summaries per-document to avoid duplicated remote work
   private static pending: Map<string, Promise<string>> = new Map();
@@ -99,10 +100,11 @@ export class RemoteSummarizer implements Summarizer {
    */
   constructor(
     fetcher: (document: Document) => Promise<string>,
-    options?: { allowNetwork?: boolean; maxSentences?: number },
+    options?: { allowNetwork?: boolean; maxSentences?: number; authToken?: string },
   ) {
     this.fetcher = fetcher;
     this.allowNetwork = options?.allowNetwork ?? false;
+    this.authToken = options?.authToken;
     this.allowsNetwork = this.allowNetwork;
     this.fallback = new LocalSummarizer(options?.maxSentences ?? 3);
   }

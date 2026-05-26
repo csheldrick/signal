@@ -19,6 +19,8 @@ export interface AppConfig {
   peerId: string;
   /** Allow remote summarization (must be explicitly enabled) */
   allowNetwork?: boolean;
+  /** Optional network authentication token required to enable remote summarization. */
+  networkAuthToken?: string;
 }
 
 export class SignalApp {
@@ -35,6 +37,7 @@ export class SignalApp {
   private _sync?: SyncEngine;
   private _summarizer?: Summarizer;
   private readonly _allowNetwork: boolean;
+  private readonly _networkAuthToken?: string;
 
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
@@ -46,6 +49,7 @@ export class SignalApp {
     // Initialize summarizer deterministically to LocalSummarizer by default.
     // Remote summarization is opt-in and must be explicitly enabled.
     this._allowNetwork = !!config.allowNetwork;
+    this._networkAuthToken = config.networkAuthToken;
     this._summarizer = undefined; // lazily created when first used
 
 
@@ -205,10 +209,13 @@ export class SignalApp {
   enableRemoteSummarizer(fetcher: (document: Document) => Promise<string>, options?: { allowNetwork?: boolean; maxSentences?: number }): boolean {
     // Remote summarization may only be enabled when the app was constructed with allowNetwork.
     if (!this._allowNetwork) return false;
+    // Require an explicit network authentication token to avoid accidental
+    // enabling of the remote summarizer subsystem.
+    if (!this._networkAuthToken) return false;
     // Construct RemoteSummarizer with the provided fetcher. The options.allowNetwork defaults to true
     // to allow network calls for this summarizer instance; callers may pass allowNetwork: false to force
     // local-only behavior for this instance.
-    this._summarizer = new RemoteSummarizer(fetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences });
+    this._summarizer = new RemoteSummarizer(fetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences, authToken: this._networkAuthToken });
     return true;
   }
 
