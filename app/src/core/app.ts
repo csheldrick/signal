@@ -9,6 +9,7 @@ import { PluginHost } from '../plugins/host.js';
 import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 import { PresenceTracker } from '../collaboration/presence.js';
+import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
 
 import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
@@ -49,7 +50,7 @@ export class SignalApp {
     // session lifecycle events without requiring an additional constructor
     // parameter. Defensive: swallow failures to avoid breaking tests/environments
     // without a globalThis writable slot.
-    try { (globalThis as any).__SIGNAL_STORAGE_EVENT_BUS = this.events; } catch (_) {}
+    try { setSignalStorageEventBus(this.events); } catch (_) {}
     this.store = new DocumentStore(this.events);
     const createLazyGraph = () => {
       let real: GraphBuilder | undefined;
@@ -112,7 +113,7 @@ export class SignalApp {
       searchDocuments: (query) => {
         try {
           const res = this.store.search(query) as any[];
-          return Array.isArray(res) ? res.map(r => cloneDoc(r)) : [];
+          return Array.isArray(res) ? res.map((r: any) => ({ document: cloneDoc((r as any).document), score: (r as any).score ?? 0, highlights: Array.isArray((r as any).highlights) ? [...(r as any).highlights] : [] })) : [];
         } catch (_) {
           return [];
         }
@@ -261,7 +262,7 @@ export class SignalApp {
     // explicit global opt-out to make the subsystem safe for test runs.
     const scheduleSummarize = (docId: string) => {
       const disabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
-        (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE) ||
+        (!!getDisableBgSummarize()) ||
         this._disableBgSummarize;
       if (disabled) return;
 
@@ -282,7 +283,7 @@ export class SignalApp {
     };
 
     const bgDisabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
-      (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE) ||
+      (!!getDisableBgSummarize()) ||
       this._disableBgSummarize;
     if (!bgDisabled) {
       this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
@@ -328,7 +329,7 @@ export class SignalApp {
     // outbound message generation (the SyncEngine subscribes to store events itself).
   }
 
-  enableRemoteSummarizer(fetcher: (document: Document) => Promise<string>, options?: { allowNetwork?: boolean; maxSentences?: number }): boolean {
+  enableRemoteSummarizer(fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>, options?: { allowNetwork?: boolean; maxSentences?: number }): boolean {
     // Remote summarization may only be enabled when the app was constructed with allowNetwork.
     if (!this._allowNetwork) return false;
     // Require an explicit network authentication token to avoid accidental
@@ -337,7 +338,16 @@ export class SignalApp {
     // Construct RemoteSummarizer with the provided fetcher. The options.allowNetwork defaults to true
     // to allow network calls for this summarizer instance; callers may pass allowNetwork: false to force
     // local-only behavior for this instance.
-    this._summarizer = new RemoteSummarizer(fetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences, authToken: this._networkAuthToken });
+    // Support backward-compatible single-arg fetchers by wrapping them in a function that enforces an authToken
+    // is supplied via the options bag. This makes the network-auth contract explicit.
+    const effectiveFetcher = (fetcher as any).length === 1
+      ? (doc: Document, opts?: { authToken?: string }) => {
+        if (!opts || !opts.authToken) return Promise.reject(new Error('auth token required'));
+        return (fetcher as any)(doc);
+      }
+      : fetcher;
+
+    this._summarizer = new RemoteSummarizer(effectiveFetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences, authToken: this._networkAuthToken });
     return true;
   }
 

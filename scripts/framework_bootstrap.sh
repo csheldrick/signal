@@ -32,7 +32,7 @@ else
 fi
 
 # 4. Propagate activation and derive tensions
-weave run --ticks 30 --utilis
+weave run --ticks 10 --utilis
 
 # 5. Observe results
 weave observe tensions
