@@ -10,6 +10,9 @@ export interface StorageEventCreated {
   readonly type: 'created';
   readonly document: Readonly<DocumentSnapshot>;
   readonly timestamp: number;
+  // Optional monotonic sequence number assigned by the persistent store when
+  // available. Consumers that depend on ordering should consult this field.
+  readonly seq?: number;
 }
 
 export interface StorageEventUpdated {
@@ -18,18 +21,27 @@ export interface StorageEventUpdated {
   readonly previous: Readonly<DocumentSnapshot>;
   readonly current: Readonly<DocumentSnapshot>;
   readonly timestamp: number;
+  // Optional monotonic sequence number assigned by the persistent store when
+  // available. Consumers that depend on ordering should consult this field.
+  readonly seq?: number;
 }
 
 export interface StorageEventDeleted {
   readonly type: 'deleted';
   readonly documentId: string;
   readonly timestamp: number;
+  // Optional monotonic sequence number assigned by the persistent store when
+  // available. Consumers that depend on ordering should consult this field.
+  readonly seq?: number;
 }
 
 export interface StorageEventLinked {
   readonly type: 'linked';
   readonly link: Readonly<DocumentLink>;
   readonly timestamp: number;
+  // Optional monotonic sequence number assigned by the persistent store when
+  // available. Consumers that depend on ordering should consult this field.
+  readonly seq?: number;
 }
 
 export type StorageEvent =

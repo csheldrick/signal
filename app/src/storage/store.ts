@@ -35,6 +35,20 @@ export class DocumentStore {
   private documents: Map<string, Document> = new Map();
   readonly events: StorageEventBus;
 
+  // Monotonic sequence counter used to assign ordering to persisted buffered
+  // mutations. This counter is persisted with the store so that monotonicity
+  // is preserved across restarts.
+  private seqCounter: number = 0;
+
+  // Durable mutation log for buffered (offline) mutations. Each entry has a
+  // monotonic sequence number ensuring deterministic drain order when replayed.
+  // The log is persisted alongside documents by save()/load().
+  private mutationLog: Array<{ seq: number; id: string; op: string; payload: any }> = [];
+
+  // Track ids of already-applied mutations (at replay-time) to make replay
+  // idempotent. This is stored in-memory and persisted as an array on save().
+  private appliedMutationIds: Set<string> = new Set();
+
   // Operation counters for basic observability
   private opCounts: { create: number; update: number; delete: number; link: number } = {
     create: 0,
@@ -237,14 +251,56 @@ export class DocumentStore {
   }
 
   save(filePath: string): void {
-    const data = Array.from(this.documents.values());
-    writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    // Persist documents along with the mutation log and sequence metadata so
+    // OfflineSyncQueue / other consumers can durably store buffered mutations
+    // in the same backend and resume with deterministic ordering on restart.
+    const payload = {
+      documents: Array.from(this.documents.values()),
+      mutationLog: this.mutationLog,
+      seqCounter: this.seqCounter,
+      appliedMutationIds: Array.from(this.appliedMutationIds),
+    };
+    writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
   }
 
   load(filePath: string): void {
     if (!existsSync(filePath)) return;
     const raw = readFileSync(filePath, 'utf-8');
-    const docs = JSON.parse(raw) as Document[];
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_) {
+      // Corrupt file or unreadable contents; treat as empty store.
+      return;
+    }
+
+    // Support legacy format (array of documents) and new format (object with
+    // documents + mutationLog + seq metadata).
+    let docs: Document[] = [];
+    if (Array.isArray(parsed)) {
+      docs = parsed as Document[];
+    } else if (parsed && Array.isArray(parsed.documents)) {
+      docs = parsed.documents as Document[];
+      // Load mutation log and metadata if present.
+      try {
+        this.mutationLog = Array.isArray(parsed.mutationLog)
+          ? parsed.mutationLog.map((m: any) => ({ seq: Number(m.seq) || 0, id: String(m.id), op: String(m.op), payload: m.payload }))
+          : [];
+      } catch (_) {
+        this.mutationLog = [];
+      }
+
+      this.seqCounter = typeof parsed.seqCounter === 'number' ? parsed.seqCounter : (this.mutationLog.length ? Math.max(...this.mutationLog.map(m => m.seq)) : 0);
+      try {
+        this.appliedMutationIds = new Set<string>(Array.isArray(parsed.appliedMutationIds) ? parsed.appliedMutationIds.map(String) : []);
+      } catch (_) {
+        this.appliedMutationIds = new Set();
+      }
+    } else {
+      // Unknown format — bail out without mutating in-memory store.
+      return;
+    }
+
     this.documents.clear();
     for (const doc of docs) {
       // Insert the document into the in-memory store and emit a 'created' event
@@ -253,10 +309,50 @@ export class DocumentStore {
       const stored = cloneDocument(doc);
       this.documents.set(doc.id, stored);
       this.opCounts.create++;
-      // Use async emit during load to avoid firing many synchronous created events
-      // while the system is still initializing. Consumers that need to observe
-      // created events synchronously should use the store API directly.
-      this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(stored), timestamp: Date.now() });
+      // Emit asynchronously to avoid synchronous initialization storms.
+      this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(stored), timestamp: Date.now(), seq: undefined });
+    }
+  }
+
+  /**
+   * Record a buffered mutation to the durable mutation log with a monotonic
+   * sequence number. Returns the assigned sequence number. This method does
+   * not apply the mutation to documents; it merely persists the buffered
+   * mutation so OfflineSyncQueue can drain deterministically.
+   */
+  recordBufferedMutation(mutationId: string, op: 'create' | 'update' | 'delete' | 'link', payload: any): number {
+    // Respect idempotency at the logging layer: if a mutation with the same
+    // id already appears in the log, return its existing seq.
+    const existing = this.mutationLog.find(m => m.id === mutationId);
+    if (existing) return existing.seq;
+
+    this.seqCounter += 1;
+    const entry = { seq: this.seqCounter, id: mutationId, op, payload };
+    this.mutationLog.push(entry);
+    return entry.seq;
+  }
+
+  /**
+   * Replay buffered mutations in monotonically increasing sequence order. The
+   * provided applyFn is invoked for each mutation that has not yet been
+   * recorded in appliedMutationIds. If applyFn succeeds, the mutation id is
+   * marked applied so future replays will be a no-op for duplicates.
+   * applyFn may be synchronous or asynchronous; errors from applyFn are
+   * caught and swallowed to avoid halting overall replay — callers may wish
+   * to inspect returned results or provide a tolerant apply function.
+   */
+  async replayBufferedMutations(applyFn: (m: { seq: number; id: string; op: string; payload: any }) => Promise<void> | void): Promise<void> {
+    // Iterate in seq order to ensure deterministic application.
+    const ordered = this.mutationLog.slice().sort((a, b) => a.seq - b.seq);
+    for (const m of ordered) {
+      if (this.appliedMutationIds.has(m.id)) continue; // idempotent no-op
+      try {
+        await Promise.resolve(applyFn(m));
+        this.appliedMutationIds.add(m.id);
+      } catch (_) {
+        // Swallow to continue processing subsequent mutations; callers can
+        // re-run replay to attempt failed entries later.
+      }
     }
   }
 }
