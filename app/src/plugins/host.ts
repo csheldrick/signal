@@ -158,7 +158,7 @@ export class PluginHost {
             if (typeof maybe === 'function') {
               const res = maybe();
               // Ensure we return a plain object (not frozen by upstream) so callers can read safely.
-              return (res && typeof res === 'object') ? res : {};
+              return (res && typeof res === 'object') ? { ...res } : {};
             }
           } catch (_) {
             /* swallow errors and provide safe default */

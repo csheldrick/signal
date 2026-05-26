@@ -53,7 +53,25 @@ export class SignalApp {
       listDocuments: () => this.store.list(),
       searchDocuments: (query) => this.store.search(query),
       getDocument: (id) => this.store.read(id),
-      getClock: () => ({}),
+      getClock: () => {
+        try {
+          // Prefer the active SyncEngine clock when available so plugins receive
+          // a meaningful view of the current vector clock. Return a shallow
+          // copy to avoid exposing internal mutable state.
+          const maybeSync = (this as any)._sync;
+          if (maybeSync && typeof maybeSync.getClock === 'function') {
+            try {
+              const c = maybeSync.getClock();
+              return (c && typeof c === 'object') ? { ...c } : {};
+            } catch (_) {
+              return {};
+            }
+          }
+        } catch (_) {
+          /* swallow */
+        }
+        return {};
+      },
 
       onStorageEvent: (type, listener) => {
         // Provide plugins a readonly/frozen snapshot of events and a disposer.
