@@ -30,18 +30,35 @@ export class SyncEngine {
     this.clock[peerId] = 0;
 
     // Register this engine keyed by the concrete store object to detect duplicates.
+    // Access the registry carefully: if platform-level WeakMap operations fail
+    // we log and continue, BUT we must not swallow the semantic duplicate-engine
+    // error (existing && existing !== this). That condition should propagate so
+    // callers fail fast on misconfiguration.
+    const key = (this.store as unknown) as object;
+
+    // Try to observe any existing registration; if registry access itself fails
+    // we warn but do not fabricate an "existing" entry.
+    let existing: SyncEngine | undefined;
     try {
-      const key = (this.store as unknown) as object;
-      const existing = SyncEngine._instancesByStore.get(key);
-      if (existing && existing !== this) {
-        // Throw to make misconfiguration explicit: multiple engines for same store
-        // lead to divergent vector clocks and conflict-resolution issues.
-        throw new Error('SyncEngine: multiple engines bound to the same DocumentStore instance; this may cause divergent VectorClock histories.');
-      }
+      existing = SyncEngine._instancesByStore.get(key);
+    } catch (e) {
+      console.warn('SyncEngine: instance registry unavailable (read)', e);
+      existing = undefined;
+    }
+
+    // If an existing engine is found for the same concrete store object and it
+    // is not this instance, this is a real misconfiguration — throw so callers
+    // can observe and handle it (fail-fast).
+    if (existing && existing !== this) {
+      throw new Error('SyncEngine: multiple engines bound to the same DocumentStore instance; this may cause divergent VectorClock histories.');
+    }
+
+    // Attempt to set our registration; if setting fails due to platform issues
+    // we log but proceed (we don't hide the duplicate-engine condition above).
+    try {
       SyncEngine._instancesByStore.set(key, this);
     } catch (e) {
-      // If registry fails for any reason, log and continue — this is defensive.
-      console.warn('SyncEngine: instance registry unavailable', e);
+      console.warn('SyncEngine: instance registry unavailable (write)', e);
     }
 
     // If the store exposes the event bus with the standard .on() API, subscribe

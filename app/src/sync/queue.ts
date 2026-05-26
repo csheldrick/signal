@@ -146,11 +146,15 @@ export class SyncQueue {
   }
 
   private findIndex(message: SyncMessage): number {
+    // Identify queue entries by the stable (documentId, operation) tuple.
+    // This aligns with enqueue()'s dedup semantics and avoids brittle
+    // matching on clock object identity or deep-equality (which can fail
+    // when logically-equivalent clocks are represented by different objects
+    // or when clocks differ but the logical message to ack/fail is the same).
     return this.entries.findIndex(
       e =>
         e.message.documentId === message.documentId &&
-        e.message.operation === message.operation &&
-        this.clocksEqual(e.message.clock as Record<string, number>, message.clock as Record<string, number>),
+        e.message.operation === message.operation,
     );
   }
 }
