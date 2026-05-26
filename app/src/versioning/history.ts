@@ -48,7 +48,7 @@ export class VersionHistory {
     history.push(version);
 
     // Cap history per-document to avoid unbounded memory growth.
-    const MAX_VERSIONS = 50;
+    const MAX_VERSIONS = 20;
     if (history.length > MAX_VERSIONS) {
       const removed = history.splice(0, history.length - MAX_VERSIONS);
       for (const old of removed) {

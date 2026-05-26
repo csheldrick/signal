@@ -325,7 +325,7 @@ export class SyncManager {
 
   // ── Lifecycle ─────────────────────────────────────────────
 
-  start(flushIntervalMs = 200): void {
+  start(flushIntervalMs = 1000): void {
     if (this.flushTimer !== undefined) return;
     this.flushTimer = setInterval(() => void this.flush(), flushIntervalMs);
   }

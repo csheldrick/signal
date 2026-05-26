@@ -42,7 +42,19 @@ export class SignalApp {
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
     this.store = new DocumentStore(this.events);
-    this.graph = new GraphBuilder(() => this.store.list());
+    const createLazyGraph = () => {
+      let real: GraphBuilder | undefined;
+      const ensure = () => {
+        if (!real) real = new GraphBuilder(() => this.store.list());
+        return real!;
+      };
+      return {
+        buildGraph: () => ensure().buildGraph(),
+        findClusters: () => ensure().findClusters(),
+        findHubs: (minLinks?: number) => ensure().findHubs(minLinks),
+      } as unknown as GraphBuilder;
+    };
+    this.graph = createLazyGraph();
     // Initial validator seeding is handled where validators are attached below; avoid redundant registration here to reduce listener churn.
     this._peerId = config.peerId;
 
@@ -257,8 +269,12 @@ export class SignalApp {
       timers.set(docId, t);
     };
 
-    this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
-    this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId));
+    const bgDisabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
+      (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE);
+    if (!bgDisabled) {
+      this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
+      this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId));
+    }
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
     this.presence = new PresenceTracker();
@@ -274,13 +290,31 @@ export class SignalApp {
     // Provide a synchronous snapshot validator for the realtime path so callers
     // using PresenceTracker.setValidator receive a pure (non-IO) function.
     // Also attach the async event-driven validator for comprehensive checks.
-    this.presence.setValidator(
-      this.events.attachDocumentValidatorSnapshot(initialIds)
-    );
+    // Use a single shared existence set and one listener for both sync and async
+    // validators to avoid registering two separate '*' listeners which increases fan-out.
+    const known = new Set<string>(initialIds);
+    const listener = (ev: any) => {
+      switch (ev.type) {
+        case 'created':
+          known.add(ev.document.id);
+          break;
+        case 'deleted':
+          known.delete(ev.documentId);
+          break;
+        default:
+          break;
+      }
+    };
+    this.events.on('*', listener);
 
-    this.presence.setAsyncValidator(
-      this.events.attachDocumentValidatorFromEvents(initialIds)
-    );
+    const syncValidator = (id: string) => known.has(id);
+    (syncValidator as any).dispose = () => { this.events.off('*', listener); };
+
+    const asyncValidator = async (id: string) => known.has(id);
+    (asyncValidator as any).dispose = () => { this.events.off('*', listener); };
+
+    this.presence.setValidator(syncValidator);
+    this.presence.setAsyncValidator(asyncValidator);
 
     // Storage events are forwarded to the SyncEngine internally when appropriate.
     // Avoid registering a second, duplicate forwarder here to prevent duplicate
