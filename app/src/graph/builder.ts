@@ -16,6 +16,8 @@ export interface AdjacencyList {
   edges: Map<string, Set<string>>;
 }
 
+export type GraphAdjacencyList = AdjacencyList;
+
 export class GraphBuilder {
   private lastSignature: string | undefined;
   private cachedGraph: AdjacencyList | undefined;

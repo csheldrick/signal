@@ -14,6 +14,8 @@ export interface SearchHit {
   score: number;
 }
 
+export type InvertedIndexSearchHit = SearchHit;
+
 export class InvertedIndex {
   private posting: Map<string, Set<string>> = new Map();
   private docTerms: Map<string, Set<string>> = new Map();

@@ -23,6 +23,8 @@ export interface ConflictResolution {
  * Detect whether a remote document write genuinely conflicts with the local
  * version (concurrent vector clocks) or is simply a causally-later update.
  */
+export type ConflictCandidateRecord = ConflictCandidate;
+
 export function isConflict(localClock: VectorClock, remoteClock: VectorClock): boolean {
   return isConcurrent(localClock, remoteClock);
 }

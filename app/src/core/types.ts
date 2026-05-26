@@ -60,6 +60,8 @@ export interface DocumentChange {
   tags?: string[];
 }
 
+export type DeprecatedDocumentChange = DocumentChange;
+
 // Utility: create a lightweight, readonly-friendly DocumentSnapshot from a Document.
 // Encourages passing snapshots across subsystem boundaries to avoid accidental
 // mutation and to reduce memory pressure.

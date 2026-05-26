@@ -49,6 +49,8 @@ export interface StorageEventBusContract {
   attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean & { dispose?: () => void };
 }
 
+export type DeprecatedStorageEventCreated = StorageEventCreated;
+
 export class StorageEventBus implements StorageEventBusContract {
   private listeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
 
