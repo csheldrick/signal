@@ -307,6 +307,15 @@ export class SyncManager {
       this.emitTelemetry('engine_drain_error', { error: err });
     }
 
+    // Periodic compaction: allow an optional snapshot service to compact
+    // the engine's vector clock to bound comparison/merge cost over long
+    // running sessions. This is best-effort and non-fatal.
+    try {
+      if (this.snapshotService && typeof this.snapshotService.compactClock === 'function') {
+        try { (this.engine as any).compactClock(this.snapshotService.compactClock); } catch (_) { /* swallow */ }
+      }
+    } catch (_) {}
+
     // No transport attached or no sessions — nothing to send.
     if (!this.transport || this.sessions.size === 0) return;
 

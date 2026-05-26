@@ -304,6 +304,20 @@ export class SyncEngine {
     }
 
     if (message) {
+      // Best-effort: persist outbound message into the store's durable mutation
+      // log to reduce the data-loss surface when a transport drops mid-session.
+      // This is intentionally conservative and does not throw if the store
+      // doesn't support persistence.
+      try {
+        const storeAny: any = this.store;
+        const persistedId = (message as any).messageId ?? makeMessageId((message as any).documentId ?? '');
+        if (storeAny && typeof storeAny.recordBufferedMutation === 'function') {
+          try { storeAny.recordBufferedMutation(persistedId, message.operation as any, message); } catch (_) { /* swallow */ }
+        } else if (storeAny && typeof storeAny.appendMutationLog === 'function') {
+          try { storeAny.appendMutationLog({ id: persistedId, op: message.operation, payload: message, messageId: persistedId, clock: message.clock, peerId: message.peerId, timestamp: message.timestamp }); } catch (_) { /* swallow */ }
+        }
+      } catch (_) { /* swallow */ }
+
       // Coalesce outbound messages per-document to avoid noisy churn. Behavior:
       // - delete takes precedence and will replace earlier create/update entries.
       // - create supersedes prior entries for the same document.
@@ -353,5 +367,25 @@ export class SyncEngine {
 
   getClock(): VectorClock {
     return { ...this.clock };
+  }
+
+  /**
+   * Best-effort clock compaction hook. Accepts a compactor function (e.g.
+   * provided by SyncManager.snapshotService.compactClock) and replaces the
+   * engine's internal clock with a compacted, validated clock. Never throws.
+   */
+  compactClock(compactor: (clock: VectorClock) => VectorClock): void {
+    try {
+      if (typeof compactor !== 'function') return;
+      const candidate = compactor({ ...this.clock }) || {};
+      const normalized: VectorClock = {};
+      for (const [k, v] of Object.entries(candidate)) {
+        const n = Number(v);
+        if (Number.isFinite(n) && n > 0) normalized[k] = n;
+      }
+      this.clock = normalized;
+    } catch (_) {
+      // swallow — compaction is best-effort
+    }
   }
 }
