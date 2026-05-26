@@ -207,23 +207,32 @@ export class PresenceTracker {
     return presence;
   }
 
-  async leave(peerId: string): Promise<void> {
+  async leave(peerId: string, awaitCleanup: boolean = false): Promise<void> {
     const existing = this.peers.get(peerId);
     if (existing) {
       // Optional async cleanup hook: plugins may provide a sandboxed
-      // onPeerLeave(peerId, documentId) hook on PluginContext. We invoke
-      // it if present and await it here, but swallow errors to avoid
-      // impacting realtime flows. Callers that need to ensure cleanup can
-      // await the returned Promise.
+      // onPeerLeave(peerId, documentId) hook on PluginContext. By default
+      // we schedule it on a macrotask so the realtime path stays non-blocking.
+      // Callers that require deterministic cleanup may pass awaitCleanup = true
+      // to wait for the hook to complete; in that case we await with a short
+      // timeout to avoid long blocking on the realtime path.
       try {
-        // Schedule optional plugin cleanup in the background instead of awaiting
-        // it here. Awaiting onPeerLeave can make many concurrent leave() calls
-        // expensive and increase pressure on presence-related subsystems.
         if (this.context && typeof (this.context as any).onPeerLeave === 'function') {
           try {
-            // Schedule optional plugin cleanup on a macrotask to avoid creating
-            // a large microtask storm when many leaves occur concurrently.
-            try { setTimeout(() => { try { (this.context as any).onPeerLeave(peerId, existing.documentId); } catch (_) { /* swallow */ } }, 0); } catch (_) { /* swallow scheduling errors */ }
+            const hook = (this.context as any).onPeerLeave;
+            if (awaitCleanup) {
+              // Await the plugin's cleanup with a short timeout to keep callers
+              // from blocking indefinitely if a plugin misbehaves.
+              try {
+                await Promise.race([
+                  (async () => { try { await hook(peerId, existing.documentId); } catch (_) { /* swallow hook errors */ } })(),
+                  new Promise<void>(res => setTimeout(res, 200)),
+                ]);
+              } catch (_) { /* swallow */ }
+            } else {
+              // Schedule non-blocking macrotask invocation to avoid microtask storms
+              try { setTimeout(() => { try { hook(peerId, existing.documentId); } catch (_) { /* swallow */ } }, 0); } catch (_) { /* swallow scheduling errors */ }
+            }
           } catch (_) { /* swallow scheduling errors */ }
         }
       } catch (_) {
