@@ -12,11 +12,8 @@ import type { DocumentSnapshot } from '../core/types.js';
 export type DocumentStore = DocumentSnapshot;
 export type SyncEngine = PluginContext;
 
-// Deprecated aliases: prefer PluginContext and PluginContext methods directly
+// Deprecated aliases removed to reduce cross-subsystem coupling. Prefer PluginContext APIs.
 export type DeprecatedDocumentStore = DocumentSnapshot;
-export type DeprecatedDocumentReader = DocumentReader;
-export type DeprecatedClockProvider = ClockProvider;
-export type DeprecatedPresenceStatus = PresenceStatus;
 
 // Deprecated interfaces — use PluginContext methods instead.
 export interface DocumentReader {

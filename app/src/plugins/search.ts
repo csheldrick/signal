@@ -28,8 +28,8 @@ export class SearchPlugin implements Plugin {
   }
 
   private lastSearchTs = 0;
-  private static readonly MIN_INTERVAL_MS = 50;
-  private static readonly MAX_TEXT_LENGTH = 500;
+  private static readonly MIN_INTERVAL_MS = 100;
+  private static readonly MAX_TEXT_LENGTH = 300;
   private static readonly MAX_TAGS = 10;
 
   search(query: SearchQuery): ReadonlyArray<SearchResult> {

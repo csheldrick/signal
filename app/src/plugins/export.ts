@@ -33,7 +33,7 @@ export class ExportPlugin implements Plugin {
 
     try {
       const all = this.context.listDocuments();
-      const MAX_EXPORT = 500;
+      const MAX_EXPORT = 100;
       let docs = all;
       let truncatedNote = '';
       if (all.length > MAX_EXPORT) {

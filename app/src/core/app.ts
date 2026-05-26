@@ -86,7 +86,8 @@ export class SignalApp {
             const now = Date.now();
             if (now - cachedTs < TTL_MS) return cached;
             const list = this.store.list();
-            const results = Array.isArray(list) ? list.map((d: any) => cloneDoc(d)) : [];
+            const MAX_PLUGIN_LIST = 1000;
+            const results = Array.isArray(list) ? list.slice(0, MAX_PLUGIN_LIST).map((d: any) => cloneDoc(d)) : [];
             cachedTs = now;
             cached = results;
             return results;
@@ -265,7 +266,7 @@ export class SignalApp {
           await s.summarize(doc);
           try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
         } catch (_) { /* swallow background errors */ }
-      }, 100);
+      }, 500);
       timers.set(docId, t);
     };
 

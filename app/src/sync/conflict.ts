@@ -8,9 +8,9 @@ import { isConcurrent } from './protocol.js';
 
 export interface ConflictCandidate {
   documentId: string;
-  local: Document | DocumentSnapshot;
+  local: DocumentSnapshot;
   localClock: VectorClock;
-  remote: Document | DocumentSnapshot;
+  remote: DocumentSnapshot;
   remoteClock: VectorClock;
 }
 

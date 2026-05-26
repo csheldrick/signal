@@ -44,26 +44,10 @@ export interface PluginContext {
   summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
 }
 
-export const dire: Record<string, unknown> = (() => {
-  // Backwards-compat stub for removed 'dire' primitive. Emit a one-time
-  // deprecation message at module evaluation and provide a frozen empty
-  // object to avoid proxy-based runtime complexity and unexpected side-effects.
-  try {
-    // Only emit the noisy deprecation in non-test environments. Tests and some
-    // automated runners expect minimal console noise; use debug there instead.
-    if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'test') {
-      // eslint-disable-next-line no-console
-      console.warn("'dire' is deprecated; use PluginContext and PluginHost APIs instead.");
-    } else {
-      // eslint-disable-next-line no-console
-      try { console.debug("'dire' is deprecated; suppressed warning in test environment."); } catch (_) { /* swallow */ }
-    }
-  } catch (_) { /* swallow console errors */ }
-  return Object.freeze({}) as Record<string, unknown>;
-})();
+export const dire: Record<string, unknown> = Object.freeze({});
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 100; // lowered to reduce plugin subsystem fan-out and resource pressure
+  private static readonly MAX_REGISTERED_PLUGINS = 32; // lowered to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
