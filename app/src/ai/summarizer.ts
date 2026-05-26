@@ -75,7 +75,7 @@ export class RemoteSummarizer implements Summarizer {
 
   // Coalesce concurrent summaries per-document to avoid duplicated remote work
   private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
-  private static readonly MAX_PENDING_ENTRIES = 200;
+  private static readonly MAX_PENDING_ENTRIES = 50;
 
   private static getPending(id: string): Promise<string> | undefined {
     const entry = RemoteSummarizer.pending.get(id);
@@ -117,7 +117,7 @@ export class RemoteSummarizer implements Summarizer {
   // Track the last remote attempt per-document to apply a small rate limit
   // which prevents rapid repeated remote attempts for the same document.
   private lastAttemptAt: Map<string, number> = new Map();
-  private readonly minAttemptIntervalMs: number = 200;
+  private readonly minAttemptIntervalMs: number = 1000;
 
   /**
    * Create a RemoteSummarizer.

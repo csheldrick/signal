@@ -45,7 +45,7 @@ export class SignalApp {
     const createLazyGraph = () => {
       let real: GraphBuilder | undefined;
       const ensure = () => {
-        if (!real) real = new GraphBuilder(() => this.store.list());
+        if (!real) real = new GraphBuilder(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
         return real!;
       };
       return {
@@ -86,7 +86,7 @@ export class SignalApp {
             const now = Date.now();
             if (now - cachedTs < TTL_MS) return cached;
             const list = this.store.list();
-            const MAX_PLUGIN_LIST = 1000;
+            const MAX_PLUGIN_LIST = 200;
             const results = Array.isArray(list) ? list.slice(0, MAX_PLUGIN_LIST).map((d: any) => cloneDoc(d)) : [];
             cachedTs = now;
             cached = results;
@@ -266,7 +266,7 @@ export class SignalApp {
           await s.summarize(doc);
           try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
         } catch (_) { /* swallow background errors */ }
-      }, 500);
+      }, 2000);
       timers.set(docId, t);
     };
 

@@ -73,10 +73,10 @@ export class PresenceTracker {
   private leaveBatch: Map<string, string | undefined> = new Map();
   private leaveBatchScheduled: boolean = false;
 
-  private static readonly MAX_PEERS = 2000;
+  private static readonly MAX_PEERS = 1000;
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
-  private static readonly MAX_PENDING_VALIDATIONS = 500;
+  private static readonly MAX_PENDING_VALIDATIONS = 200;
 
   private evictIfNeeded(): void {
     try {
@@ -159,7 +159,7 @@ export class PresenceTracker {
   private pendingValidations: Map<string, Promise<boolean>> = new Map();
 
   private cleanupTimer?: ReturnType<typeof setInterval>;
-  private static readonly INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
+  private static readonly INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
 
   constructor(context?: PluginContext) {
     this.context = context;
@@ -180,7 +180,7 @@ export class PresenceTracker {
         } catch (_) {
           /* swallow cleanup errors */
         }
-      }, 60 * 1000);
+      }, 2 * 60 * 1000);
     } catch (_) {
       // If timers are not available for any reason (test envs), degrade silently.
     }

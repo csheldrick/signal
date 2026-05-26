@@ -36,7 +36,7 @@ export class SyncQueue {
   private readonly maxDelayMs: number;
 
   constructor(opts: SyncQueueOptions = {}) {
-    this.maxQueueSize = opts.maxQueueSize ?? 1000;
+    this.maxQueueSize = opts.maxQueueSize ?? 500;
     this.maxAttempts = opts.maxAttempts ?? 5;
     this.baseDelayMs = opts.baseDelayMs ?? 500;
     this.maxDelayMs = opts.maxDelayMs ?? 30_000;
@@ -99,7 +99,7 @@ export class SyncQueue {
     // so callers decide ack/fail semantics. To avoid returning an unbounded
     // set (which can overload consumers), cap the batch size.
     const out: QueueEntry[] = [];
-    const MAX_BATCH = 50;
+    const MAX_BATCH = 20;
     for (const e of this.entries) {
       if (e.nextRetryAt <= now) {
         out.push(e);

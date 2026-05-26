@@ -47,7 +47,7 @@ export interface PluginContext {
 export const dire: Record<string, unknown> = Object.freeze({});
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 32; // lowered to reduce plugin subsystem fan-out and resource pressure
+  private static readonly MAX_REGISTERED_PLUGINS = 16; // lowered to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
@@ -115,7 +115,7 @@ export class PluginHost {
       const ctx: PluginContext = {
         listDocuments: () => {
           // Validate and provide only well-formed document snapshots to plugins.
-          return this.context.listDocuments().map(d => {
+          return (this.context.listDocuments().slice(0, 200)).map(d => {
             try {
               if (!d || typeof d.id !== 'string' || typeof d.title !== 'string' || typeof d.content !== 'string' || !Array.isArray(d.links) || !Array.isArray(d.tags)) return undefined;
               const safeDoc = {
@@ -217,7 +217,7 @@ export class PluginHost {
                 // avoid unbounded growth of pluginEventManagers (each distinct
                 // type can hold many listeners). If the cap is reached, avoid
                 // adding another manager and fall back to a no-op behaviour.
-                const MAX_EVENT_TYPES = 32;
+                const MAX_EVENT_TYPES = 16;
                 if (this.pluginEventManagers.size >= MAX_EVENT_TYPES) {
                   try { console.warn('PluginHost: event manager type limit reached; registering noop listener'); } catch (_) {}
                   mgr = { upstreamDispose: undefined, listeners: new Set() };
