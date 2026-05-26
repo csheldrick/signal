@@ -183,6 +183,28 @@ export class SyncEngine {
           timestamp: event.timestamp,
         } as any) as SyncMessage;
         break;
+      case 'linked': {
+        // Map storage 'linked' events to a logical 'link' SyncMessage so
+        // receivers can apply (or index) link relationships deterministically.
+        // We include the link object as the payload and choose a sensible
+        // documentId to group messages (prefer the target document when available).
+        const link = (event as any).link || {};
+        const docId = link.documentId ?? link.targetId ?? link.sourceId ?? '';
+        message = ({
+          messageId: `${this.peerId}:${docId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+          operation: 'link',
+          documentId: docId,
+          payload: {
+            link: {
+              ...link,
+            },
+          },
+          clock: { ...this.clock },
+          peerId: this.peerId,
+          timestamp: event.timestamp,
+        } as any) as SyncMessage;
+        break;
+      }
       case 'deleted':
         message = ({
           messageId: `${this.peerId}:${event.documentId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
