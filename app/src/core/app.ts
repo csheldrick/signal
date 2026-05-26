@@ -183,9 +183,13 @@ export class SignalApp {
           // requested it by passing allowNetwork = true. The summarizer's own
           // allowsNetwork flag still controls whether it was constructed to
           // permit network usage, but callers must opt-in to allow remote calls.
-          if ((typeof (sSumm as any).isRemote === 'boolean' ? (sSumm as any).isRemote : false) && (!allowNetwork || !(typeof (sSumm as any).allowsNetwork === 'boolean' ? (sSumm as any).allowsNetwork : false))) {
-            return undefined;
-          }
+          if (summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
+              // The Summarizer contract exposes deterministic flags:
+              // - isRemote: implementation performs remote/network I/O
+              // - allowsNetwork: whether this instance was constructed to permit network calls
+              // Enforce both the summarizer's configuration and the caller's explicit opt-in.
+              return undefined;
+            }
 
           // Provide a small retry/backoff wrapper for remote summarization to mitigate
           // transient network failures and reduce backpressure on upstream queues.
