@@ -42,8 +42,11 @@ export function resolveConflict(
   // external API permissive (accepts DocumentSnapshot). Callers that pass
   // snapshots are not exposed to internal mutation because we operate on copies
   // / assertions here.
-  const ldoc: Document = local as Document;
-  const rdoc: Document = remote as Document;
+  // Operate on shallow copies to avoid mutating caller-owned objects
+  // (Document or DocumentSnapshot). This preserves store/test invariants and
+  // ensures resolution logic cannot leak internal mutations.
+  const ldoc: Document = { ...(local as Document) };
+  const rdoc: Document = { ...(remote as Document) };
   const resolvedAt = Date.now();
 
   let winner: Document;

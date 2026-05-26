@@ -43,7 +43,16 @@ export class SyncQueue {
   }
 
   private keyFor(msg: SyncMessage): string {
-    return `${msg.documentId}::${msg.operation}`;
+    // Prefer an explicit stable messageId when present (set by producers like
+    // SyncEngine or SyncManager). This allows ack/fail to reliably match
+    // queued entries even when message objects are deserialized/reconstructed
+    // across transport boundaries. When no messageId is present (tests / old
+    // callers), fall back to deduping by documentId + operation to preserve
+    // existing semantics.
+    if (msg && typeof (msg as any).messageId === 'string' && (msg as any).messageId.length > 0) {
+      return `id:${(msg as any).messageId}`;
+    }
+    return `docop:${msg.documentId}::${msg.operation}`;
   }
 
   enqueue(message: SyncMessage): Promise<void> {
