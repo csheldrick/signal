@@ -13,6 +13,7 @@ import type { StorageEvent } from '../storage/events.js';
 import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
+import { createLazySyncEngine } from './lazyEngine.js';
 import { SyncQueue } from './queue.js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
@@ -65,28 +66,11 @@ export class SyncManager {
     this.peerId = opts.peerId;
     this.conflictStrategy = opts.conflictStrategy ?? 'last-write-wins';
 
-    // Reuse an existing engine attached to the store when possible to avoid
-    // creating duplicate SyncEngine instances that would lead to divergent
-    // VectorClock histories. Cache the engine on the store under a non-enumerable
-    // property name to keep it private.
+    // Lazily obtain a SyncEngine proxy to avoid eager subscriptions and buffering at startup.
     if (opts.engine) {
       this.engine = opts.engine;
     } else {
-      try {
-      const fromStore = getSyncEngineFromStore(store as any);
-      if (fromStore) {
-        this.engine = fromStore;
-      } else {
-        // Use canonical factory which consults store accessors or falls back
-        // to the internal WeakMap registry. Register on the store if possible.
-        const created = SyncEngine.getOrCreate(store as any, opts.peerId);
-        try { setSyncEngineOnStore(store as any, created); } catch (_) { /* swallow */ }
-        this.engine = created;
-      }
-      } catch (_) {
-        // Best-effort fallback to factory when any accessor inspection fails.
-        this.engine = SyncEngine.getOrCreate(store as any, opts.peerId);
-      }
+      this.engine = createLazySyncEngine(store as any, opts.peerId);
     }
     this.queue = new SyncQueue();
 

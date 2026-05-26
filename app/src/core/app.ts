@@ -12,7 +12,7 @@ import { SyncEngine } from '../sync/engine.js';
 import { PresenceTracker } from '../collaboration/presence.js';
 import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
 import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
-import { createLazyGraph, createLazyPluginHost } from './factories.js';
+import { createLazyGraph, createLazyPluginHost, createLazyPresenceTracker } from './factories.js';
 
 import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
@@ -275,6 +275,8 @@ export class SignalApp {
     // Lazy PluginHost instantiation to reduce startup fan-out and avoid
     // constructing the full plugin subsystem until it's actually used.
     this.plugins = createLazyPluginHost(pluginContext);
+    // Lazy PresenceTracker to avoid starting background timers and IO until needed.
+    this.presence = createLazyPresenceTracker(() => pluginContext);
 
     // Background summarization warm-up: schedule lightweight summarization for created/updated docs
     // to provide async job processing and warm caches (reduces remote latency on first real request).
