@@ -240,12 +240,13 @@ export class DocumentStore {
       // Insert the document into the in-memory store and emit a 'created' event
       // so existing event-driven validators and consumers can discover loaded
       // documents without directly importing the store.
-      this.documents.set(doc.id, cloneDocument(doc));
+      const stored = cloneDocument(doc);
+      this.documents.set(doc.id, stored);
       this.opCounts.create++;
       // Use async emit during load to avoid firing many synchronous created events
       // while the system is still initializing. Consumers that need to observe
       // created events synchronously should use the store API directly.
-      this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(doc), timestamp: Date.now() });
+      this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(stored), timestamp: Date.now() });
     }
   }
 }

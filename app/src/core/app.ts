@@ -141,7 +141,7 @@ export class SignalApp {
           // requested it by passing allowNetwork = true. The summarizer's own
           // allowsNetwork flag still controls whether it was constructed to
           // permit network usage, but callers must opt-in to allow remote calls.
-          if (sSumm.isRemote && !allowNetwork) {
+          if (sSumm.isRemote && (!allowNetwork || !sSumm.allowsNetwork)) {
             return undefined;
           }
 
