@@ -35,6 +35,9 @@ export interface PeerPresence {
   documentId: string | undefined;
   status: PresenceStatus;
   lastSeen: number;
+  // Monotonic sequence used to provide atomic versioning for presence
+  // entries. This enables safe compare-and-delete semantics in leave().
+  seq: number;
 }
 
 export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
@@ -64,6 +67,9 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
 
 export class PresenceTracker {
   private peers: Map<string, PeerPresence> = new Map();
+  // Monotonic sequence counter to provide atomic versioning for presence entries.
+  private nextSeq: number = 1;
+
   private static readonly MAX_PEERS = 2000;
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
@@ -150,6 +156,7 @@ export class PresenceTracker {
       documentId,
       status: 'active',
       lastSeen: Date.now(),
+      seq: this.nextSeq++,
     };
 
     // Register presence immediately so the realtime join path is never blocked.
@@ -258,7 +265,7 @@ export class PresenceTracker {
       // by a newer join for the same peerId. Compare the stored record's lastSeen to
       // avoid deleting a fresh record created after this leave() began.
       const current = this.peers.get(peerId);
-      if (current && current.lastSeen === existing.lastSeen && current.peerId === existing.peerId) {
+      if (current && current.seq === existing.seq && current.peerId === existing.peerId) {
         this.peers.delete(peerId);
       }
     }
@@ -327,6 +334,7 @@ export class PresenceTracker {
       documentId,
       status: 'active',
       lastSeen: Date.now(),
+      seq: this.nextSeq++,
     };
 
     this.peers.set(peerId, updated);
