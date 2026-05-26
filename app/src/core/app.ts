@@ -39,6 +39,7 @@ export class SignalApp {
   private readonly _peerId: string;
   private _sync?: SyncEngine;
   private _summarizer?: Summarizer;
+  private readonly _localSummarizer: LocalSummarizer;
   private readonly _allowNetwork: boolean;
   private readonly _networkAuthToken?: string;
   private readonly _disableBgSummarize: boolean;
@@ -74,6 +75,9 @@ export class SignalApp {
     this._networkAuthToken = config.networkAuthToken;
     this._disableBgSummarize = !!config.disableBackgroundSummarize;
     this._summarizer = undefined; // lazily created when first used
+    // Shared LocalSummarizer used throughout the app to avoid creating many
+    // ephemeral instances which increase subsystem fan-out and memory churn.
+    this._localSummarizer = new LocalSummarizer(3);
 
 
     // Provide safe, defensive clones to plugins so they cannot mutate internal store state.
@@ -210,7 +214,7 @@ export class SignalApp {
         const d = this.store.read(documentId);
         if (!d) return undefined;
         // Use the configured summarizer when present; otherwise use a local one.
-        const summarizer: Summarizer = this._summarizer ?? new LocalSummarizer(3);
+        const summarizer: Summarizer = this._summarizer ?? this._localSummarizer;
 
         // Deny network summarization when caller does not explicitly request it.
         try {
@@ -289,7 +293,7 @@ export class SignalApp {
         try {
           const doc = this.store.read(docId);
           if (!doc) return;
-          const s = new LocalSummarizer(3);
+          const s = this._localSummarizer;
           await s.summarize(doc);
           try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
         } catch (_) { /* swallow background errors */ }
