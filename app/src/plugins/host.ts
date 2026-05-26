@@ -45,23 +45,14 @@ export interface PluginContext {
 }
 
 export const dire: Record<string, unknown> = (() => {
-  // Backwards-compat stub for removed 'dire' primitive. Accessing it logs a
-  // one-time deprecation warning and returns undefined on property access so
-  // older plugins don't crash at import-time.
-  let warned = false;
-  return new Proxy({}, {
-    get() {
-      try {
-        if (!warned) {
-          // eslint-disable-next-line no-console
-          console.warn("'dire' is deprecated; use PluginContext and PluginHost APIs instead.");
-          warned = true;
-        }
-      } catch (_) { /* swallow console errors */ }
-      return undefined;
-    },
-    apply() { return undefined as any; },
-  });
+  // Backwards-compat stub for removed 'dire' primitive. Emit a one-time
+  // deprecation message at module evaluation and provide a frozen empty
+  // object to avoid proxy-based runtime complexity and unexpected side-effects.
+  try {
+    // eslint-disable-next-line no-console
+    console.warn("'dire' is deprecated; use PluginContext and PluginHost APIs instead.");
+  } catch (_) { /* swallow console errors */ }
+  return Object.freeze({}) as Record<string, unknown>;
 })();
 
 export class PluginHost {

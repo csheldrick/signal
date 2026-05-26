@@ -6,14 +6,14 @@ import type { DocumentSnapshot, Document } from '../core/types.js';
 
 
 export interface GraphNode {
-  id: string;
-  title: string;
-  linkCount: number;
+  readonly id: string;
+  readonly title: string;
+  readonly linkCount: number;
 }
 
 export interface AdjacencyList {
-  nodes: Map<string, GraphNode>;
-  edges: Map<string, Set<string>>;
+  readonly nodes: ReadonlyMap<string, GraphNode>;
+  readonly edges: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 export type GraphAdjacencyList = AdjacencyList;

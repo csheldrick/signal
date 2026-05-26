@@ -7,29 +7,29 @@ import type { DocumentSnapshot, DocumentLink } from '../core/types.js';
 export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
 
 export interface StorageEventCreated {
-  type: 'created';
-  document: DocumentSnapshot;
-  timestamp: number;
+  readonly type: 'created';
+  readonly document: Readonly<DocumentSnapshot>;
+  readonly timestamp: number;
 }
 
 export interface StorageEventUpdated {
-  type: 'updated';
-  documentId: string;
-  previous: DocumentSnapshot;
-  current: DocumentSnapshot;
-  timestamp: number;
+  readonly type: 'updated';
+  readonly documentId: string;
+  readonly previous: Readonly<DocumentSnapshot>;
+  readonly current: Readonly<DocumentSnapshot>;
+  readonly timestamp: number;
 }
 
 export interface StorageEventDeleted {
-  type: 'deleted';
-  documentId: string;
-  timestamp: number;
+  readonly type: 'deleted';
+  readonly documentId: string;
+  readonly timestamp: number;
 }
 
 export interface StorageEventLinked {
-  type: 'linked';
-  link: DocumentLink;
-  timestamp: number;
+  readonly type: 'linked';
+  readonly link: Readonly<DocumentLink>;
+  readonly timestamp: number;
 }
 
 export type StorageEvent =
@@ -38,7 +38,10 @@ export type StorageEvent =
   | StorageEventDeleted
   | StorageEventLinked;
 
-type Listener = (event: StorageEvent) => void;
+// Listener receives a readonly snapshot of events to discourage mutation and
+// reduce coupling between event producers and consumers.
+
+type Listener = (event: Readonly<StorageEvent>) => void;
 
 export interface StorageEventBusContract {
   on(type: StorageEventType | '*', listener: Listener): void;
@@ -49,7 +52,7 @@ export interface StorageEventBusContract {
   attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean & { dispose?: () => void };
 }
 
-export type DeprecatedStorageEventCreated = StorageEventCreated;
+// deprecated alias removed to reduce legacy surface area
 
 export class StorageEventBus implements StorageEventBusContract {
   private listeners: Map<StorageEventType | '*', Set<Listener>> = new Map();

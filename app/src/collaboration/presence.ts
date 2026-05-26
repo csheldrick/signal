@@ -38,40 +38,28 @@ export interface PeerPresence {
 }
 
 export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
-  // Deprecated helper retained for backwards-compatibility. Callers should
-  // migrate to StorageEventBus.attachDocumentValidatorFromEvents(initialIds)
-  // and register via PresenceTracker.setAsyncValidator(). This shim is safe:
-  // - never throws (treats errors as "not found")
-  // - awaits Promise-like reader results
-  // - emits a one-time deprecation warning to guide migration
+  // Deprecated shim: no longer performs synchronous store IO on the realtime path.
+  // This conservative implementation prevents legacy callers from triggering
+  // blocking or IO-bound behaviour while guiding migration to the event-driven
+  // validators (StorageEventBus.attachDocumentValidatorFromEvents).
   let warned = false;
 
-  return async (id: string) => {
+  const validator = async (id: string) => {
     if (!warned) {
       try {
         // eslint-disable-next-line no-console
-        console.warn('createValidatorFromStore is deprecated; prefer StorageEventBus.attachDocumentValidatorFromEvents(initialIds) and PresenceTracker.setAsyncValidator().');
-      } catch (_) {
-        /* swallow console errors */
-      }
+        console.warn('createValidatorFromStore is deprecated and no longer performs store IO; use StorageEventBus.attachDocumentValidatorFromEvents(initialIds) and PresenceTracker.setAsyncValidator().');
+      } catch (_) { /* swallow */ }
       warned = true;
     }
-
-    try {
-      const res = (_store as unknown as DocumentReader).read(id);
-      // Avoid awaiting Promise-like readers on the realtime validation path.
-      // If the provided reader returns a Promise-like value we treat it as
-      // "not found" to prevent IO from being performed synchronously during
-      // presence validation. Callers should migrate to attachDocumentValidatorFromEvents/Async validators.
-      if (res !== null && (typeof res === 'object' || typeof res === 'function') && typeof (res as any).then === 'function') {
-        return false;
-      }
-      const resolved = res as unknown;
-      return resolved !== undefined && resolved !== null;
-    } catch (_) {
-      return false;
-    }
+    // Conservative default for realtime paths: avoid any IO and return false.
+    return false;
   };
+
+  // Provide a no-op disposer for compatibility with callers that expect it.
+  (validator as any).dispose = () => { /* no-op */ };
+
+  return validator;
 }
 
 export class PresenceTracker {
