@@ -41,6 +41,12 @@ export class SignalApp {
 
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
+    // Expose the app StorageEventBus on a small, well-known global slot so
+    // lightly-coupled components (e.g. PresenceTracker wrappers) can emit
+    // session lifecycle events without requiring an additional constructor
+    // parameter. Defensive: swallow failures to avoid breaking tests/environments
+    // without a globalThis writable slot.
+    try { (globalThis as any).__SIGNAL_STORAGE_EVENT_BUS = this.events; } catch (_) {}
     this.store = new DocumentStore(this.events);
     const createLazyGraph = () => {
       let real: GraphBuilder | undefined;
@@ -74,6 +80,9 @@ export class SignalApp {
         tags: Array.isArray(d.tags) ? [...d.tags] : [],
       };
     };
+
+    let remoteSummarizeInFlight = 0;
+    const MAX_CONCURRENT_REMOTE_SUMMARIES = 3;
 
     const pluginContext: PluginContext = {
       listDocuments: (() => {
@@ -184,34 +193,32 @@ export class SignalApp {
         const summarizer: Summarizer = this._summarizer ?? new LocalSummarizer(3);
 
         // Deny network summarization when caller does not explicitly request it.
-        // Plugins will call PluginContext.summarizeDocument without allowNetwork,
-        // so this prevents plugins from causing network calls.
         try {
-          // Use explicit Summarizer contract flags rather than fragile constructor.name checks.
-          // If the active summarizer is remote but neither it nor the caller allow
-          // network I/O, refuse to perform remote summarization.
           const sSumm: Summarizer = summarizer;
-          // Enforce caller-driven network opt-in: if the active summarizer is
-          // remote, refuse to perform network I/O unless the caller explicitly
-          // requested it by passing allowNetwork = true. The summarizer's own
-          // allowsNetwork flag still controls whether it was constructed to
-          // permit network usage, but callers must opt-in to allow remote calls.
           if (summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
-              // The Summarizer contract exposes deterministic flags:
-              // - isRemote: implementation performs remote/network I/O
-              // - allowsNetwork: whether this instance was constructed to permit network calls
-              // Enforce both the summarizer's configuration and the caller's explicit opt-in.
-              return undefined;
-            }
+            return undefined;
+          }
 
-          // Provide a small retry/backoff wrapper for remote summarization to mitigate
-          // transient network failures and reduce backpressure on upstream queues.
+          const isRemote = !!(summarizer && (summarizer as any).isRemote);
+          // If remote, enforce a simple concurrency cap to avoid unbounded
+          // in-flight remote requests that can backlog and affect realtime flows.
+          if (isRemote && remoteSummarizeInFlight >= MAX_CONCURRENT_REMOTE_SUMMARIES) {
+            return undefined;
+          }
+
           const MAX_RETRIES = 3;
           const BASE_MS = 100;
 
           const attempt = async (triesLeft: number): Promise<string | undefined> => {
             try {
-              return await summarizer.summarize(d);
+              if (isRemote) remoteSummarizeInFlight++;
+              try {
+                return await summarizer.summarize(d);
+              } finally {
+                if (isRemote) {
+                  try { remoteSummarizeInFlight = Math.max(0, remoteSummarizeInFlight - 1); } catch (_) { remoteSummarizeInFlight = 0; }
+                }
+              }
             } catch (err) {
               if (triesLeft <= 0) return undefined;
               await new Promise(res => setTimeout(res, BASE_MS * Math.pow(2, MAX_RETRIES - triesLeft)));

@@ -134,23 +134,45 @@ export class PresenceTracker {
    */
   setSessionTracker(tracker?: { openSession?: (id: string, clock?: any) => void; closeSession?: (id: string) => void; list?: () => any[] }): void {
     // Wrap and store a safe, minimal session-tracker to avoid leaking rich
-    // cross-subsystem objects directly into PresenceTracker. All invocations
-    // are wrapped in try/catch to prevent plugin or external errors from
-    // impacting realtime paths.
+    // cross-subsystem objects directly into PresenceTracker. In addition to
+    // forwarding calls to the provided tracker we also emit lightweight
+    // session lifecycle events on the app StorageEventBus (if present) so
+    // other subsystems can react without polling. All emissions are
+    // defensive and non-blocking.
     try {
       if (!tracker) {
         (this as any).sessionTracker = undefined;
         return;
       }
+
+      const bus = (globalThis as any).__SIGNAL_STORAGE_EVENT_BUS;
+      const emitSafe = (ev: any) => {
+        try {
+          if (bus && typeof (bus as any).emit === 'function') {
+            try { (bus as any).emit(ev); } catch (_) { /* swallow bus errors */ }
+          }
+        } catch (_) { /* swallow */ }
+      };
+
       const safe: any = {
-        openSession: typeof tracker.openSession === 'function' ? (id: string, clock?: any) => { try { tracker.openSession!(id, clock); } catch (_) {} } : undefined,
-        closeSession: typeof tracker.closeSession === 'function' ? (id: string) => { try { tracker.closeSession!(id); } catch (_) {} } : undefined,
+        openSession: typeof tracker.openSession === 'function' ? (id: string, clock?: any) => {
+          try { tracker.openSession!(id, clock); } catch (_) {}
+          try { emitSafe({ type: 'sync_session_opened', peerId: id, clock: clock ?? undefined, timestamp: Date.now() }); } catch (_) {}
+        } : undefined,
+        closeSession: typeof tracker.closeSession === 'function' ? (id: string) => {
+          try { tracker.closeSession!(id); } catch (_) {}
+          try { emitSafe({ type: 'sync_session_closed', peerId: id, timestamp: Date.now() }); } catch (_) {}
+        } : undefined,
         list: typeof tracker.list === 'function' ? () => { try { return tracker.list!(); } catch (_) { return []; } } : undefined,
       };
-      // Allow optional heartbeat updater if present on the tracker (non-standard).
+
       if (typeof (tracker as any).updateHeartbeat === 'function') {
-        safe.updateHeartbeat = (peerId: string) => { try { (tracker as any).updateHeartbeat(peerId); } catch (_) {} };
+        safe.updateHeartbeat = (peerId: string) => {
+          try { (tracker as any).updateHeartbeat(peerId); } catch (_) {}
+          try { emitSafe({ type: 'sync_session_heartbeat', peerId, timestamp: Date.now() }); } catch (_) {}
+        };
       }
+
       (this as any).sessionTracker = safe;
     } catch (_) { /* swallow */ }
   }
