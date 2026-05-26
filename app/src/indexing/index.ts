@@ -31,24 +31,30 @@ export class InvertedIndex {
       this.remove(documentId);
     }
 
-    const terms = this.tokenize(text);
-    // Prevent pathological per-document term explosions by bounding retained
-    // unique terms per document. This keeps index memory and CPU work predictable.
+    // Defensive: ensure text is a string and bound per-document unique terms
+    const terms = this.tokenize(String(text ?? ''));
     const MAX_TERMS_PER_DOC = 10000;
-    let termSet = new Set(terms);
-    if (termSet.size > MAX_TERMS_PER_DOC) {
-      // Keep first N unique terms deterministically.
-      termSet = new Set(Array.from(termSet).slice(0, MAX_TERMS_PER_DOC));
+
+    // Deterministic first-N unique tokens to avoid set iteration non-determinism
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const t of terms) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        ordered.push(t);
+        if (seen.size >= MAX_TERMS_PER_DOC) break;
+      }
     }
+
+    const termSet = new Set(ordered);
     this.docTerms.set(documentId, termSet);
     this.totalTerms += termSet.size;
-    // Mark cached stats dirty due to mutation.
     this.statsDirty = true;
 
     for (const term of termSet) {
       let list = this.posting.get(term);
       if (!list) {
-        list = new Set();
+        list = new Set<string>();
         this.posting.set(term, list);
       }
       list.add(documentId);

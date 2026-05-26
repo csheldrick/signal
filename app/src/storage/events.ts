@@ -54,7 +54,7 @@ export type DeprecatedStorageEventCreated = StorageEventCreated;
 export class StorageEventBus implements StorageEventBusContract {
   private listeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
   private asyncQueue: StorageEvent[] = [];
-  private asyncScheduled: boolean = false;
+  private asyncScheduled: boolean = false; private trace: StorageEvent[] = [];
 
   on(type: StorageEventType | '*', listener: Listener): void {
     // Prevent unbounded listener growth which can cause heavy synchronous
@@ -94,6 +94,7 @@ export class StorageEventBus implements StorageEventBusContract {
     // ordering for validators/listeners that must observe state changes before
     // the emitter returns. If non-blocking semantics are required callers can
     // opt-in using emitAsync(event).
+    try { this.trace.push(event); if (this.trace.length > 1000) this.trace.splice(0, this.trace.length - 1000); } catch (_) {}
     const direct = this.listeners.get(event.type);
     const star = this.listeners.get('*');
 
@@ -134,6 +135,7 @@ export class StorageEventBus implements StorageEventBusContract {
     // This batches many emitAsync calls into a single dispatch and uses a
     // macrotask (setTimeout) to yield to the event loop, preventing large
     // numbers of microtasks from overwhelming the runtime.
+    try { this.trace.push(event); if (this.trace.length > 1000) this.trace.splice(0, this.trace.length - 1000); } catch (_) {}
     this.asyncQueue.push(event);
     if (this.asyncScheduled) return;
     this.asyncScheduled = true;

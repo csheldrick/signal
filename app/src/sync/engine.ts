@@ -14,6 +14,7 @@ interface DocumentStoreLike {
 import type { StorageEvent } from '../storage/events.js';
 import type { SyncMessage, VectorClock } from './protocol.js';
 import { mergeClocks } from './protocol.js';
+import { isValidDocumentSnapshot } from '../core/types.js';
 
 export class SyncEngine {
   private clock: VectorClock = {};
@@ -138,6 +139,15 @@ export class SyncEngine {
     this.clock[this.peerId] = (this.clock[this.peerId] ?? 0) + 1;
 
     let message: SyncMessage | undefined;
+
+    // Defensive validation: drop created/updated events that carry malformed snapshots.
+    if (event.type === 'created' || event.type === 'updated') {
+      const snap = (event.type === 'created') ? (event as any).document : (event as any).current;
+      if (!isValidDocumentSnapshot(snap)) {
+        try { console.warn('SyncEngine: ignoring storage event with invalid document snapshot', event); } catch (_) {}
+        return undefined;
+      }
+    }
 
     switch (event.type) {
       case 'created':

@@ -65,6 +65,29 @@ export type DeprecatedDocumentChange = DocumentChange;
 // Utility: create a lightweight, readonly-friendly DocumentSnapshot from a Document.
 // Encourages passing snapshots across subsystem boundaries to avoid accidental
 // mutation and to reduce memory pressure.
+export function isValidDocumentSnapshot(obj: any): obj is DocumentSnapshot {
+  if (!obj || typeof obj !== 'object') return false;
+  try {
+    return typeof obj.id === 'string' &&
+      typeof obj.title === 'string' &&
+      typeof obj.content === 'string' &&
+      Array.isArray(obj.tags) &&
+      Array.isArray(obj.links) &&
+      typeof obj.createdAt === 'number' &&
+      typeof obj.updatedAt === 'number';
+  } catch (_) {
+    return false;
+  }
+}
+
+export function validateDocumentChange(ch?: DocumentChange): boolean {
+  if (!ch || typeof ch !== 'object') return true; // empty change allowed
+  if (ch.title !== undefined && typeof ch.title !== 'string') return false;
+  if (ch.content !== undefined && typeof ch.content !== 'string') return false;
+  if (ch.tags !== undefined && (!Array.isArray(ch.tags) || ch.tags.some(t => typeof t !== 'string'))) return false;
+  return true;
+}
+
 export function createDocumentSnapshot(doc: Document): DocumentSnapshot {
   return {
     id: doc.id,

@@ -136,6 +136,7 @@ export class SyncManager {
       if (localDoc) {
         const localClock = this.engine.getClock();
         if (isConflict(localClock, message.clock)) {
+      try { this.emitTelemetry('conflict_detected', { documentId: message.documentId, peerId: message.peerId, localClock, remoteClock: message.clock }); } catch (_) { /* swallow */ }
           const remoteDoc = (() => {
             const payload = message.payload as {
               title?: string;
@@ -205,6 +206,7 @@ export class SyncManager {
         const msgId = `${this.peerId}:${msg.documentId}:${msg.timestamp}:${suffix}`;
         // We augment the message with messageId in a non-destructive way.
         const prepared = { ...(msg as any), messageId: msgId } as unknown as SyncMessage;
+        try { this.emitTelemetry('outbound_prepared', { message: prepared }); } catch (_) { /* swallow */ }
 
         enqPromises.push(
           this.queue.enqueue(prepared).catch(err => {
