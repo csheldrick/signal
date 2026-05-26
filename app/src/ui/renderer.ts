@@ -7,11 +7,14 @@ import type { AdjacencyList } from '../graph/builder.js';
 
 export function renderDocument(doc: Document): string {
   const header = `[${doc.id}] ${doc.title}`;
-  const meta = `  tags: ${doc.tags.join(', ') || '(none)'}`;
-  const links = doc.links.length > 0
-    ? `  links: ${doc.links.map(l => `${l.targetId} (${l.kind})`).join(', ')}`
+  const tagsArray = Array.isArray((doc as any).tags) ? (doc as any).tags : [];
+  const meta = `  tags: ${tagsArray.length > 0 ? tagsArray.join(', ') : '(none)'}`;
+  const linksArray = Array.isArray((doc as any).links) ? (doc as any).links as Array<{targetId?: string; kind?: string}> : [];
+  const links = linksArray.length > 0
+    ? `  links: ${linksArray.map((l: {targetId?: string; kind?: string}) => `${l.targetId || '?'} (${l.kind || '?'})`).join(', ')}`
     : '  links: (none)';
-  const body = doc.content.split('\n').map(line => `  ${line}`).join('\n');
+  const content = typeof (doc as any).content === 'string' ? (doc as any).content : '';
+  const body = content.split('\n').map((line: string) => `  ${line}`).join('\n');
 
   return [header, meta, links, '', body].join('\n');
 }

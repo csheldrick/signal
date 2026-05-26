@@ -78,6 +78,21 @@ export class GraphBuilder {
 
   async findClusters(): Promise<string[][]> {
     const graph = await this.buildGraph();
+    // Precompute reverse adjacency map for incoming neighbors to avoid
+    // scanning all edges for every node visit. This reduces complexity from
+    // O(N * E) worst-case to O(N + E) and alleviates hotspot pressure.
+    const reverse = new Map<string, Set<string>>();
+    for (const [src, set] of graph.edges) {
+      for (const tgt of set) {
+        let s = reverse.get(tgt);
+        if (!s) {
+          s = new Set<string>();
+          reverse.set(tgt, s);
+        }
+        s.add(src);
+      }
+    }
+
     const visited = new Set<string>();
     const clusters: string[][] = [];
 
@@ -98,9 +113,8 @@ export class GraphBuilder {
         const out = graph.edges.get(current);
         if (out) for (const n of out) neighbors.add(n);
         // Incoming neighbors (treat graph as undirected for clustering)
-        for (const [src, set] of graph.edges) {
-          if (set.has(current)) neighbors.add(src);
-        }
+        const incoming = reverse.get(current);
+        if (incoming) for (const src of incoming) neighbors.add(src);
         if (neighbors) {
           for (const neighbor of neighbors) {
             if (!visited.has(neighbor)) queue.push(neighbor);
