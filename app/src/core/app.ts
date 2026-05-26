@@ -323,17 +323,29 @@ export class SignalApp {
         this._sync = cached;
       } else {
         // Create a new engine and publish it to the store for other callers
-        // to reuse. If another caller created one between the cached check
-        // and define attempt the SyncEngine constructor will throw and the
-        // caller can observe/handle the misconfiguration (failing fast).
-        const created = new SyncEngine(this.store, this._peerId);
+        // to reuse. Be robust against races: if construction throws because
+        // another actor created an engine concurrently, prefer the installed
+        // engine. If no engine is installed, rethrow the error so callers can
+        // observe the misconfiguration.
         try {
-          Object.defineProperty(this.store, ENGINE_KEY, { value: created, enumerable: false, configurable: true });
-        } catch (_){
-          // Fallback for environments that restrict defineProperty.
-          (this.store as any)[ENGINE_KEY] = created;
+          const created = new SyncEngine(this.store, this._peerId);
+          try {
+            Object.defineProperty(this.store, ENGINE_KEY, { value: created, enumerable: false, configurable: true });
+          } catch (_){
+            // Fallback for environments that restrict defineProperty.
+            (this.store as any)[ENGINE_KEY] = created;
+          }
+          this._sync = created;
+        } catch (err) {
+          // If another actor installed an engine in the interim, use it.
+          const installed = (this.store as any)[ENGINE_KEY] as SyncEngine | undefined;
+          if (installed) {
+            this._sync = installed;
+          } else {
+            // No installed engine found; rethrow so the caller sees the real error.
+            throw err;
+          }
         }
-        this._sync = created;
       }
     }
     this.started = true;

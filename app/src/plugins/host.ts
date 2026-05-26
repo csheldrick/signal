@@ -49,8 +49,15 @@ export const dire: Record<string, unknown> = (() => {
   // deprecation message at module evaluation and provide a frozen empty
   // object to avoid proxy-based runtime complexity and unexpected side-effects.
   try {
-    // eslint-disable-next-line no-console
-    console.warn("'dire' is deprecated; use PluginContext and PluginHost APIs instead.");
+    // Only emit the noisy deprecation in non-test environments. Tests and some
+    // automated runners expect minimal console noise; use debug there instead.
+    if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'test') {
+      // eslint-disable-next-line no-console
+      console.warn("'dire' is deprecated; use PluginContext and PluginHost APIs instead.");
+    } else {
+      // eslint-disable-next-line no-console
+      try { console.debug("'dire' is deprecated; suppressed warning in test environment."); } catch (_) { /* swallow */ }
+    }
   } catch (_) { /* swallow console errors */ }
   return Object.freeze({}) as Record<string, unknown>;
 })();
