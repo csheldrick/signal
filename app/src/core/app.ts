@@ -61,7 +61,14 @@ export class SignalApp {
     // session lifecycle events without requiring an additional constructor
     // parameter. Defensive: swallow failures to avoid breaking tests/environments
     // without a globalThis writable slot.
-    try { setSignalStorageEventBus(this.events); } catch (_) {}
+    // Only expose the StorageEventBus via globalThis when explicitly opted-in.
+    // Default behaviour is to avoid writing to globals to reduce implicit
+    // process-wide coupling and to keep the application a well-typed, explicit
+    // dependency graph. Set env SIGNAL_ALLOW_GLOBALS=true to opt-in for
+    // backwards compatibility in environments that require the global slot.
+    if (typeof setSignalStorageEventBus === 'function' && (typeof process !== 'undefined' && process.env && process.env.SIGNAL_ALLOW_GLOBALS === 'true')) {
+      try { setSignalStorageEventBus(this.events); } catch (_) {}
+    }
     this.store = new DocumentStore(this.events);
     this.graph = createLazyGraph(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
     // Create a lightweight inverted index and an Indexer that listens to
