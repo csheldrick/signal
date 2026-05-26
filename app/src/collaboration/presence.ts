@@ -70,6 +70,12 @@ export class PresenceTracker {
   // Monotonic sequence counter to provide atomic versioning for presence entries.
   private nextSeq: number = 1;
 
+  // Batch slot for non-blocking onPeerLeave hook invocation. When many peers
+  // leave concurrently scheduling a setTimeout per-leave creates heavy
+  // macrotask churn; coalesce them into a single macrotask to reduce fan-out.
+  private leaveBatch: Map<string, string | undefined> = new Map();
+  private leaveBatchScheduled: boolean = false;
+
   private static readonly MAX_PEERS = 2000;
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
@@ -285,8 +291,35 @@ export class PresenceTracker {
                 ]);
               } catch (_) { /* swallow */ }
             } else {
-              // Schedule non-blocking macrotask invocation to avoid microtask storms
-              try { setTimeout(() => { try { hook(peerId, existing.documentId); } catch (_) { /* swallow */ } }, 0); } catch (_) { /* swallow scheduling errors */ }
+              // Schedule non-blocking batched macrotask invocation to avoid microtask storms
+              try {
+                // If the hook is not present bail out
+                if (!hook) {
+                  // nothing to schedule
+                } else {
+                  // Add to the batch; latest entry for a peerId wins
+                  this.leaveBatch.set(peerId, existing.documentId);
+
+                  if (!this.leaveBatchScheduled) {
+                    this.leaveBatchScheduled = true;
+                    setTimeout(() => {
+                      try {
+                        const batch = new Map(this.leaveBatch);
+                        this.leaveBatch.clear();
+                        this.leaveBatchScheduled = false;
+
+                        for (const [pId, docId] of batch.entries()) {
+                          try { hook(pId, docId); } catch (_) { /* swallow individual hook errors */ }
+                        }
+                      } catch (_) {
+                        /* swallow batch delivery errors */
+                        try { this.leaveBatch.clear(); } catch (_) {}
+                        this.leaveBatchScheduled = false;
+                      }
+                    }, 0);
+                  }
+                }
+              } catch (_) { /* swallow scheduling errors */ }
             }
           } catch (_) { /* swallow scheduling errors */ }
         }
