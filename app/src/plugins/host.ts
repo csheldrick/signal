@@ -74,14 +74,10 @@ export class PluginHost {
     // that do not set usesPluginContext === true must be migrated. This
     // prevents accidental sandbox escapes and makes the boundary explicit.
     if (plugin.usesPluginContext !== true) {
-      try {
-      // eslint-disable-next-line no-console
-      console.warn(`Plugin '${plugin.id}' did not opt into PluginContext sandbox; registering for backward compatibility but this is deprecated. Set usesPluginContext = true to opt-in.`);
-    } catch (_) {}
-    // Allow legacy plugins to register for backward-compatibility so older
-    // plugins that reference 'dire' or other migration shims do not cause
-    // plugin initialization to fail. This is a temporary compatibility
-    // relaxation to ease migration of third-party plugins.
+      // Enforce explicit opt-in for the PluginContext sandbox. Fail fast to
+      // prevent accidental sandbox escapes and to encourage migration of
+      // legacy plugins to the sandboxed contract.
+      throw new Error(`Plugin '${plugin.id}' must set usesPluginContext = true to register with PluginHost`);
     }
 
     if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {
