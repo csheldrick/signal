@@ -47,43 +47,68 @@ export class GraphBuilder {
     return { nodes, edges };
   }
 
+  // In-flight build coalescing: when many callers request the graph at
+  // the same time we avoid recomputing the adjacency repeatedly by sharing
+  // a single in-progress Promise. This reduces CPU/memory pressure during
+  // bursts and helps avoid subsystem overload.
+  private building?: Promise<AdjacencyList> | undefined;
+
   async buildGraph(): Promise<AdjacencyList> {
     const docs = this.listDocuments();
     const signature = this.computeSignature(docs);
+
+    // Fast-path: identical signature and cached graph available.
     if (this.lastSignature === signature && this.cachedGraph) {
       return this.cloneAdjacency(this.cachedGraph);
     }
 
-    const nodes = new Map<string, GraphNode>();
-    const edges = new Map<string, Set<string>>();
-
-    for (const doc of docs) {
-      nodes.set(doc.id, {
-        id: doc.id,
-        title: doc.title,
-        linkCount: Array.isArray((doc as any).links) ? (doc as any).links.length : 0,
-      });
-      if (!edges.has(doc.id)) edges.set(doc.id, new Set());
-
-      for (const link of (doc as any).links || []) {
-        edges.get(doc.id)!.add(link.targetId);
-        // Ensure the referenced target exists in the nodes map so graph
-        // traversals and clustering consider referenced-but-missing nodes.
-        if (!nodes.has(link.targetId)) {
-          nodes.set(link.targetId, { id: link.targetId, title: '(missing)', linkCount: 0 });
-        }
-        // Ensure adjacency entry for the target exists so incoming edges are
-        // represented consistently (helps undirected traversals).
-        if (!edges.has(link.targetId)) edges.set(link.targetId, new Set());
+    // If a build is already in flight for a differing signature, wait for it
+    // to complete and return a cloned adjacency to avoid duplicated work.
+    if (this.building) {
+      try {
+        const adj = await this.building;
+        return this.cloneAdjacency(adj);
+      } catch (_) {
+        // If the in-flight build failed, fall through to attempt a rebuild.
       }
     }
 
-    const adj: AdjacencyList = { nodes, edges };
-    // Cache a clone so subsequent identical queries return quickly without
-    // exposing internal mutable structures.
-    this.cachedGraph = this.cloneAdjacency(adj);
-    this.lastSignature = signature;
-    return adj;
+    // Start a new build and record the promise so concurrent callers can
+    // await the same work instead of duplicating it.
+    this.building = (async () => {
+      const nodes = new Map<string, GraphNode>();
+      const edges = new Map<string, Set<string>>();
+
+      for (const doc of docs) {
+        nodes.set(doc.id, {
+          id: doc.id,
+          title: doc.title,
+          linkCount: Array.isArray((doc as any).links) ? (doc as any).links.length : 0,
+        });
+        if (!edges.has(doc.id)) edges.set(doc.id, new Set());
+
+        for (const link of (doc as any).links || []) {
+          edges.get(doc.id)!.add(link.targetId);
+          if (!nodes.has(link.targetId)) {
+            nodes.set(link.targetId, { id: link.targetId, title: '(missing)', linkCount: 0 });
+          }
+          if (!edges.has(link.targetId)) edges.set(link.targetId, new Set());
+        }
+      }
+
+      const adj: AdjacencyList = { nodes, edges };
+      // Cache a clone so subsequent identical queries return quickly without
+      // exposing internal mutable structures.
+      this.cachedGraph = this.cloneAdjacency(adj);
+      this.lastSignature = signature;
+
+      // Clear the in-flight marker and return the computed adjacency.
+      this.building = undefined;
+      return adj;
+    })();
+
+    const result = await this.building;
+    return this.cloneAdjacency(result);
   }
 
   async findClusters(): Promise<string[][]> {

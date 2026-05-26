@@ -48,6 +48,7 @@ export class SyncManager {
   private flushTimer: ReturnType<typeof setInterval> | undefined;
   private transport: TransportSend | undefined;
   private authValidator?: (peerId: string, message?: SyncMessage) => boolean;
+  private static readonly MAX_TELEMETRY_LISTENERS = 32;
   private telemetryListeners: Set<(event: { type: string; payload: any }) => void> = new Set();
 
   constructor(
@@ -92,16 +93,44 @@ export class SyncManager {
 
   /** Attach a transport. The manager will call this whenever it has messages to send. */
   setTransport(send: TransportSend, authValidator?: (peerId: string, message?: SyncMessage) => boolean): void {
-    this.transport = send;
+    // Wrap the provided transport with a light-weight yielding wrapper when
+    // the session count is large so that heavy synchronous send bursts are
+    // converted into asynchronous macrotasks. This reduces risk of blocking
+    // the event loop when many peers are connected.
     this.authValidator = authValidator;
+
+    const WRAP_SESSION_THRESHOLD = 50;
+    this.transport = async (peerId: string, message: SyncMessage) => {
+      try {
+        if (this.sessions.size > WRAP_SESSION_THRESHOLD) {
+          // Use a macrotask to yield; wrap the underlying send so callers see
+          // a Promise-based API as before.
+          return new Promise<void>((resolve, reject) => {
+            setTimeout(() => {
+              Promise.resolve(send(peerId, message)).then(resolve).catch(reject);
+            }, 0);
+          });
+        }
+        return send(peerId, message);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    };
   }
 
   /**
    * Register a telemetry/metrics listener. Returns a disposer to remove it.
    */
   onTelemetry(listener: (event: { type: string; payload: any }) => void): () => void {
+    try {
+      if (this.telemetryListeners.size >= SyncManager.MAX_TELEMETRY_LISTENERS) {
+        try { console.warn('SyncManager: telemetry listener limit reached; refusing to add'); } catch (_) {}
+        return () => {};
+      }
+    } catch (_) {}
+
     this.telemetryListeners.add(listener);
-    return () => this.telemetryListeners.delete(listener);
+    return () => { this.telemetryListeners.delete(listener); };
   }
 
   private emitTelemetry(type: string, payload: any): void {

@@ -213,8 +213,11 @@ export class StorageEventBus implements StorageEventBusContract {
       }
     };
 
-    // Observe all events to maintain an internal existence set.
-    this.on('*', listener);
+    // Observe only the concrete events we care about to maintain an internal existence set.
+    // Using a wildcard '*' listener increases star-listener fan-out on the StorageEventBus
+    // and can overload downstream subsystems. We only need 'created' and 'deleted' here.
+    this.on('created', listener);
+    this.on('deleted', listener);
 
     // Return an async validator function. For callers that wish to stop
     // observing events (and avoid keeping the listener referenced) a
@@ -225,7 +228,7 @@ export class StorageEventBus implements StorageEventBusContract {
       return known.has(id);
     };
 
-    (validator as any).dispose = () => { this.off('*', listener); };
+    (validator as any).dispose = () => { this.off('created', listener); this.off('deleted', listener); };
 
     return validator;
   }
@@ -260,13 +263,16 @@ export class StorageEventBus implements StorageEventBusContract {
       }
     };
 
-    this.on('*', listener);
+    // Observe only the concrete events needed for the snapshot validator.
+    // Avoid registering a wildcard '*' listener which causes large fan-out.
+    this.on('created', listener);
+    this.on('deleted', listener);
 
     // Synchronous snapshot validator. We attach an optional .dispose()
     // method to allow callers to remove the underlying listener when they
     // no longer need the snapshot, preventing memory and processing leaks.
     const validator = (id: string) => known.has(id);
-    (validator as any).dispose = () => { this.off('*', listener); };
+    (validator as any).dispose = () => { this.off('created', listener); this.off('deleted', listener); };
     return validator;
   }
 }
