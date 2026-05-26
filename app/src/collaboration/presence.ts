@@ -106,6 +106,9 @@ export class PresenceTracker {
   private validator?: (id: string) => Promise<boolean>;
 
   private context: PluginContext | undefined;
+  // Cache in-flight validations per document id to deduplicate concurrent
+  // validations (reduces redundant IO and CPU when many peers target the same doc).
+  private pendingValidations: Map<string, Promise<boolean>> = new Map();
 
   private cleanupTimer?: ReturnType<typeof setInterval>;
   private static readonly INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
@@ -149,11 +152,24 @@ export class PresenceTracker {
 
     // If a validator exists, validate in the background with a short timeout.
     // Do NOT await here; a slow validator must not block the realtime path.
-    if (documentId && this.validator) {
+    const validator = this.validator;
+    if (documentId && validator) {
       const timeoutMs = 100;
+
+      // Reuse any in-flight validation for this document to avoid duplicate work.
+      let pending = this.pendingValidations.get(documentId);
+      if (!pending) {
+        pending = (async () => {
+          try { return await validator(documentId); } catch (_) { return false; }
+        })();
+        // Ensure cleanup once settled.
+        pending.then(() => this.pendingValidations.delete(documentId)).catch(() => this.pendingValidations.delete(documentId));
+        this.pendingValidations.set(documentId, pending);
+      }
+
       (async () => {
         try {
-          const validatorPromise = this.validator!(documentId).catch(() => false);
+          const validatorPromise = pending!.catch(() => false);
           const ok = await Promise.race([
             validatorPromise,
             new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
@@ -231,10 +247,23 @@ export class PresenceTracker {
 
     // If there is a validator, validate the target document with a short timeout.
     // Do NOT block the realtime path for long; mirror the join() behaviour's timeout.
-    if (documentId && this.validator) {
+    const validator = this.validator;
+    if (documentId && validator) {
       const timeoutMs = 100;
+
+      // Reuse any in-flight validation for this document instead of issuing
+      // a duplicate check.
+      let pending = this.pendingValidations.get(documentId);
+      if (!pending) {
+        pending = (async () => {
+          try { return await validator(documentId); } catch (_) { return false; }
+        })();
+        pending.then(() => this.pendingValidations.delete(documentId)).catch(() => this.pendingValidations.delete(documentId));
+        this.pendingValidations.set(documentId, pending);
+      }
+
       try {
-        const validatorPromise = this.validator(documentId).catch(() => false);
+        const validatorPromise = pending!.catch(() => false);
         const ok = await Promise.race([
           validatorPromise,
           new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),

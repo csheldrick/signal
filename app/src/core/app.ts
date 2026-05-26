@@ -197,7 +197,22 @@ export class SignalApp {
         }
       },
     };
-    this.plugins = new PluginHost(pluginContext);
+    // Lazy PluginHost instantiation to reduce startup fan-out and avoid
+    // constructing the full plugin subsystem until it's actually used.
+    const createLazyHost = () => {
+      let real: PluginHost | undefined;
+      const ensure = () => {
+        if (!real) real = new PluginHost(pluginContext);
+        return real!;
+      };
+      return {
+        register(plugin: any) { ensure().register(plugin); },
+        enable(pluginId: string) { return ensure().enable(pluginId); },
+        disable(pluginId: string) { return ensure().disable(pluginId); },
+        list() { return ensure().list(); },
+      } as unknown as PluginHost;
+    };
+    this.plugins = createLazyHost();
 
     // Background summarization warm-up: schedule lightweight summarization for created/updated docs
     // to provide async job processing and warm caches (reduces remote latency on first real request).

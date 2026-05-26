@@ -22,9 +22,9 @@ export class GraphBuilder {
   private lastSignature: string | undefined;
   private cachedGraph: AdjacencyList | undefined;
 
-  constructor(private readonly listDocuments: () => DocumentSnapshot[]) {}
+  constructor(private readonly listDocuments: () => Array<Document | DocumentSnapshot>) {}
 
-  private computeSignature(docs: Document[]): string {
+  private computeSignature(docs: Array<Document | DocumentSnapshot>): string {
     // Stable short signature: id and updatedAt are sufficient to detect content changes
     return docs.map(d => `${d.id}:${d.updatedAt}`).join('|');
   }
@@ -38,19 +38,24 @@ export class GraphBuilder {
   }
 
   async buildGraph(): Promise<AdjacencyList> {
+    const docs = this.listDocuments();
+    const signature = this.computeSignature(docs as Array<Document | DocumentSnapshot>);
+    if (this.lastSignature === signature && this.cachedGraph) {
+      return this.cloneAdjacency(this.cachedGraph);
+    }
+
     const nodes = new Map<string, GraphNode>();
     const edges = new Map<string, Set<string>>();
-    const docs = this.listDocuments();
 
     for (const doc of docs) {
       nodes.set(doc.id, {
         id: doc.id,
         title: doc.title,
-        linkCount: doc.links.length,
+        linkCount: Array.isArray((doc as any).links) ? (doc as any).links.length : 0,
       });
       if (!edges.has(doc.id)) edges.set(doc.id, new Set());
 
-      for (const link of doc.links) {
+      for (const link of (doc as any).links || []) {
         edges.get(doc.id)!.add(link.targetId);
         // Ensure the referenced target exists in the nodes map so graph
         // traversals and clustering consider referenced-but-missing nodes.
@@ -63,7 +68,12 @@ export class GraphBuilder {
       }
     }
 
-    return { nodes, edges };
+    const adj: AdjacencyList = { nodes, edges };
+    // Cache a clone so subsequent identical queries return quickly without
+    // exposing internal mutable structures.
+    this.cachedGraph = this.cloneAdjacency(adj);
+    this.lastSignature = signature;
+    return adj;
   }
 
   async findClusters(): Promise<string[][]> {

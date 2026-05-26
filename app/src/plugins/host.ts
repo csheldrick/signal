@@ -68,6 +68,10 @@ export class PluginHost {
   private static readonly MAX_REGISTERED_PLUGINS = 200;
   private plugins: Map<string, Plugin> = new Map();
   private enabled: Set<string> = new Set();
+  // Shared per-event-type managers to avoid registering one upstream
+  // listener per plugin. This consolidates upstream listeners and
+  // reduces StorageEventBus fan-out under load.
+  private pluginEventManagers: Map<StorageEventType | '*', { upstreamDispose?: () => void; listeners: Set<(event: Readonly<StorageEvent>) => void> }> = new Map();
   private context: PluginContext;
 
   constructor(context: PluginContext) {
@@ -199,46 +203,80 @@ export class PluginHost {
           try {
             const maybe = (this.context as any)?.onStorageEvent;
             if (typeof maybe === 'function') {
-              // Wrap to ensure plugins receive a frozen, readonly snapshot tailored by event.type
-              const wrapped = (ev: StorageEvent) => {
-                try {
-                  switch (ev.type) {
-                    case 'created': {
-                      const d = (ev as any).document;
-                      const safe = Object.freeze({ ...ev, document: Object.freeze({ ...d, links: d.links.map((l: any) => Object.freeze({ ...l })), tags: [...d.tags] }) });
-                      listener(safe);
-                      return;
-                    }
-                    case 'updated': {
-                      const prev = (ev as any).previous; const cur = (ev as any).current;
-                      const safe = Object.freeze({ ...ev,
-                        previous: Object.freeze({ ...prev, links: prev.links.map((l: any) => Object.freeze({ ...l })), tags: [...prev.tags] }),
-                        current: Object.freeze({ ...cur, links: cur.links.map((l: any) => Object.freeze({ ...l })), tags: [...cur.tags] }),
-                      });
-                      listener(safe);
-                      return;
-                    }
-                    case 'deleted': {
-                      listener(Object.freeze({ ...ev }));
-                      return;
-                    }
-                    case 'linked': {
-                      const link = (ev as any).link;
-                      listener(Object.freeze({ ...ev, link: Object.freeze({ ...link }) }));
-                      return;
-                    }
-                    default:
-                      listener(Object.freeze(ev));
-                      return;
-                  }
-                } catch (_) {
-                  try { listener(ev as any); } catch (_) { /* swallow */ }
-                }
-              };
+              // Use a shared upstream listener per event type to avoid registering
+              // one listener per plugin on the host context, which reduces listener
+              // fan-out and helps prevent StorageEventBus overload.
+              const key = type;
+              let mgr = this.pluginEventManagers.get(key);
+              if (!mgr) {
+                mgr = { upstreamDispose: undefined, listeners: new Set() };
+                this.pluginEventManagers.set(key, mgr);
+              }
+              mgr.listeners.add(listener);
 
-              const dispose = maybe(type, wrapped);
-              if (typeof dispose === 'function') return dispose;
-              return () => { try { (this.context as any).off(type, wrapped); } catch (_) {} };
+              // Install upstream listener when first plugin subscribes for this type.
+              if (!mgr.upstreamDispose) {
+                const upstreamWrapped = (ev: StorageEvent) => {
+                  try {
+                    // Prepare a frozen snapshot tailored to the event type.
+                    let toSend: Readonly<StorageEvent> = Object.freeze(ev as any);
+                    try {
+                      switch (ev.type) {
+                        case 'created': {
+                          const d = (ev as any).document;
+                          toSend = Object.freeze({ ...ev, document: Object.freeze({ ...d, links: d.links.map((l: any) => Object.freeze({ ...l })), tags: [...d.tags] }) });
+                          break;
+                        }
+                        case 'updated': {
+                          const prev = (ev as any).previous; const cur = (ev as any).current;
+                          toSend = Object.freeze({ ...ev,
+                            previous: Object.freeze({ ...prev, links: prev.links.map((l: any) => Object.freeze({ ...l })), tags: [...prev.tags] }),
+                            current: Object.freeze({ ...cur, links: cur.links.map((l: any) => Object.freeze({ ...l })), tags: [...cur.tags] }),
+                          });
+                          break;
+                        }
+                        case 'deleted': {
+                          toSend = Object.freeze({ ...ev });
+                          break;
+                        }
+                        case 'linked': {
+                          const link = (ev as any).link;
+                          toSend = Object.freeze({ ...ev, link: Object.freeze({ ...link }) });
+                          break;
+                        }
+                        default:
+                          toSend = Object.freeze(ev as any);
+                          break;
+                      }
+                    } catch (_) { toSend = Object.freeze(ev as any); }
+
+                    for (const fn of Array.from(mgr!.listeners)) {
+                      try { fn(toSend); } catch (_) { /* swallow */ }
+                    }
+                  } catch (_) { /* swallow */ }
+                };
+
+                const dispose = maybe(type, upstreamWrapped);
+                if (typeof dispose === 'function') {
+                  mgr.upstreamDispose = dispose;
+                } else {
+                  mgr.upstreamDispose = () => { try { (this.context as any).off(type, upstreamWrapped); } catch (_) {} };
+                }
+              }
+
+              // Return a disposer that removes this plugin listener and tears down upstream when empty.
+              return () => {
+                try {
+                  const m = this.pluginEventManagers.get(key);
+                  if (m) {
+                    m.listeners.delete(listener);
+                    if (m.listeners.size === 0) {
+                      try { m.upstreamDispose && m.upstreamDispose(); } catch (_) {}
+                      this.pluginEventManagers.delete(key);
+                    }
+                  }
+                } catch (_) { /* swallow */ }
+              };
             }
           } catch (_) { /* ignore */ }
           return () => {};
