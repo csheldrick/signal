@@ -64,6 +64,8 @@ export interface StorageEventBusContract {
   emitAsync(event: StorageEvent): void;
   attachDocumentValidatorFromEvents(initial?: Iterable<string>): (id: string) => Promise<boolean> & { dispose?: () => void };
   attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean & { dispose?: () => void };
+  /** Return a snapshot of recently emitted storage events for diagnostics */
+  getTrace(): ReadonlyArray<StorageEvent>;
 }
 
 // deprecated alias removed to reduce legacy surface area
@@ -73,6 +75,7 @@ export class StorageEventBus implements StorageEventBusContract {
   private asyncQueue: StorageEvent[] = [];
   private asyncScheduled: boolean = false;
   private trace: StorageEvent[] = [];
+  getTrace(): ReadonlyArray<StorageEvent> { try { return this.trace.slice(); } catch (_) { return []; } }
   // Async listeners are intended for consumers that must not run synchronously
   // on the emitter's call path (e.g. plugins, background summarizers, session
   // lifecycle observers). They are invoked in microtasks/macrotasks depending

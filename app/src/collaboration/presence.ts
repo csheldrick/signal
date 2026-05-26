@@ -247,6 +247,17 @@ export class PresenceTracker {
     this.evictIfNeeded();
     this.peers.set(peerId, presence);
 
+    // Best-effort, non-blocking observable lifecycle event so other subsystems
+    // can react to joins without importing PresenceTracker internals.
+    try {
+      const bus = getSignalStorageEventBus();
+      if (bus && typeof (bus as any).emitAsync === 'function') {
+        try { (bus as any).emitAsync({ type: 'presence_joined', peerId, documentId, timestamp: Date.now() } as any); } catch (_) { /* swallow */ }
+      } else if (bus && typeof (bus as any).emit === 'function') {
+        try { (bus as any).emit({ type: 'presence_joined', peerId, documentId, timestamp: Date.now() } as any); } catch (_) { /* swallow */ }
+      }
+    } catch (_) { /* swallow */ }
+
     // Notify an attached session tracker that a session has opened or been
     // (re-)activated. Provide an initial clock snapshot when available from
     // the sandboxed PluginContext so session owners can record vector-clock
@@ -399,7 +410,20 @@ export class PresenceTracker {
       // avoid deleting a fresh record created after this leave() began.
       const current = this.peers.get(peerId);
       if (current && current.seq === existing.seq && current.peerId === existing.peerId) {
-        this.peers.delete(peerId);
+        try {
+      this.peers.delete(peerId);
+    } catch (_) { /* swallow */ }
+
+    // Best-effort, non-blocking observable lifecycle event so other subsystems
+    // can react to leaves without importing PresenceTracker internals.
+    try {
+      const bus = getSignalStorageEventBus();
+      if (bus && typeof (bus as any).emitAsync === 'function') {
+        try { (bus as any).emitAsync({ type: 'presence_left', peerId, documentId: existing.documentId, timestamp: Date.now() } as any); } catch (_) { /* swallow */ }
+      } else if (bus && typeof (bus as any).emit === 'function') {
+        try { (bus as any).emit({ type: 'presence_left', peerId, documentId: existing.documentId, timestamp: Date.now() } as any); } catch (_) { /* swallow */ }
+      }
+    } catch (_) { /* swallow */ }
       }
     }
   }

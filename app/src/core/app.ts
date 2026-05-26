@@ -131,7 +131,17 @@ export class SignalApp {
           // Prefer the active SyncEngine clock when available so plugins receive
           // a meaningful view of the current vector clock. Return a shallow
           // copy to avoid exposing internal mutable state.
-          const maybeSync = (this as any)._sync;
+          const maybeSync = (() => {
+            try {
+              // Prefer a canonical engine published on the store (if present)
+              // to avoid accidental duplicate SyncEngine instances and to
+              // centralize engine registration. Fall back to the app-local
+              // _sync only if the store does not expose a registered engine.
+              const fromStore = (this.store && typeof (this.store as any).getSyncEngine === 'function') ? (this.store as any).getSyncEngine() : undefined;
+              if (fromStore && typeof fromStore.getClock === 'function') return fromStore;
+            } catch (_) { /* swallow */ }
+            try { return (this as any)._sync; } catch (_) { return undefined; }
+          })();
           if (maybeSync && typeof maybeSync.getClock === 'function') {
             try {
               const c = maybeSync.getClock();
