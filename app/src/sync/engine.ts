@@ -154,7 +154,7 @@ export class SyncEngine {
       }
       case 'delete':
         return this.store.delete(message.documentId);
-      case 'linked': {
+      case 'link': {
         // Attempt to apply a logical link. Many store implementations may
         // not support an explicit link API; call it if present and return
         // a boolean-ish success indicator. Be defensive and avoid throwing
@@ -261,7 +261,7 @@ export class SyncEngine {
         const docId = link.targetId ?? link.sourceId ?? link.documentId ?? '';
         message = ({
           messageId: makeMessageId(docId),
-          operation: 'linked',
+          operation: 'link',
           documentId: docId,
           payload: {
             link: {

@@ -273,34 +273,70 @@ export class DocumentStore {
     // Persist documents along with the mutation log and sequence metadata so
     // OfflineSyncQueue / other consumers can durably store buffered mutations
     // in the same backend and resume with deterministic ordering on restart.
+    // Implement atomic write-then-rename with rotation to retain at least two
+    // recent snapshots. The write work is scheduled off the immediate caller
+    // path to avoid blocking live write paths.
     const payload = {
       documents: Array.from(this.documents.values()),
       mutationLog: this.mutationLog,
       seqCounter: this.seqCounter,
       appliedMutationIds: Array.from(this.appliedMutationIds),
     };
-    try {
-      // Schedule the potentially-heavy filesystem write off the immediate
-      // caller path to avoid blocking the event loop in hot paths. Provide
-      // a synchronous fallback to preserve durability if scheduling is
-      // unavailable.
+
+    const data = JSON.stringify(payload, null, 2);
+
+    const writeWork = () => {
       try {
-        setImmediate(() => {
-          try {
-            writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
-          } catch (_) { /* swallow secondary write errors */ }
-        });
-      } catch (_) {
-        // setImmediate might not be available in some environments; fall
-        // back to synchronous write.
+        // Use require here so we don't need to change module-level imports.
+        const fs = require('node:fs');
+        const path = require('node:path');
+
+        const tmpPath = `${filePath}.tmp`;
+        const prev1 = `${filePath}.prev`;
+        const prev2 = `${filePath}.prev2`;
+
         try {
-          writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
-        } catch (_) { /* swallow */ }
+          // Rotate previous snapshots: prev1 -> prev2, current -> prev1
+          if (fs.existsSync(prev1)) {
+            try { fs.renameSync(prev1, prev2); } catch (_) { /* best-effort */ }
+          }
+          if (fs.existsSync(filePath)) {
+            try { fs.renameSync(filePath, prev1); } catch (_) { /* best-effort */ }
+          }
+        } catch (_) {
+          // Rotation best-effort — do not fail the write if rotation fails.
+        }
+
+        try {
+          // Write to a temporary file first then atomically rename into place.
+          fs.writeFileSync(tmpPath, data, 'utf-8');
+        } catch (e) {
+          // If writing the temp file fails, attempt a direct write as last resort.
+          try { fs.writeFileSync(filePath, data, 'utf-8'); } catch (_) { /* swallow to avoid crashing host */ }
+          return;
+        }
+
+        try {
+          fs.renameSync(tmpPath, filePath);
+        } catch (e) {
+          // If rename fails, attempt to copy and then unlink tmp to leave a
+          // best-effort durable state.
+          try {
+            try { fs.copyFileSync(tmpPath, filePath); } catch (_) { /* swallow */ }
+            try { fs.unlinkSync(tmpPath); } catch (_) { /* swallow */ }
+          } catch (_) { /* swallow all */ }
+        }
+      } catch (_) {
+        // Swallow filesystem-related errors to avoid crashing the host process.
       }
+    };
+
+    // Schedule the write off the immediate caller path, falling back to
+    // synchronous execution if scheduling primitives are unavailable.
+    try {
+      setImmediate(writeWork);
     } catch (_) {
-      // As a last resort, attempt a synchronous write and swallow failures to
-      // avoid crashing the host process from save() calls.
-      try { writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8'); } catch (_) { /* swallow */ }
+      try { writeWork(); } catch (_) { /* swallow */ }
     }
   }
 
@@ -389,6 +425,19 @@ export class DocumentStore {
     this.seqCounter += 1;
     const entry = { seq: this.seqCounter, id: mutationId, op, payload };
     this.mutationLog.push(entry);
+
+    // Best-effort: if a host configures a persistent store filepath via the
+    // global __SIGNAL_STORE_FILEPATH we attempt to flush the store to disk
+    // immediately so buffered mutations are durable across process restarts.
+    // This keeps the API backwards-compatible while improving offline durability
+    // in deployments that opt-in to a file-backed store.
+    try {
+      const configured = (globalThis as any).__SIGNAL_STORE_FILEPATH;
+      if (typeof configured === 'string' && configured.length > 0) {
+        try { this.save(configured); } catch (_) { /* swallow persistence errors */ }
+      }
+    } catch (_) { /* swallow */ }
+
     return entry.seq;
   }
 
