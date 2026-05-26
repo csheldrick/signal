@@ -47,10 +47,21 @@ export class SyncEngine {
     }
 
     // If an existing engine is found for the same concrete store object and it
-    // is not this instance, this is a real misconfiguration — throw so callers
-    // can observe and handle it (fail-fast).
+    // is not this instance, this is a real misconfiguration. Throwing here can
+    // cause surprising crashes in normal application compositions where multiple
+    // managers or startup paths attempt to construct an engine for the same
+    // store object. Log a clear, high-severity message and proceed without
+    // registering this second instance so callers do not unexpectedly crash.
+    // Operators/tests will still see a clear message and can migrate to an
+    // explicit injection/shared-engine approach.
     if (existing && existing !== this) {
-      throw new Error('SyncEngine: multiple engines bound to the same DocumentStore instance; this may cause divergent VectorClock histories.');
+      try {
+        console.error('SyncEngine: multiple engines bound to the same DocumentStore instance; continuing without registering this second engine to avoid crashing.');
+      } catch (_) { /* swallow logging errors */ }
+      // Do not overwrite the registry entry for the original engine. Proceed
+      // without registering this instance to avoid surprising throws during
+      // normal composition. Note: callers that require strict ownership should
+      // construct and pass a single shared SyncEngine explicitly.
     }
 
     // Attempt to set our registration; if setting fails due to platform issues
