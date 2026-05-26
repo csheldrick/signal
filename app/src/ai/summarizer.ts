@@ -77,6 +77,13 @@ export class RemoteSummarizer implements Summarizer {
   private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
   private static readonly MAX_PENDING_ENTRIES = 50;
 
+  // Global concurrency control: limit the number of simultaneous remote
+  // summarization requests across all RemoteSummarizer instances. When the
+  // global cap is reached we immediately return a local summary to avoid
+  // overloading the remote service and downstream subsystems.
+  private static globalActiveRequests: number = 0;
+  private static readonly GLOBAL_MAX_CONCURRENT = 6;
+
   private static getPending(id: string): Promise<string> | undefined {
     const entry = RemoteSummarizer.pending.get(id);
     if (!entry) return undefined;
@@ -224,10 +231,27 @@ export class RemoteSummarizer implements Summarizer {
     // Encapsulate the remote attempt so we can register it in the pending map
     const op = (async (): Promise<string> => {
       try {
-        const result = await Promise.race([
-          this.fetcher(document, { authToken: this.authToken }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
-        ]);
+        let result: string;
+        try {
+          // If the global concurrency cap is reached, avoid starting another
+          // remote request — treat this as a transient overload and return a
+          // safe local summary instead. This prevents many different documents
+          // from creating an unbounded number of simultaneous remote calls.
+          if (RemoteSummarizer.globalActiveRequests >= RemoteSummarizer.GLOBAL_MAX_CONCURRENT) {
+            this.recordFailure();
+            return this.fallback.summarize(document);
+          }
+
+          RemoteSummarizer.globalActiveRequests++;
+
+          result = await Promise.race([
+            this.fetcher(document, { authToken: this.authToken }),
+            new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
+          ]);
+        } finally {
+          // Ensure the global active counter is decremented even on timeout/failure.
+          try { RemoteSummarizer.globalActiveRequests = Math.max(0, RemoteSummarizer.globalActiveRequests - 1); } catch (_) { RemoteSummarizer.globalActiveRequests = 0; }
+        }
 
         if (typeof result !== 'string' || result.length === 0) {
           // Treat invalid/empty responses as failures

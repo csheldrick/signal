@@ -32,6 +32,60 @@ function cloneDocument(d: import('../core/types.js').Document): import('../core/
 export const SYM_SYNC_ENGINE = Symbol('signal:sync-engine');
 
 export class DocumentStore {
+  // Event batching queue to smooth spikes of StorageEventBus emissions.
+  // Many parts of the system (indexer, graph builder, plugins) attach
+  // listeners to the StorageEventBus; emitting thousands of events in a
+  // tight loop can overload those subsystems. We buffer events locally and
+  // flush them in bounded-size batches using the macrotask queue.
+  private _eventQueue: any[] = [];
+  private _eventFlushScheduled: boolean = false;
+  private static readonly _EVENT_MAX_FLUSH = 50; // max events per flush
+  private static readonly _EVENT_MAX_QUEUE = 1000; // max queued events (drop oldest beyond this)
+
+  private emitAsyncEvent(ev: any): void {
+    try {
+      if (!Array.isArray(this._eventQueue)) this._eventQueue = [];
+      // Bound the queue to avoid unbounded memory growth during sustained
+      // bursts; drop oldest entries if necessary to keep memory bounded.
+      try {
+        if (this._eventQueue.length >= DocumentStore._EVENT_MAX_QUEUE) {
+          // drop oldest to make room
+          this._eventQueue.shift();
+        }
+      } catch (_) { /* swallow */ }
+
+      this._eventQueue.push(ev);
+
+      if (this._eventFlushScheduled) return;
+      this._eventFlushScheduled = true;
+
+      const flush = () => {
+        try {
+          this._eventFlushScheduled = false;
+          const toSend = this._eventQueue.splice(0, DocumentStore._EVENT_MAX_FLUSH);
+          for (const e of toSend) {
+            try {
+              if (this.events && typeof (this.events as any).emitAsync === 'function') {
+                try { (this.events as any).emitAsync(e); } catch (_) { try { (this.events as any).emit(e); } catch (_) { /* swallow */ } }
+              } else if (this.events && typeof (this.events as any).emit === 'function') {
+                try { (this.events as any).emit(e); } catch (_) { /* swallow */ }
+              }
+            } catch (_) { /* swallow per-event errors */ }
+          }
+        } catch (_) { /* swallow flush errors */ }
+
+        // If queue still has items, schedule another flush to avoid monopolizing
+        // a single macrotask while still smoothing bursts across multiple ticks.
+        try {
+          if (this._eventQueue.length > 0) {
+            try { setImmediate(flush); } catch (_) { setTimeout(flush, 0); }
+          }
+        } catch (_) { /* swallow scheduling errors */ }
+      };
+
+      try { setImmediate(flush); } catch (_) { setTimeout(flush, 0); }
+    } catch (_) { /* swallow overall errors to avoid breaking callers */ }
+  }
   private static _instances = 0;
 
   private documents: Map<string, Document> = new Map();
@@ -121,7 +175,7 @@ export class DocumentStore {
     const stored = cloneDocument(doc);
     this.documents.set(id, stored);
     this.opCounts.create++;
-    this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(stored), timestamp: now });
+    this.emitAsyncEvent({ type: 'created', document: createDocumentSnapshot(stored), timestamp: now });
     return cloneDocument(stored);
   }
 
@@ -185,7 +239,7 @@ export class DocumentStore {
         // Use async emit for the cascade of per-document updates caused by a
         // delete to avoid syncing large numbers of listeners synchronously and
         // creating huge realtime bursts (e.g. graph/index rebuilds).
-        this.events.emitAsync({
+        this.emitAsyncEvent({
           type: 'updated',
           documentId: c.current.id,
           previous: createDocumentSnapshot(c.previous),
@@ -197,7 +251,7 @@ export class DocumentStore {
       this.opCounts.delete++;
       // Emit deletion asynchronously to avoid immediate heavy downstream processing
       // that can cause subsystem overload when many listeners are registered.
-      this.events.emitAsync({ type: 'deleted', documentId: id, timestamp: Date.now() });
+      this.emitAsyncEvent({ type: 'deleted', documentId: id, timestamp: Date.now() });
     }
     return existed;
   }
@@ -222,9 +276,9 @@ export class DocumentStore {
     // Emit both a linked event and a corresponding updated event for consumers
     // that observe document mutations via 'updated' events.
     this.opCounts.link++;
-    this.events.emitAsync({ type: 'linked', link: { ...link }, timestamp: Date.now() });
+    this.emitAsyncEvent({ type: 'linked', link: { ...link }, timestamp: Date.now() });
     this.opCounts.update++;
-    this.events.emitAsync({
+    this.emitAsyncEvent({
       type: 'updated',
       documentId: sourceId,
       previous: createDocumentSnapshot(previous),
