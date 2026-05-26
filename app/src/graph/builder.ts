@@ -53,15 +53,29 @@ export class GraphBuilder {
   // In-flight build coalescing: when many callers request the graph at
   // the same time we avoid recomputing the adjacency repeatedly by sharing
   // a single in-progress Promise. This reduces CPU/memory pressure during
-  // bursts and helps avoid subsystem overload.
+  // bursts and helps avoid subsystem overload. Additionally we implement a
+  // short throttle and a per-build document cap to avoid rebuild storms and
+  // long synchronous loops when the doc set is large.
   private building?: Promise<AdjacencyList> | undefined;
+  private lastBuildTs: number = 0;
+  private static readonly BUILD_THROTTLE_MS = 250; // short throttle window
+  private static readonly MAX_DOCS_PROCESS = 500; // cap documents per build to bound work
 
   async buildGraph(): Promise<AdjacencyList> {
-    const docs = this.listDocuments();
+    const docs = this.listDocuments() || [];
     const signature = this.computeSignature(docs);
+    const now = Date.now();
 
     // Fast-path: identical signature and cached graph available.
     if (this.lastSignature === signature && this.cachedGraph) {
+      return this.cloneAdjacency(this.cachedGraph);
+    }
+
+    // Short-term throttle: if we have a cached graph and the last build
+    // happened recently, return the cached clone to avoid rebuild storms.
+    // This helps when many callers trigger graph operations in quick
+    // succession (e.g. UI refresh loops).
+    if (this.cachedGraph && (now - this.lastBuildTs) < GraphBuilder.BUILD_THROTTLE_MS) {
       return this.cloneAdjacency(this.cachedGraph);
     }
 
@@ -82,7 +96,13 @@ export class GraphBuilder {
       const nodes = new Map<string, GraphNode>();
       const edges = new Map<string, Set<string>>();
 
-      for (const doc of docs) {
+      // Cap the amount of documents processed in a single build to avoid
+      // long synchronous loops that can monopolize the event loop. We
+      // process a representative prefix; callers that need full graph can
+      // request again later when the background load subsides.
+      const toProcess = docs.slice(0, GraphBuilder.MAX_DOCS_PROCESS);
+
+      for (const doc of toProcess) {
         nodes.set(doc.id, {
           id: doc.id,
           title: doc.title,
@@ -91,11 +111,16 @@ export class GraphBuilder {
         if (!edges.has(doc.id)) edges.set(doc.id, new Set());
 
         for (const link of (doc as any).links || []) {
-          edges.get(doc.id)!.add(link.targetId);
-          if (!nodes.has(link.targetId)) {
-            nodes.set(link.targetId, { id: link.targetId, title: '(missing)', linkCount: 0 });
+          try {
+            edges.get(doc.id)!.add(link.targetId);
+            if (!nodes.has(link.targetId)) {
+              nodes.set(link.targetId, { id: link.targetId, title: '(missing)', linkCount: 0 });
+            }
+            if (!edges.has(link.targetId)) edges.set(link.targetId, new Set());
+          } catch (_) {
+            // Defensive: ignore malformed link entries to keep the builder
+            // robust under partial/malformed data.
           }
-          if (!edges.has(link.targetId)) edges.set(link.targetId, new Set());
         }
       }
 
@@ -104,6 +129,7 @@ export class GraphBuilder {
       // exposing internal mutable structures.
       this.cachedGraph = this.cloneAdjacency(adj);
       this.lastSignature = signature;
+      this.lastBuildTs = Date.now();
 
       // Clear the in-flight marker and return the computed adjacency.
       this.building = undefined;

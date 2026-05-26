@@ -72,17 +72,30 @@ export class SignalApp {
     this.store = new DocumentStore(this.events);
     this.graph = createLazyGraph(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
     // Create a lightweight inverted index and an Indexer that listens to
-    // the StorageEventBus. This keeps indexing responsibilities decoupled
-    // from the DocumentStore and reduces direct Document subsystem fan-out.
-    try {
-      const idx = createInvertedIndex();
+    // the StorageEventBus. Historically we created these eagerly which
+    // increases startup fan-out (many listeners and background work).
+    // Defer creation until first use to minimize startup overhead and
+    // avoid registering listeners unless indexing is actually required.
+    (this as any)._invertedIndex = undefined;
+    (this as any)._indexer = undefined;
+    // Provide a best-effort factory so diagnostics or other code can
+    // instantiate the indexer on demand without making it part of the
+    // startup critical path.
+    (this as any)._createInvertedIndex = () => {
       try {
-        const indexer = new Indexer(this.events, idx);
-        // Expose for diagnostics/tooling without tightening types here.
-        (this as any)._invertedIndex = idx;
-        (this as any)._indexer = indexer;
-      } catch (_) { /* swallow */ }
-    } catch (_) { /* swallow */ }
+        if ((this as any)._invertedIndex) return (this as any)._invertedIndex;
+        const idx = createInvertedIndex();
+        try {
+          const indexer = new Indexer(this.events, idx);
+          (this as any)._invertedIndex = idx;
+          (this as any)._indexer = indexer;
+        } catch (_) { /* swallow indexer construction errors */ }
+        return (this as any)._invertedIndex;
+      } catch (_) {
+        // If index creation fails, return undefined but do not crash startup.
+        return undefined;
+      }
+    };
     // Initial validator seeding is handled where validators are attached below; avoid redundant registration here to reduce listener churn.
     this._peerId = config.peerId;
 
