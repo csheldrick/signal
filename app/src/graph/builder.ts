@@ -2,7 +2,7 @@
 // Builds a traversable graph from document links.
 // Imports from core/types and storage — creates cross-module edges.
 
-import type { DocumentSnapshot, DocumentLink } from '../core/types.js';
+import type { DocumentSnapshot, Document } from '../core/types.js';
 
 
 export interface GraphNode {

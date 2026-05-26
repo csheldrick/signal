@@ -2,7 +2,7 @@
 // Plugin lifecycle manager. Defines the sandbox boundary.
 // Plugins receive a PluginContext — NOT the store directly.
 
-import type { DocumentSnapshot, SearchQuery, SearchResultSnapshot } from '../core/types.js';
+import type { DocumentSnapshot, SearchQuery, SearchResult, SearchResultSnapshot } from '../core/types.js';
 import type { StorageEvent, StorageEventType } from '../storage/events.js';
 
 export type { SearchQuery } from '../core/types.js';
@@ -125,7 +125,7 @@ export class PluginHost {
             } catch (_) {
               return undefined;
             }
-          }).filter((x): x is Readonly<Document> => !!x);
+          }).filter((x): x is Readonly<DocumentSnapshot> => !!x);
         },
         searchDocuments: (q: SearchQuery) => {
           try {
