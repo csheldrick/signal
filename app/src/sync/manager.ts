@@ -13,6 +13,7 @@ import type { StorageEvent } from '../storage/events.js';
 import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
 import { SyncQueue } from './queue.js';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
 import { isConflict, resolveConflict } from './conflict.js';
 import type { ConflictRecord } from './protocol.js';
@@ -29,11 +30,17 @@ export interface SyncManagerOptions {
   flushIntervalMs?: number;
   /** Optional externally-provided SyncEngine instance to avoid duplicate engine creation. */
   engine?: SyncEngine;
+  /** Optional external session tracker so PresenceTracker and SyncManager can share authoritative sessions. */
+  sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
+  /** Optional snapshot service to compact vector clocks and expose snapshot hooks. */
+  snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
 }
 
 export class SyncManager {
   private readonly engine: SyncEngine;
   private readonly queue: SyncQueue;
+  private readonly sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
+  private readonly snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
   private readonly sessions: Map<string, PeerSession> = new Map();
   private readonly conflictLog: ConflictRecord[] = [];
   private readonly conflictStrategy: ConflictStrategy;
@@ -50,8 +57,27 @@ export class SyncManager {
     this.peerId = opts.peerId;
     this.conflictStrategy = opts.conflictStrategy ?? 'last-write-wins';
 
-    this.engine = opts.engine ?? new SyncEngine(store, opts.peerId);
+    // Reuse an existing engine attached to the store when possible to avoid
+    // creating duplicate SyncEngine instances that would lead to divergent
+    // VectorClock histories. Cache the engine on the store under a non-enumerable
+    // property name to keep it private.
+    const ENGINE_KEY = '__signal_sync_engine__';
+    if (opts.engine) {
+      this.engine = opts.engine;
+    } else {
+      const cached = (store as any)[ENGINE_KEY] as SyncEngine | undefined;
+      if (cached) {
+        this.engine = cached;
+      } else {
+        const created = new SyncEngine(store, opts.peerId);
+        try { Object.defineProperty(store, ENGINE_KEY, { value: created, enumerable: false, configurable: true }); } catch (_) { (store as any)[ENGINE_KEY] = created; }
+        this.engine = created;
+      }
+    }
     this.queue = new SyncQueue();
+    // Attach optional external hooks (readonly assignment allowed in constructor)
+    this.sessionTracker = opts.sessionTracker;
+    this.snapshotService = opts.snapshotService;
 
     // Outbound generation is driven by the SyncEngine. Rather than subscribing
     // directly to store.events and enqueueing immediately (which can cause
@@ -91,6 +117,7 @@ export class SyncManager {
     const session = new PeerSession(peerId, initialClock);
     session.onConnected();
     this.sessions.set(peerId, session);
+    try { this.sessionTracker?.openSession(peerId, initialClock); } catch (_) {}
     return session;
   }
 
@@ -99,6 +126,7 @@ export class SyncManager {
     if (session) {
       session.onDisconnected();
       this.sessions.delete(peerId);
+      try { this.sessionTracker?.closeSession(peerId); } catch (_) {}
     }
   }
 
@@ -213,6 +241,19 @@ export class SyncManager {
             // Convert rejection to a handled telemetry emission so a single failure
             // does not throw from flush; queue.enqueue already enforces semantics.
             try { this.emitTelemetry('queue_enqueue_failed', { message: prepared, error: err }); } catch (_) {}
+
+            // Persist the prepared message to a per-peer offline file so it can be
+            // recovered across restarts. This conservative fallback reduces the
+            // immediate data-loss surface when enqueues fail (e.g. transient disk/queue errors).
+            try {
+              const path = `.signal_offline_${this.peerId}.json`;
+              let arr: any[] = [];
+              if (existsSync(path)) {
+                try { arr = JSON.parse(readFileSync(path, 'utf-8') || '[]'); } catch (_) { arr = []; }
+              }
+              arr.push(prepared);
+              try { writeFileSync(path, JSON.stringify(arr), 'utf-8'); } catch (_) {}
+            } catch (_) {}
           }),
         );
       }
@@ -304,7 +345,13 @@ export class SyncManager {
   }
 
   getClock(): VectorClock {
-    return this.engine.getClock();
+    const clock = this.engine.getClock();
+    try {
+      if (this.snapshotService && typeof this.snapshotService.compactClock === 'function') {
+        return this.snapshotService.compactClock(clock);
+      }
+    } catch (_) { /* swallow */ }
+    return clock;
   }
 
   getQueueSize(): number {

@@ -53,7 +53,17 @@ export class DocumentStore {
       console.warn('Multiple DocumentStore instances detected; this may lead to divergent state. Prefer a single shared instance.');
     }
 
-    this.events = events ?? new StorageEventBus();
+        // Validate the provided events bus to avoid silent disconnection of
+    // downstream event-driven subsystems (indexes, graph builders, etc.).
+    const isValidBus = (e: any): e is StorageEventBus =>
+      e && typeof e.emit === 'function' && typeof e.emitAsync === 'function' && typeof e.on === 'function' && typeof e.off === 'function';
+
+    if (events && !isValidBus(events)) {
+      try { console.warn('DocumentStore: provided events object is invalid; creating a new StorageEventBus to avoid index staleness.'); } catch (_) {}
+      this.events = new StorageEventBus();
+    } else {
+      this.events = events ?? new StorageEventBus();
+    }
   }
 
   create(id: string, title: string, content: string, tags: string[] = []): Document {

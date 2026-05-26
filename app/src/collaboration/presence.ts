@@ -114,6 +114,16 @@ export class PresenceTracker {
     // decoupled from the store and enable sandboxed document access.
     this.context = context;
   }
+
+  /**
+   * Allow wiring a SyncSessionTracker so PresenceTracker and SyncManager can
+   * share an authoritative session view. This is optional and uses any-typed
+   * tracker to avoid tight coupling; only the lifecycle methods used are
+   * invoked if present.
+   */
+  setSessionTracker(tracker?: { openSession?: (id: string, clock?: any) => void; closeSession?: (id: string) => void; list?: () => any[] }): void {
+    try { (this as any).sessionTracker = tracker; } catch (_) { /* swallow */ }
+  }
   // Cache in-flight validations per document id to deduplicate concurrent
   // validations (reduces redundant IO and CPU when many peers target the same doc).
   private pendingValidations: Map<string, Promise<boolean>> = new Map();
