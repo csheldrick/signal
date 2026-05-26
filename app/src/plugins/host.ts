@@ -320,7 +320,7 @@ export class PluginHost {
           return () => {};
         },
 
-        summarizeDocument: async (documentId: string, allowNetwork?: boolean) => {
+        summarizeDocument: async (documentId: string, allowNetwork: boolean = false) => {
           try {
             const maybe = (this.context as any)?.summarizeDocument;
             if (typeof maybe === 'function') {
