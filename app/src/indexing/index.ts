@@ -56,21 +56,56 @@ export class InvertedIndex {
     this.totalTerms += termSet.size;
     this.statsDirty = true;
 
+    // To avoid long synchronous CPU bursts when indexing extremely large
+    // term sets, process an initial slice synchronously and schedule the
+    // remainder asynchronously. This bounds per-document synchronous work
+    // and reduces event-loop stalls under heavy ingestion.
+    const SYNC_TERM_THRESHOLD = 500;
+    let syncProcessed = 0;
+    const remaining: string[] = [];
+
     for (const term of termSet) {
-      let list = this.posting.get(term);
-      if (!list) {
-        list = new Set<string>();
-        this.posting.set(term, list);
-      }
-      // Respect a safety cap on per-term posting list size to avoid
-      // pathological memory growth caused by extremely common terms.
-      if (list.size < InvertedIndex.MAX_DOCS_PER_TERM) {
-        list.add(documentId);
+      if (syncProcessed < SYNC_TERM_THRESHOLD) {
+        let list = this.posting.get(term);
+        if (!list) {
+          list = new Set<string>();
+          this.posting.set(term, list);
+        }
+        if (list.size < InvertedIndex.MAX_DOCS_PER_TERM) {
+          list.add(documentId);
+        }
+        syncProcessed++;
       } else {
-        // Skip adding to extremely large term posting lists. This keeps
-        // indexing bounded; very common terms will still be searchable but
-        // won't grow without bound. Do not throw — indexing should remain
-        // tolerant under load.
+        remaining.push(term);
+      }
+    }
+
+    if (remaining.length > 0) {
+      const doRemaining = () => {
+        try {
+          for (const term of remaining) {
+            let list = this.posting.get(term);
+            if (!list) {
+              list = new Set<string>();
+              this.posting.set(term, list);
+            }
+            if (list.size < InvertedIndex.MAX_DOCS_PER_TERM) {
+              list.add(documentId);
+            }
+          }
+          // Mark cached stats dirty because we mutated posting lists asynchronously
+          this.statsDirty = true;
+        } catch (_) { /* swallow to keep indexing tolerant */ }
+      };
+
+      try {
+        if (typeof (globalThis as any).setImmediate === 'function') {
+          (globalThis as any).setImmediate(doRemaining);
+        } else {
+          setTimeout(doRemaining, 0);
+        }
+      } catch (_) {
+        try { setTimeout(doRemaining, 0); } catch (_) { /* swallow */ }
       }
     }
   }

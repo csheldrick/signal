@@ -33,31 +33,41 @@ export class ExportPlugin implements Plugin {
 
     try {
       const all = this.context.listDocuments();
-      const MAX_EXPORT = 100;
-      let docs = all;
-      let truncatedNote = '';
-      if (all.length > MAX_EXPORT) {
-        docs = all.slice(0, MAX_EXPORT);
-        truncatedNote = `\n\n[Export truncated: ${all.length} documents, included first ${MAX_EXPORT}]\n`;
-      }
-      const docsTransformed = docs.map(d => ({
-        ...d,
-        links: Array.isArray((d as any).links) ? (d as any).links.map((l: any) => ({ ...l })) : [],
-        tags: Array.isArray((d as any).tags) ? [...(d as any).tags] : [],
-      }));
+      const MAX_EXPORT = 100; // hard cap for exported documents
+      const CONTENT_MAX = 10_000; // cap per-document content size to limit memory
+
+      const total = Array.isArray(all) ? all.length : 0;
+      const docs = Array.isArray(all) ? all.slice(0, MAX_EXPORT) : [];
+      const truncatedNote = total > MAX_EXPORT ? `\n\n[Export truncated: ${total} documents, included first ${MAX_EXPORT}]\n` : '';
+
       const lines: string[] = [];
 
-      for (const doc of docsTransformed) {
-        lines.push(`# ${doc.title}`);
-        lines.push('');
-        lines.push(doc.content);
-        if (doc.tags.length > 0) {
+      for (const d of docs) {
+        try {
+          const title = typeof (d as any).title === 'string' ? (d as any).title : '';
+          let content = typeof (d as any).content === 'string' ? (d as any).content : '';
+          if (content.length > CONTENT_MAX) {
+            content = content.slice(0, CONTENT_MAX) + '\n\n[content truncated]';
+          }
+
+          const tagsArr = Array.isArray((d as any).tags) ? (d as any).tags.filter((t: any) => typeof t === 'string').slice(0, 10) : [];
+
+          lines.push(`# ${title}`);
           lines.push('');
-          lines.push(`Tags: ${doc.tags.join(', ')}`);
+          lines.push(content);
+
+          if (tagsArr.length > 0) {
+            lines.push('');
+            lines.push(`Tags: ${tagsArr.join(', ')}`);
+          }
+
+          lines.push('');
+          lines.push('---');
+          lines.push('');
+        } catch (_) {
+          // If transforming a single doc fails, skip it but continue the export.
+          continue;
         }
-        lines.push('');
-        lines.push('---');
-        lines.push('');
       }
 
       if (truncatedNote) lines.push(truncatedNote);

@@ -284,20 +284,52 @@ export class SignalApp {
         (!!getDisableBgSummarize()) ||
         this._disableBgSummarize;
       if (disabled) return;
+      if (!docId) return;
 
+      // Per-doc timers map (shared on the instance). _bgSummarizeTimers was already created above.
       const timers: Map<string, ReturnType<typeof setTimeout>> = (this as any)._bgSummarizeTimers;
       const prev = timers.get(docId);
       if (prev) clearTimeout(prev);
+
+      // Maintain a lightweight per-doc last-summarized timestamp to avoid
+      // repeated background summarization for the same document in quick
+      // succession which can create a resonance loop under high update rates.
+      const lastMap: Map<string, number> = ((this as any)._bgSummarizeLast as Map<string, number>) || new Map();
+      (this as any)._bgSummarizeLast = lastMap;
+      const MIN_INTERVAL_MS = 5_000; // do not summarize the same doc more frequently than this
+      const now = Date.now();
+      const last = lastMap.get(docId) ?? 0;
+
+      // If we've summarized recently, avoid scheduling an immediate heavy run.
+      // Instead, put a short placeholder timer to clear previous scheduling and
+      // avoid building up timer churn. This prevents a cascade where background
+      // summarization triggers more storage events that re-schedule it.
+      if (now - last < MIN_INTERVAL_MS) {
+        // keep a short, cheap timer to collapse repeated triggers without doing work
+        const shortT = setTimeout(() => { try { timers.delete(docId); } catch (_) {} }, 750);
+        timers.set(docId, shortT);
+        return;
+      }
+
       const t = setTimeout(async () => {
         timers.delete(docId);
         try {
           const doc = this.store.read(docId);
           if (!doc) return;
           const s = this._localSummarizer;
-          await s.summarize(doc);
-          try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
+          // Run summary and record that we did so; swallowing errors to avoid
+          // affecting the event loop or the caller that triggered the event.
+          try {
+            await s.summarize(doc);
+            lastMap.set(docId, Date.now());
+            try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
+          } catch (_) {
+            // On summarize failure, do not update lastMap so a future attempt
+            // can retry after MIN_INTERVAL_MS; swallow to keep background safe.
+          }
         } catch (_) { /* swallow background errors */ }
       }, 2000);
+
       timers.set(docId, t);
     };
 
@@ -305,8 +337,23 @@ export class SignalApp {
       (!!getDisableBgSummarize()) ||
       this._disableBgSummarize;
     if (!bgDisabled) {
-      this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
-      this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId));
+      // Prefer async registration to avoid heavy synchronous fan-out on
+      // storage events (which can overload realtime subsystems). Fall back
+      // to on() for older buses for compatibility.
+      try {
+        if (typeof (this.events as any).onAsync === 'function') {
+          (this.events as any).onAsync('created', (ev: any) => scheduleSummarize(ev && ev.document && ev.document.id ? ev.document.id : ''));
+          (this.events as any).onAsync('updated', (ev: any) => scheduleSummarize(ev && ev.documentId ? ev.documentId : ''));
+        } else {
+          this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
+          this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId));
+        }
+      } catch (_) {
+        // Defensive fallbacks: if anything goes wrong prefer synchronous
+        // registration over failing to register at all, but swallow errors.
+        try { this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id)); } catch (_) {}
+        try { this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId)); } catch (_) {}
+      }
     }
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
