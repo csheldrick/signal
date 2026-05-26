@@ -34,7 +34,10 @@ export class GraphBuilder {
       for (let i = 0; i < id.length; i++) {
         hash = Math.imul(hash ^ id.charCodeAt(i), 16777619) >>> 0;
       }
-      hash = (hash ^ (d.updatedAt | 0)) >>> 0;
+      const updatedStr = String((d as any).updatedAt ?? 0);
+      for (let i = 0; i < updatedStr.length; i++) {
+        hash = Math.imul(hash ^ updatedStr.charCodeAt(i), 16777619) >>> 0;
+      }
     }
     return String(hash);
   }

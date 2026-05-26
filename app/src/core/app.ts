@@ -315,26 +315,73 @@ export class SignalApp {
         return;
       }
 
-      const t = setTimeout(async () => {
-        timers.delete(docId);
-        try {
-          const doc = this.store.read(docId);
-          if (!doc) return;
-          const s = this._localSummarizer;
-          // Run summary and record that we did so; swallowing errors to avoid
-          // affecting the event loop or the caller that triggered the event.
-          try {
-            await s.summarize(doc);
-            lastMap.set(docId, Date.now());
-            try { console.debug && console.debug(`background summarization completed for ${docId}`); } catch (_) { /* swallow */ }
-          } catch (_) {
-            // On summarize failure, do not update lastMap so a future attempt
-            // can retry after MIN_INTERVAL_MS; swallow to keep background safe.
-          }
-        } catch (_) { /* swallow background errors */ }
-      }, 2000);
+      // Concurrency & queueing: bound concurrent background summarization jobs
+      // to avoid unbounded CPU/network pressure from many timers firing.
+      const MAX_CONCURRENT_BG = 2; // conservative default
+      const MAX_QUEUE = 1000; // bounded queue size to avoid memory growth
 
-      timers.set(docId, t);
+      // Initialize shared counters/queue on the app instance if absent.
+      if (!((this as any)._bgSummarizeActive)) (this as any)._bgSummarizeActive = 0;
+      if (!((this as any)._bgSummarizeQueue)) (this as any)._bgSummarizeQueue = [] as string[];
+
+      const active = (this as any)._bgSummarizeActive as number;
+      const queue = (this as any)._bgSummarizeQueue as string[];
+
+      const scheduleJob = (id: string) => {
+        // Job runner that performs the summary and drains the queue when done.
+        (this as any)._bgSummarizeActive = ((this as any)._bgSummarizeActive as number) + 1;
+        const t = setTimeout(async () => {
+          // Clear per-doc timer slot immediately (we're running it now)
+          try { timers.delete(id); } catch (_) {}
+          try {
+            const doc = this.store.read(id);
+            if (doc) {
+              try {
+                await this._localSummarizer.summarize(doc);
+                try { lastMap.set(id, Date.now()); } catch (_) {}
+                try { console.debug && console.debug(`background summarization completed for ${id}`); } catch (_) {}
+              } catch (_) {
+                // swallow summarization errors; do not update lastMap so future attempts can retry
+              }
+            }
+          } catch (_) { /* swallow background errors */ }
+          // Mark job finished and try to drain a queued job.
+          try {
+            (this as any)._bgSummarizeActive = Math.max(0, ((this as any)._bgSummarizeActive as number) - 1);
+            const next = (this as any)._bgSummarizeQueue.shift();
+            if (next) {
+              // Use a short defer to avoid deep synchronous recursion and to
+              // give the event loop a chance to schedule other work.
+              setTimeout(() => {
+                try { scheduleSummarize(next); } catch (_) {}
+              }, 0);
+            }
+          } catch (_) { /* swallow */ }
+        }, 2000);
+
+        timers.set(id, t);
+      };
+
+      if (active < MAX_CONCURRENT_BG) {
+        // Run immediately within concurrency limits.
+        scheduleJob(docId);
+        return;
+      }
+
+      // Otherwise attempt to enqueue; if the queue is full, drop the request
+      // (best-effort protection against overload). We still set a short timer
+      // so the per-doc timers map does not grow unboundedly.
+      if (queue.length >= MAX_QUEUE) {
+        const shortT = setTimeout(() => { try { timers.delete(docId); } catch (_) {} }, 750);
+        timers.set(docId, shortT);
+        return;
+      }
+
+      queue.push(docId);
+      // Keep a lightweight placeholder timer so callers see that the request is
+      // scheduled (and so that callers that rely on timers being present behave).
+      const placeholder = setTimeout(() => { try { /* placeholder expired */ timers.delete(docId); } catch (_) {} }, 500);
+      timers.set(docId, placeholder);
     };
 
     const bgDisabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
