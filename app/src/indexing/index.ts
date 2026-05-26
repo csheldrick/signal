@@ -21,6 +21,8 @@ export class InvertedIndex {
   private docTerms: Map<string, Set<string>> = new Map();
 
   private totalTerms: number = 0;
+  // Per-term cap to avoid unbounded posting list growth under heavy ingestion.
+  private static readonly MAX_DOCS_PER_TERM: number = 10000;
   // Cached stats to avoid frequent recomputation under high read pressure.
   private cachedStats: IndexStats | null = null;
   private statsDirty: boolean = true;
@@ -57,7 +59,16 @@ export class InvertedIndex {
         list = new Set<string>();
         this.posting.set(term, list);
       }
-      list.add(documentId);
+      // Respect a safety cap on per-term posting list size to avoid
+      // pathological memory growth caused by extremely common terms.
+      if (list.size < InvertedIndex.MAX_DOCS_PER_TERM) {
+        list.add(documentId);
+      } else {
+        // Skip adding to extremely large term posting lists. This keeps
+        // indexing bounded; very common terms will still be searchable but
+        // won't grow without bound. Do not throw — indexing should remain
+        // tolerant under load.
+      }
     }
   }
 
