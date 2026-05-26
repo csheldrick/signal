@@ -35,13 +35,13 @@ export class SyncEngine {
     // we log and continue, BUT we must not swallow the semantic duplicate-engine
     // error (existing && existing !== this). That condition should propagate so
     // callers fail fast on misconfiguration.
-    const key = (this.store as unknown) as object;
+    const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
 
     // Try to observe any existing registration; if registry access itself fails
     // we warn but do not fabricate an "existing" entry.
     let existing: SyncEngine | undefined; let shouldSubscribe = true;
     try {
-      existing = SyncEngine._instancesByStore.get(key);
+      existing = keyObj ? SyncEngine._instancesByStore.get(keyObj) : undefined;
     } catch (e) {
       console.warn('SyncEngine: instance registry unavailable (read)', e);
       existing = undefined;
@@ -68,8 +68,8 @@ export class SyncEngine {
       // Only register this instance if no existing engine is already bound to
       // the concrete store object. This avoids overwriting the original
       // engine registration if we detected a duplicate above.
-      if (!existing) {
-        SyncEngine._instancesByStore.set(key, this);
+      if (!existing && keyObj) {
+        SyncEngine._instancesByStore.set(keyObj, this);
       }
     } catch (e) {
       console.warn('SyncEngine: instance registry unavailable (write)', e);
