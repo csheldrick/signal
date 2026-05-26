@@ -107,6 +107,8 @@ export class PluginHost {
         return Object.freeze(obj);
       }
 
+      const searchCache = new Map<string, { ts: number; results: ReadonlyArray<Readonly<SearchResultSnapshot>> }>();
+
       const ctx: PluginContext = {
         listDocuments: () => {
           // Validate and provide only well-formed document snapshots to plugins.
@@ -125,6 +127,37 @@ export class PluginHost {
           }).filter((x): x is Readonly<DocumentSnapshot> => !!x);
         },
         searchDocuments: (q: SearchQuery) => {
+          try {
+            // Lightweight, short-lived cache to reduce repeated identical
+            // search requests from plugins. Keying by JSON.stringify(q) is
+            // sufficient for typical plugin queries; fallback to String(q)
+            // on serialization errors.
+            const key = (() => {
+              try { return JSON.stringify(q); } catch (_) { return String(q); }
+            })();
+
+            const now = Date.now();
+            const cached = searchCache.get(key);
+            if (cached && (now - cached.ts) < 250) {
+              // Return cached frozen results
+              return cached.results;
+            }
+
+            const results = this.context.searchDocuments(q).map(r => {
+              const d = r?.document;
+              if (!d || typeof d.id !== 'string' || typeof d.title !== 'string') return undefined;
+              const safeDoc = deepFreeze({
+                ...d,
+                links: Array.isArray(d.links) ? d.links.map((l: any) => deepFreeze({ ...l })) : [],
+                tags: Array.isArray(d.tags) ? [...d.tags] : [],
+              });
+              return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights: Array.isArray(r.highlights) ? [...r.highlights] : [] });
+            }).filter((x): x is Readonly<SearchResult> => !!x);
+
+            searchCache.set(key, { ts: now, results });
+            return results;
+          } catch (_) { return []; }
+        
           try {
             return this.context.searchDocuments(q).map(r => {
               const d = r?.document;
