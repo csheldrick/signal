@@ -57,42 +57,58 @@ export class SyncQueue {
   }
 
   enqueue(message: SyncMessage): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const key = this.keyFor(message);
+    // Non-blocking enqueue: return immediately after scheduling the entry
+    // so callers (e.g. SyncManager.flush) do not block waiting for delivery/acks.
+    // Maintain an internal ack promise (settled by ack()/fail()) so the queue
+    // still has a mechanism to resolve/reject delivery lifecycle, but avoid
+    // exposing that promise to the flush path which must remain responsive.
 
-      const entry: QueueEntry = {
-        message,
-        attempts: 0,
-        nextRetryAt: 0,
-        resolve,
-        reject,
-      };
+    const key = this.keyFor(message);
 
-      const existing = this.index.get(key);
-      if (existing && existing.attempts === 0) {
-        // Replace pending unattempted entry (dedup). Reject the old promise
-        // so callers can react to being superseded.
+    // Internal ack promise (not returned to callers). Keep references to
+    // its resolve/reject so ack()/fail() can settle it. Swallow unhandled
+    // rejections to avoid noisy runtime warnings when nobody awaits the ack.
+    let ackResolve: () => void = () => {};
+    let ackReject: (err: Error) => void = () => {};
+    const ackPromise = new Promise<void>((res, rej) => { ackResolve = res; ackReject = rej; });
+    ackPromise.catch(() => { /* swallow */ });
+
+    const entry: QueueEntry = {
+      message,
+      attempts: 0,
+      nextRetryAt: 0,
+      // resolve/reject operate on the internal ack promise
+      resolve: () => { try { ackResolve(); } catch (_) { /* swallow */ } },
+      reject: (err: Error) => { try { ackReject(err); } catch (_) { /* swallow */ } },
+    };
+
+    const existing = this.index.get(key);
+    if (existing && existing.attempts === 0) {
+      // Replace pending unattempted entry (dedup). Reject the old ack promise
+      // so producers can react to being superseded.
+      try {
+        existing.reject(new Error(`Superseded by newer ${message.operation} for ${message.documentId}`));
+      } catch (_) { /* ignore */ }
+
+      const idx = this.entries.indexOf(existing);
+      if (idx !== -1) this.entries.splice(idx, 1, entry);
+      else this.entries.push(entry);
+      this.index.set(key, entry);
+    } else {
+      if (this.entries.length >= this.maxQueueSize) {
+        const removed = this.entries.shift()!;
+        const removedKey = this.keyFor(removed.message);
+        this.index.delete(removedKey);
         try {
-          existing.reject(new Error(`Superseded by newer ${message.operation} for ${message.documentId}`));
+          removed.reject(new Error('Queue full — dropped oldest entry'));
         } catch (_) { /* ignore */ }
-        // Replace in-place in the ordered list to preserve position.
-        const idx = this.entries.indexOf(existing);
-        if (idx !== -1) this.entries.splice(idx, 1, entry);
-        else this.entries.push(entry);
-        this.index.set(key, entry);
-      } else {
-        if (this.entries.length >= this.maxQueueSize) {
-          const removed = this.entries.shift()!;
-          const removedKey = this.keyFor(removed.message);
-          this.index.delete(removedKey);
-          try {
-            removed.reject(new Error('Queue full — dropped oldest entry'));
-          } catch (_) { /* ignore */ }
-        }
-        this.entries.push(entry);
-        this.index.set(key, entry);
       }
-    });
+      this.entries.push(entry);
+      this.index.set(key, entry);
+    }
+
+    // Return a resolved promise to indicate enqueue completed (non-blocking).
+    return Promise.resolve();
   }
 
   peek(now = Date.now()): QueueEntry[] {

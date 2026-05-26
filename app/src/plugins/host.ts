@@ -300,12 +300,19 @@ export class PluginHost {
               // Return a disposer that removes this plugin listener and tears down upstream when empty.
               return () => {
                 try {
-                  const m = this.pluginEventManagers.get(key);
+                  // Prefer the manager from the shared map; fall back to the
+                  // local overflow manager (captured in the closure) when the
+                  // map did not grow to include this key. This avoids leaking
+                  // listeners created when the manager-cap was reached.
+                  const m = this.pluginEventManagers.get(key) || mgr;
                   if (m) {
                     m.listeners.delete(listener);
                     if (m.listeners.size === 0) {
                       try { m.upstreamDispose && m.upstreamDispose(); } catch (_) {}
-                      this.pluginEventManagers.delete(key);
+                      // Only remove from the shared map if it is present there.
+                      if (this.pluginEventManagers.get(key)) {
+                        this.pluginEventManagers.delete(key);
+                      }
                     }
                   }
                 } catch (_) { /* swallow */ }

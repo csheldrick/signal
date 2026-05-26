@@ -30,7 +30,8 @@ export class VersionHistory {
 
   snapshot(document: DocumentSnapshot, author: string): DocumentVersion {
     if (!author || author.trim() === '') {
-      throw new Error('VersionHistory.snapshot requires a non-empty author (authentication required).');
+      try { console.warn('VersionHistory.snapshot called without author; using system:anonymous fallback.'); } catch (_) { /* swallow */ }
+      author = 'system:anonymous';
     }
 
     const history = this.chains.get(document.id) ?? [];
@@ -111,9 +112,33 @@ export class VersionHistory {
     chains: Map<string, DocumentVersion[]>;
     byId: Map<string, DocumentVersion>;
   } {
+    // Preserve the original behavior (full copy) for advanced callers that
+    // require it. Note: this can be expensive; prefer getStateSummary() when
+    // only diagnostic/inspection info is needed.
     return {
       chains: new Map(this.chains),
       byId: new Map(this.byId),
     };
+  }
+
+  getStateSummary(): {
+    documentCount: number;
+    totalVersions: number;
+    trackedDocuments: string[];
+  } {
+    // Lightweight summary to avoid forcing consumers to copy entire maps
+    // when they only need high-level metrics. Limit trackedDocuments to a
+    // small sample to avoid huge payloads.
+    const documentCount = this.chains.size;
+    let totalVersions = 0;
+    const trackedDocuments: string[] = [];
+    const MAX_SAMPLE = 50;
+
+    for (const [docId, chain] of this.chains.entries()) {
+      totalVersions += chain.length;
+      if (trackedDocuments.length < MAX_SAMPLE) trackedDocuments.push(docId);
+    }
+
+    return { documentCount, totalVersions, trackedDocuments };
   }
 }

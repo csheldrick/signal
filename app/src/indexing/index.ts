@@ -135,13 +135,22 @@ export class InvertedIndex {
   }
 
   terms(): string[] {
-    return [...this.posting.keys()];
+    // Return a capped list of terms to avoid exposing the full posting map
+    // which can become extremely large under heavy ingestion. This prevents
+    // naive callers from iterating massive lists and keeps memory/time bounded.
+    const ALL = [...this.posting.keys()];
+    const MAX = 1000;
+    if (ALL.length > MAX) {
+      try { console.warn('InvertedIndex.terms: returning capped term list'); } catch (_) { /* swallow */ }
+      return ALL.slice(0, MAX);
+    }
+    return ALL;
   }
 
   stats(): IndexStats {
     // Serve cached stats when available to avoid recomputation on hot paths.
     const now = Date.now();
-    if (!this.statsDirty && this.cachedStats && (now - this.lastStatsTs) < InvertedIndex.STATS_TTL_MS) return this.cachedStats;
+    if (!this.statsDirty && this.cachedStats && (now - this.lastStatsTs) < InvertedIndex.STATS_TTL_MS) return { ...this.cachedStats };
 
     const docCount = this.docTerms.size;
     const computed: IndexStats = {
@@ -153,7 +162,8 @@ export class InvertedIndex {
     this.cachedStats = computed;
     this.lastStatsTs = Date.now();
     this.statsDirty = false;
-    return computed;
+    // Return a shallow clone to avoid leaking internal references.
+    return { ...computed };
   }
 
   private tokenize(text: string): string[] {

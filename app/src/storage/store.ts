@@ -10,7 +10,7 @@ import type {
   SearchResult,
   DocumentChange,
 } from '../core/types.js';
-import { createDocumentSnapshot, validateDocumentChange, VALID_LINK_KINDS } from '../core/types.js';
+import { createDocumentSnapshot, validateDocumentChange, VALID_LINK_KINDS, normalizeSearchQuery } from '../core/types.js';
 import { StorageEventBus } from './events.js';
 export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
@@ -245,9 +245,17 @@ export class DocumentStore {
   }
 
   search(query: SearchQuery): SearchResult[] {
-    // If no search criteria provided, return a small preview to avoid full scans.
-    if (!query || (!query.text && (!query.tags || query.tags.length === 0) && !query.dateRange)) {
-      return Array.from(this.documents.values()).slice(0, DocumentStore.DEFAULT_LIST_PREVIEW).map(d => ({ document: cloneDocument(d), score: 0, highlights: [] }));
+    // Normalize the query to clamp pathological inputs and protect downstream
+    // subsystems (indexers/searchers). Use readonly DocumentSnapshot for
+    // results to avoid leaking mutable internal Document objects.
+    const q = normalizeSearchQuery(query);
+
+    // If normalized query is empty, return a small preview of snapshots to
+    // avoid a full scan and to bound result size.
+    if (!q || (!q.text && (!q.tags || q.tags.length === 0) && !q.dateRange)) {
+      return Array.from(this.documents.values())
+        .slice(0, DocumentStore.DEFAULT_LIST_PREVIEW)
+        .map(d => ({ document: createDocumentSnapshot(d), score: 0, highlights: [] }));
     }
 
     const results: SearchResult[] = [];
@@ -256,8 +264,8 @@ export class DocumentStore {
       let score = 0;
       const highlights: string[] = [];
 
-      if (query.text) {
-        const lower = query.text.toLowerCase();
+      if (q.text) {
+        const lower = q.text.toLowerCase();
         if (doc.title.toLowerCase().includes(lower)) {
           score += 2;
           highlights.push(doc.title);
@@ -268,24 +276,25 @@ export class DocumentStore {
         }
       }
 
-      if (query.tags && query.tags.length > 0) {
-        const matched = query.tags.filter(t => doc.tags.includes(t));
+      if (q.tags && q.tags.length > 0) {
+        const matched = q.tags.filter(t => doc.tags.includes(t));
         score += matched.length;
       }
 
-      if (query.dateRange) {
-        if (doc.updatedAt < query.dateRange.from || doc.updatedAt > query.dateRange.to) {
+      if (q.dateRange) {
+        if (doc.updatedAt < q.dateRange.from || doc.updatedAt > q.dateRange.to) {
           continue;
         }
       }
 
       if (score > 0) {
-        results.push({ document: cloneDocument(doc), score, highlights });
+        results.push({ document: createDocumentSnapshot(doc), score, highlights });
       }
 
       if (results.length >= DocumentStore.MAX_SEARCH_RESULTS) break;
     }
 
+    // Sort by score and cap results before returning to callers.
     return results.sort((a, b) => b.score - a.score).slice(0, DocumentStore.MAX_SEARCH_RESULTS);
   }
 
