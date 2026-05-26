@@ -168,6 +168,15 @@ export class PresenceTracker {
     this.evictIfNeeded();
     this.peers.set(peerId, presence);
 
+    // Notify an attached session tracker that a session has opened or been
+    // (re-)activated. Provide an initial clock snapshot when available from
+    // the sandboxed PluginContext so session owners can record vector-clock
+    // baselines without importing the concrete store.
+    try {
+      const clock = this.context && typeof (this.context as any).getClock === 'function' ? (this.context as any).getClock() : undefined;
+      try { (this as any).sessionTracker?.openSession(peerId, clock); } catch (_) { /* swallow */ }
+    } catch (_) { /* swallow */ }
+
     // If a validator exists, validate in the background with a short timeout.
     // Do NOT await here; a slow validator must not block the realtime path.
     const validator = this.validator;
@@ -325,6 +334,7 @@ export class PresenceTracker {
     };
 
     this.peers.set(peerId, updated);
+    try { (this as any).sessionTracker?.updateHeartbeat?.(peerId); } catch (_) { /* swallow */ }
     return true;
   }
 

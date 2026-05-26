@@ -43,6 +43,10 @@ export interface SyncMessage {
   clock: VectorClock;
   peerId: string;
   timestamp: number;
+  // Optional stable identifier for delivery/queued-message identity.
+  // Producers such as SyncEngine may attach this to allow queues and
+  // transports to match entries without relying on object identity.
+  messageId?: string;
 }
 
 export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
