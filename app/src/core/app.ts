@@ -232,29 +232,14 @@ export class SignalApp {
     // Lazy-initialize subsystems that are safe to defer until app start
     // summarizer is initialized lazily when first needed (avoid runtime import and coupling)
     if (!this._sync) {
-      try {
-        // Attempt to create the SyncEngine for this store. If another
-        // component already created an engine for the same DocumentStore
-        // instance the SyncEngine constructor will throw a specific error
-        // ("multiple engines bound to the same DocumentStore instance").
-        // Catch that case and degrade gracefully rather than crashing the
-        // application or registering a second engine which would increase
-        // load and produce divergent clocks.
-        this._sync = new SyncEngine(this.store, this._peerId);
-      } catch (err: unknown) {
-        const msg = String((err as any)?.message ?? err);
-        if (msg.includes('multiple engines bound to the same DocumentStore instance')) {
-          try { console.warn && console.warn('SyncEngine already registered for this store; using existing engine instance.'); } catch (_) { /* swallow */ }
-          // Leave this._sync undefined so the app continues without creating
-          // a duplicate engine. Other components that own the engine remain
-          // responsible for exposing it if necessary. PluginContext.getClock
-          // already tolerates absence of _sync and returns a safe empty map.
-          this._sync = undefined;
-        } else {
-          // Unknown error — rethrow so callers can observe it.
-          throw err;
-        }
-      }
+      // Attempt to create the SyncEngine for this store. If another
+      // component already created an engine for the same DocumentStore
+      // instance the SyncEngine constructor will throw a specific error
+      // ("multiple engines bound to the same DocumentStore instance").
+      // Do not swallow that error here — allow it to propagate so callers
+      // can observe and handle the misconfiguration. Failing fast avoids
+      // silent divergence and makes the system behaviour explicit.
+      this._sync = new SyncEngine(this.store, this._peerId);
     }
     this.started = true;
   }

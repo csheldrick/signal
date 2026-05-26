@@ -199,7 +199,7 @@ export class RemoteSummarizer implements Summarizer {
       // Publish in-flight promise so concurrent callers reuse it
       RemoteSummarizer.pending.set(id, op);
       // Ensure we cleanup the pending entry regardless of outcome
-      op.finally(() => { RemoteSummarizer.pending.delete(id); }).catch(() => { /* swallow */ });
+      op.finally(() => { RemoteSummarizer.pending.delete(id); });
     }
 
     return op;
