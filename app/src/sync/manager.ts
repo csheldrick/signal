@@ -196,11 +196,21 @@ export class SyncManager {
       // on each individual enqueue while still honoring the queue's retry semantics.
       const enqPromises: Promise<void>[] = [];
       for (const msg of outbound) {
+        // Ensure every outbound message carries a stable, explicit messageId so
+        // downstream queue operations (findIndex / ack / fail) can rely on a
+        // deterministic identity instead of fragile object reference equality.
+        // The messageId combines the manager peerId, documentId and timestamp
+        // and a small random suffix to avoid accidental collisions.
+        const suffix = Math.floor(Math.random() * 1e9).toString(36);
+        const msgId = `${this.peerId}:${msg.documentId}:${msg.timestamp}:${suffix}`;
+        // We augment the message with messageId in a non-destructive way.
+        const prepared = { ...(msg as any), messageId: msgId } as unknown as SyncMessage;
+
         enqPromises.push(
-          this.queue.enqueue(msg).catch(err => {
+          this.queue.enqueue(prepared).catch(err => {
             // Convert rejection to a handled telemetry emission so a single failure
             // does not throw from flush; queue.enqueue already enforces semantics.
-            try { this.emitTelemetry('queue_enqueue_failed', { message: msg, error: err }); } catch (_) {}
+            try { this.emitTelemetry('queue_enqueue_failed', { message: prepared, error: err }); } catch (_) {}
           }),
         );
       }
