@@ -92,7 +92,7 @@ export class StorageEventBus implements StorageEventBusContract {
     // Threshold chosen conservatively; tune if necessary. When exceeded we
     // schedule a microtask so the emitter yields control briefly but preserves
     // listener invocation order relative to this emit call.
-    const SYNC_LISTENER_THRESHOLD = 8;
+    const SYNC_LISTENER_THRESHOLD = 4; // lowered to yield earlier for large listener sets
     if (totalListeners > SYNC_LISTENER_THRESHOLD) {
       Promise.resolve().then(() => invoke());
     } else {

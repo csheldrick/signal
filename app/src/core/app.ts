@@ -136,7 +136,12 @@ export class SignalApp {
           // If the active summarizer is remote but neither it nor the caller allow
           // network I/O, refuse to perform remote summarization.
           const sSumm: Summarizer = summarizer;
-          if (sSumm.isRemote && !sSumm.allowsNetwork && !allowNetwork) {
+          // Enforce caller-driven network opt-in: if the active summarizer is
+          // remote, refuse to perform network I/O unless the caller explicitly
+          // requested it by passing allowNetwork = true. The summarizer's own
+          // allowsNetwork flag still controls whether it was constructed to
+          // permit network usage, but callers must opt-in to allow remote calls.
+          if (sSumm.isRemote && !allowNetwork) {
             return undefined;
           }
 
