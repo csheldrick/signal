@@ -10,7 +10,7 @@ import type {
   SearchResult,
   DocumentChange,
 } from '../core/types.js';
-import { createDocumentSnapshot } from '../core/types.js';
+import { createDocumentSnapshot, validateDocumentChange, VALID_LINK_KINDS } from '../core/types.js';
 import { StorageEventBus } from './events.js';
 export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
@@ -81,6 +81,13 @@ export class DocumentStore {
   }
 
   create(id: string, title: string, content: string, tags: string[] = []): Document {
+    // Defensive validation to protect downstream subsystems from malformed inputs.
+    if (typeof title !== 'string' || typeof content !== 'string') {
+      throw new Error('DocumentStore.create: invalid title or content');
+    }
+    if (!Array.isArray(tags) || tags.some(t => typeof t !== 'string')) {
+      throw new Error('DocumentStore.create: invalid tags');
+    }
     const now = Date.now();
     const doc: Document = {
       id,
@@ -104,6 +111,11 @@ export class DocumentStore {
   }
 
   update(id: string, changes: DocumentChange): Document | undefined {
+    // Validate change object to enforce the core input validation boundary.
+    if (!validateDocumentChange(changes)) {
+      try { console.warn('DocumentStore.update: rejected invalid changes'); } catch (_) {}
+      return undefined;
+    }
     const existing = this.documents.get(id);
     if (!existing) return undefined;
 
@@ -174,6 +186,13 @@ export class DocumentStore {
     const source = this.documents.get(sourceId);
     const target = this.documents.get(targetId);
     if (!source || !target) return undefined;
+
+    // Validate the provided link kind against the canonical list to avoid
+    // propagating unknown/typo'd kinds across subsystems.
+    if (!VALID_LINK_KINDS.includes(kind as any)) {
+      try { console.warn(`DocumentStore.link: invalid link kind '${String(kind)}'`); } catch (_) {}
+      return undefined;
+    }
 
     const link: DocumentLink = { sourceId, targetId, kind };
     const previous = cloneDocument(source);

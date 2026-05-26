@@ -21,6 +21,8 @@ export interface AppConfig {
   allowNetwork?: boolean;
   /** Optional network authentication token required to enable remote summarization. */
   networkAuthToken?: string;
+  /** When true, background summarization timers will be disabled (useful for tests) */
+  disableBackgroundSummarize?: boolean;
 }
 
 export class SignalApp {
@@ -38,6 +40,7 @@ export class SignalApp {
   private _summarizer?: Summarizer;
   private readonly _allowNetwork: boolean;
   private readonly _networkAuthToken?: string;
+  private readonly _disableBgSummarize: boolean;
 
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
@@ -68,6 +71,7 @@ export class SignalApp {
     // Remote summarization is opt-in and must be explicitly enabled.
     this._allowNetwork = !!config.allowNetwork;
     this._networkAuthToken = config.networkAuthToken;
+    this._disableBgSummarize = !!config.disableBackgroundSummarize;
     this._summarizer = undefined; // lazily created when first used
 
 
@@ -258,7 +262,8 @@ export class SignalApp {
     // explicit global opt-out to make the subsystem safe for test runs.
     const scheduleSummarize = (docId: string) => {
       const disabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
-        (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE);
+        (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE) ||
+        this._disableBgSummarize;
       if (disabled) return;
 
       const timers: Map<string, ReturnType<typeof setTimeout>> = (this as any)._bgSummarizeTimers;
@@ -278,7 +283,8 @@ export class SignalApp {
     };
 
     const bgDisabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
-      (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE);
+      (typeof (globalThis as any).__DISABLE_BG_SUMMARIZE !== 'undefined' && !!(globalThis as any).__DISABLE_BG_SUMMARIZE) ||
+      this._disableBgSummarize;
     if (!bgDisabled) {
       this.events.on('created', (ev) => scheduleSummarize((ev as any).document.id));
       this.events.on('updated', (ev) => scheduleSummarize((ev as any).documentId));

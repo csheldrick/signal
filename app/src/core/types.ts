@@ -35,6 +35,8 @@ export interface DocumentLink {
 
 export type LinkKind = 'reference' | 'related' | 'derived_from' | 'blocks';
 
+export const VALID_LINK_KINDS: LinkKind[] = ['reference', 'related', 'derived_from', 'blocks'];
+
 export interface SearchQuery {
   text?: string;
   tags?: string[];
@@ -80,7 +82,7 @@ export function isValidDocumentSnapshot(obj: any): obj is DocumentSnapshot {
       if (!l || typeof l !== 'object') return false;
       if (typeof l.sourceId !== 'string' || typeof l.targetId !== 'string') return false;
       if (typeof l.kind !== 'string') return false;
-      const kinds: LinkKind[] = ['reference', 'related', 'derived_from', 'blocks'];
+      const kinds = VALID_LINK_KINDS;
       if (!kinds.includes(l.kind as LinkKind)) return false;
     }
 
