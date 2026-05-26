@@ -29,6 +29,11 @@ export class SearchPlugin implements Plugin {
 
   search(query: SearchQuery): ReadonlyArray<SearchResult> {
     if (!this.context) return [];
+    if (!query || (!query.text && (!query.tags || query.tags.length === 0) && !query.dateRange)) {
+      // Short-circuit obviously-empty queries to avoid unnecessary work in
+      // potentially expensive search implementations.
+      return [];
+    }
     return this.context.searchDocuments(query);
   }
 }

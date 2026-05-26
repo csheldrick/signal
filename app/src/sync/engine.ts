@@ -39,7 +39,7 @@ export class SyncEngine {
 
     // Try to observe any existing registration; if registry access itself fails
     // we warn but do not fabricate an "existing" entry.
-    let existing: SyncEngine | undefined;
+    let existing: SyncEngine | undefined; let shouldSubscribe = true;
     try {
       existing = SyncEngine._instancesByStore.get(key);
     } catch (e) {
@@ -56,10 +56,10 @@ export class SyncEngine {
     // Operators/tests will still see a clear message and can migrate to an
     // explicit injection/shared-engine approach.
     if (existing && existing !== this) {
-      // Duplicate engine detected: fail fast so callers can correct ownership.
-      // This prevents silent divergence caused by multiple engines mutating the
-      // same DocumentStore and producing inconsistent clocks.
-      throw new Error('SyncEngine: multiple engines bound to the same DocumentStore instance');
+      // Duplicate engine detected: avoid subscribing to the store events to prevent
+      // duplicate outbound generation. Log and continue without registering.
+      try { console.warn('SyncEngine: multiple engines bound to the same DocumentStore instance — new instance will not subscribe to store events'); } catch (_) {}
+      shouldSubscribe = false;
     }
 
     // Attempt to set our registration; if setting fails due to platform issues
@@ -80,7 +80,7 @@ export class SyncEngine {
     // clock progression. This reduces the chance of divergent clocks when
     // multiple writers exist.
     try {
-      const bus = this.store?.events;
+      const bus = shouldSubscribe ? this.store?.events : undefined;
       if (bus && typeof bus.on === 'function') {
         // Decouple heavy sync processing from the storage emitter by buffering
         // incoming events and flushing them in a microtask. This reduces

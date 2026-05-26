@@ -21,14 +21,22 @@ export class ExportPlugin implements Plugin {
   exportToMarkdown(): string {
     if (!this.context) return '';
 
-    const docs = this.context.listDocuments().map(d => ({
+    const all = this.context.listDocuments();
+    const MAX_EXPORT = 500;
+    let docs = all;
+    let truncatedNote = '';
+    if (all.length > MAX_EXPORT) {
+      docs = all.slice(0, MAX_EXPORT);
+      truncatedNote = `\n\n[Export truncated: ${all.length} documents, included first ${MAX_EXPORT}]\n`;
+    }
+    const docsTransformed = docs.map(d => ({
       ...d,
       links: Array.isArray((d as any).links) ? (d as any).links.map((l: any) => ({ ...l })) : [],
       tags: Array.isArray((d as any).tags) ? [...(d as any).tags] : [],
     }));
     const lines: string[] = [];
 
-    for (const doc of docs) {
+    for (const doc of docsTransformed) {
       lines.push(`# ${doc.title}`);
       lines.push('');
       lines.push(doc.content);
@@ -41,6 +49,7 @@ export class ExportPlugin implements Plugin {
       lines.push('');
     }
 
+    if (truncatedNote) lines.push(truncatedNote);
     return lines.join('\n');
   }
 }

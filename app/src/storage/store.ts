@@ -94,7 +94,7 @@ export class DocumentStore {
     const stored = cloneDocument(doc);
     this.documents.set(id, stored);
     this.opCounts.create++;
-    this.events.emit({ type: 'created', document: createDocumentSnapshot(stored), timestamp: now });
+    this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(stored), timestamp: now });
     return cloneDocument(stored);
   }
 
@@ -120,7 +120,7 @@ export class DocumentStore {
     const previousSnapshot = cloneDocument(existing);
     this.documents.set(id, updated);
     this.opCounts.update++;
-    this.events.emit({
+    this.events.emitAsync({
       type: 'updated',
       documentId: id,
       previous: createDocumentSnapshot(previousSnapshot),
@@ -183,9 +183,9 @@ export class DocumentStore {
     // Emit both a linked event and a corresponding updated event for consumers
     // that observe document mutations via 'updated' events.
     this.opCounts.link++;
-    this.events.emit({ type: 'linked', link: { ...link }, timestamp: Date.now() });
+    this.events.emitAsync({ type: 'linked', link: { ...link }, timestamp: Date.now() });
     this.opCounts.update++;
-    this.events.emit({
+    this.events.emitAsync({
       type: 'updated',
       documentId: sourceId,
       previous: createDocumentSnapshot(previous),

@@ -75,8 +75,8 @@ export class StorageEventBus implements StorageEventBusContract {
     // Prevent unbounded listener growth which can cause heavy synchronous
     // fan-out and subsystem overload. Enforce soft caps and refuse to add new
     // listeners when global or per-type limits are exceeded.
-    const MAX_TOTAL_LISTENERS = 1000;
-    const MAX_PER_TYPE = 250;
+    const MAX_TOTAL_LISTENERS = 200;
+    const MAX_PER_TYPE = 50;
 
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
