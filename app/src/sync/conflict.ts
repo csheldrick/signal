@@ -115,6 +115,7 @@ export function resolveConflict(
 
     default:
       winner = { ...rdoc };
+      break;
   }
 
   const record: ConflictRecord = {
