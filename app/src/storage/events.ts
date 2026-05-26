@@ -80,8 +80,20 @@ export class StorageEventBus implements StorageEventBusContract {
       for (const fn of starArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
     };
 
-    // Invoke synchronously to preserve ordering for validators/listeners.
-    invoke();
+    // If many listeners are registered, yield to the event loop to avoid
+    // heavy synchronous fan-out that can overload downstream subsystems.
+    // For small listener sets preserve synchronous semantics to maintain
+    // ordering guarantees expected by validators/listeners.
+    const totalListeners = (direct ? direct.size : 0) + (star ? star.size : 0);
+    // Threshold chosen conservatively; tune if necessary. When exceeded we
+    // schedule a microtask so the emitter yields control briefly but preserves
+    // listener invocation order relative to this emit call.
+    const SYNC_LISTENER_THRESHOLD = 8;
+    if (totalListeners > SYNC_LISTENER_THRESHOLD) {
+      Promise.resolve().then(() => invoke());
+    } else {
+      invoke();
+    }
   }
 
   /**
