@@ -230,10 +230,15 @@ export class SyncManager {
         // deterministic identity instead of fragile object reference equality.
         // The messageId combines the manager peerId, documentId and timestamp
         // and a small random suffix to avoid accidental collisions.
-        const suffix = Math.floor(Math.random() * 1e9).toString(36);
-        const msgId = `${this.peerId}:${msg.documentId}:${msg.timestamp}:${suffix}`;
-        // We augment the message with messageId in a non-destructive way.
-        const prepared = { ...(msg as any), messageId: msgId } as unknown as SyncMessage;
+        // Preserve any upstream-provided messageId (e.g. from SyncEngine). Only
+        // generate and attach a messageId when one is not already present. This
+        // prevents churn and inconsistent identities between engine -> manager -> queue
+        // which otherwise cause ack/fail/findIndex to miss entries.
+        const prepared = ((msg as any).messageId ? (msg as any) : (() => {
+          const suffix = Math.floor(Math.random() * 1e9).toString(36);
+          const msgId = `${this.peerId}:${msg.documentId}:${msg.timestamp}:${suffix}`;
+          return { ...(msg as any), messageId: msgId } as unknown as SyncMessage;
+        })());
         try { this.emitTelemetry('outbound_prepared', { message: prepared }); } catch (_) { /* swallow */ }
 
         enqPromises.push(

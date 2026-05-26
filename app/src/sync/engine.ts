@@ -164,47 +164,53 @@ export class SyncEngine {
       }
     }
 
+    // Helper to produce a compact, stable-ish id when the engine must generate one.
+    // The id includes the peer, document grouping and a timestamp+random suffix to
+    // avoid accidental collisions while remaining stable for the immediate pipeline.
+    const makeMessageId = (docId: string) => `${this.peerId}:${docId}:${Date.now()}:${Math.floor(Math.random() * 1e9).toString(36)}`;
+
     switch (event.type) {
-      case 'created':
+      case 'created': {
+        const docId = (event as any).document?.id ?? '';
         message = ({
-          // Stable-ish message id to enable reliable queue lookup/deduplication
-          messageId: `${this.peerId}:${event.document.id}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+          messageId: makeMessageId(docId),
           operation: 'create',
-          documentId: event.document.id,
+          documentId: docId,
           payload: {
-            title: event.document.title,
-            content: event.document.content,
-            tags: event.document.tags,
+            title: (event as any).document.title,
+            content: (event as any).document.content,
+            tags: (event as any).document.tags,
           },
           clock: { ...this.clock },
           peerId: this.peerId,
           timestamp: event.timestamp,
         } as any) as SyncMessage;
         break;
-      case 'updated':
+      }
+      case 'updated': {
+        const docId = (event as any).documentId ?? '';
         message = ({
-          messageId: `${this.peerId}:${event.documentId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+          messageId: makeMessageId(docId),
           operation: 'update',
-          documentId: event.documentId,
+          documentId: docId,
           payload: {
-            title: event.current.title,
-            content: event.current.content,
-            tags: event.current.tags,
+            title: (event as any).current.title,
+            content: (event as any).current.content,
+            tags: (event as any).current.tags,
           },
           clock: { ...this.clock },
           peerId: this.peerId,
           timestamp: event.timestamp,
         } as any) as SyncMessage;
         break;
+      }
       case 'linked': {
-        // Map storage 'linked' events to a logical 'link' SyncMessage so
-        // receivers can apply (or index) link relationships deterministically.
-        // We include the link object as the payload and choose a sensible
-        // documentId to group messages (prefer the target document when available).
+        // Map storage 'linked' events to a logical 'link' SyncMessage. Prefer
+        // targetId then sourceId as the grouping document id.
         const link = (event as any).link || {};
-        const docId = link.documentId ?? link.targetId ?? link.sourceId ?? '';
+        const docId = link.targetId ?? link.sourceId ?? link.documentId ?? '';
         message = ({
-          messageId: `${this.peerId}:${docId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+          messageId: makeMessageId(docId),
           operation: 'link',
           documentId: docId,
           payload: {
@@ -218,17 +224,19 @@ export class SyncEngine {
         } as any) as SyncMessage;
         break;
       }
-      case 'deleted':
+      case 'deleted': {
+        const docId = (event as any).documentId ?? '';
         message = ({
-          messageId: `${this.peerId}:${event.documentId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+          messageId: makeMessageId(docId),
           operation: 'delete',
-          documentId: event.documentId,
+          documentId: docId,
           payload: null,
           clock: { ...this.clock },
           peerId: this.peerId,
           timestamp: event.timestamp,
         } as any) as SyncMessage;
         break;
+      }
     }
 
     if (message) {
