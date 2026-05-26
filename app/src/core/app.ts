@@ -5,6 +5,7 @@
 import { DocumentStore } from '../storage/store.js';
 import { StorageEventBus } from '../storage/events.js';
 import { GraphBuilder } from '../graph/builder.js';
+import { createInvertedIndex, Indexer } from '../index/inverted.js';
 import { PluginHost } from '../plugins/host.js';
 import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
@@ -66,6 +67,18 @@ export class SignalApp {
       } as unknown as GraphBuilder;
     };
     this.graph = createLazyGraph();
+    // Create a lightweight inverted index and an Indexer that listens to
+    // the StorageEventBus. This keeps indexing responsibilities decoupled
+    // from the DocumentStore and reduces direct Document subsystem fan-out.
+    try {
+      const idx = createInvertedIndex();
+      try {
+        const indexer = new Indexer(this.events, idx);
+        // Expose for diagnostics/tooling without tightening types here.
+        (this as any)._invertedIndex = idx;
+        (this as any)._indexer = indexer;
+      } catch (_) { /* swallow */ }
+    } catch (_) { /* swallow */ }
     // Initial validator seeding is handled where validators are attached below; avoid redundant registration here to reduce listener churn.
     this._peerId = config.peerId;
 

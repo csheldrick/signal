@@ -1,0 +1,201 @@
+// Lightweight in-memory inverted index and an Indexer that binds to StorageEventBus.
+// This module provides runtime implementations only; the InvertedIndex interface
+// is declared in core/types.ts so multiple implementations can coexist.
+
+import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex } from '../core/types.js';
+import { normalizeSearchQuery } from '../core/types.js';
+
+// Basic tokenizer: split on non-alphanumerics and lowercase
+function tokenize(text: string | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!text || typeof text !== 'string') return out;
+  try {
+    const toks = text.toLowerCase().split(/[^a-z0-9]+/);
+    for (const t of toks) {
+      if (!t) continue;
+      if (t.length <= 2) continue; // skip tiny tokens
+      out.add(t);
+    }
+  } catch (_) {
+    // defensive
+  }
+  return out;
+}
+
+class InvertedIndexImpl implements InvertedIndex {
+  private termMap: Map<string, Set<string>> = new Map(); // term -> docIds
+  private docStore: Map<string, DocumentSnapshot> = new Map();
+  private docTerms: Map<string, Set<string>> = new Map();
+  private termCounts: Map<string, number> = new Map();
+
+  indexDocument(doc: DocumentSnapshot): void {
+    if (!doc || typeof doc.id !== 'string') return;
+    if (this.docStore.has(doc.id)) {
+      this.updateDocument(doc);
+      return;
+    }
+    this.docStore.set(doc.id, doc);
+    const terms = this.extractTerms(doc);
+    this.docTerms.set(doc.id, terms);
+    for (const t of terms) {
+      let s = this.termMap.get(t);
+      if (!s) { s = new Set(); this.termMap.set(t, s); }
+      if (!s.has(doc.id)) {
+        s.add(doc.id);
+        this.termCounts.set(t, (this.termCounts.get(t) || 0) + 1);
+      }
+    }
+  }
+
+  updateDocument(doc: DocumentSnapshot): void {
+    if (!doc || typeof doc.id !== 'string') return;
+    const prev = this.docTerms.get(doc.id);
+    if (prev) {
+      for (const t of prev) {
+        const s = this.termMap.get(t);
+        if (s) {
+          s.delete(doc.id);
+          if (s.size === 0) this.termMap.delete(t);
+        }
+        const c = this.termCounts.get(t) ?? 0;
+        if (c <= 1) this.termCounts.delete(t); else this.termCounts.set(t, c - 1);
+      }
+    }
+    this.docStore.set(doc.id, doc);
+    const terms = this.extractTerms(doc);
+    this.docTerms.set(doc.id, terms);
+    for (const t of terms) {
+      let s = this.termMap.get(t);
+      if (!s) { s = new Set(); this.termMap.set(t, s); }
+      if (!s.has(doc.id)) {
+        s.add(doc.id);
+        this.termCounts.set(t, (this.termCounts.get(t) || 0) + 1);
+      }
+    }
+  }
+
+  removeDocument(documentId: string): void {
+    if (!documentId) return;
+    const prev = this.docTerms.get(documentId);
+    if (prev) {
+      for (const t of prev) {
+        const s = this.termMap.get(t);
+        if (s) {
+          s.delete(documentId);
+          if (s.size === 0) this.termMap.delete(t);
+        }
+        const c = this.termCounts.get(t) ?? 0;
+        if (c <= 1) this.termCounts.delete(t); else this.termCounts.set(t, c - 1);
+      }
+      this.docTerms.delete(documentId);
+    }
+    this.docStore.delete(documentId);
+  }
+
+  search(query: SearchQuery): SearchResult[] {
+    try {
+      const q = normalizeSearchQuery(query);
+      const text = (q && q.text) ? String(q.text).trim().toLowerCase() : '';
+      const qterms = text ? Array.from(tokenize(text)) : [];
+
+      const results: Array<{ doc: DocumentSnapshot; score: number; highlights: string[] }> = [];
+
+      for (const [id, doc] of this.docStore) {
+        if (q.dateRange) {
+          if (doc.updatedAt < q.dateRange.from || doc.updatedAt > q.dateRange.to) continue;
+        }
+        if (q.tags && q.tags.length > 0) {
+          let has = false;
+          for (const t of q.tags) if (doc.tags.includes(t)) { has = true; break; }
+          if (!has) continue;
+        }
+
+        let score = 0;
+        const highlights: string[] = [];
+
+        if (qterms.length > 0) {
+          const combined = new Set<string>();
+          for (const term of qterms) combined.add(term);
+          for (const term of combined) {
+            if ((doc.title || '').toLowerCase().includes(term)) { score += 3; highlights.push(doc.title); }
+            if ((doc.content || '').toLowerCase().includes(term)) { score += 1; highlights.push(doc.content.substring(0, 150)); }
+            if (Array.isArray(doc.tags) && doc.tags.some(t => (t || '').toLowerCase() === term)) { score += 2; highlights.push(doc.tags.join(', ')); }
+          }
+        }
+
+        if (score > 0 || (qterms.length === 0 && (!q.tags || q.tags.length === 0) && !q.dateRange)) {
+          results.push({ doc, score, highlights });
+        }
+      }
+
+      results.sort((a, b) => b.score - a.score);
+      return results.slice(0, 100).map(r => ({ document: r.doc, score: r.score, highlights: r.highlights }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  stats(): IndexStats {
+    const termCount = this.termMap.size;
+    const docCount = this.docStore.size;
+    const top: Array<{ term: string; count: number }> = [];
+    try {
+      const arr = Array.from(this.termCounts.entries());
+      arr.sort((a, b) => b[1] - a[1]);
+      for (let i = 0; i < Math.min(10, arr.length); i++) top.push({ term: arr[i][0], count: arr[i][1] });
+    } catch (_) { }
+    return { docCount, termCount, topTerms: top };
+  }
+
+  private extractTerms(doc: DocumentSnapshot): Set<string> {
+    const out = new Set<string>();
+    try {
+      for (const t of tokenize(doc.title)) out.add(t);
+      for (const t of tokenize(doc.content)) out.add(t);
+      if (Array.isArray(doc.tags)) for (const tg of doc.tags) {
+        const t = (tg || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+        if (t && t.length > 2) out.add(t);
+      }
+    } catch (_) {}
+    return out;
+  }
+}
+
+export function createInvertedIndex(): InvertedIndex {
+  return new InvertedIndexImpl();
+}
+
+export class Indexer {
+  private disposers: Array<() => void> = [];
+  constructor(events: any, private readonly index: InvertedIndex) {
+    if (!events || !this.index) return;
+    try {
+      const created = (ev: any) => { try { if (ev && ev.document) this.index.indexDocument(ev.document); } catch (_) {} };
+      const updated = (ev: any) => { try { if (ev && ev.current) this.index.updateDocument(ev.current); } catch (_) {} };
+      const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
+
+      if (typeof events.onAsync === 'function') {
+        events.onAsync('created', created);
+        events.onAsync('updated', updated);
+        events.onAsync('deleted', deleted);
+        this.disposers.push(() => { try { events.off('created', created); } catch (_) {} });
+        this.disposers.push(() => { try { events.off('updated', updated); } catch (_) {} });
+        this.disposers.push(() => { try { events.off('deleted', deleted); } catch (_) {} });
+      } else {
+        events.on('created', created);
+        events.on('updated', updated);
+        events.on('deleted', deleted);
+        this.disposers.push(() => { try { events.off('created', created); } catch (_) {} });
+        this.disposers.push(() => { try { events.off('updated', updated); } catch (_) {} });
+        this.disposers.push(() => { try { events.off('deleted', deleted); } catch (_) {} });
+      }
+    } catch (_) { /* swallow */ }
+  }
+
+  dispose(): void {
+    for (const d of this.disposers) {
+      try { d(); } catch (_) {}
+    }
+    this.disposers = [];
+  }
+}

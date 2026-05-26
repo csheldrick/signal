@@ -179,3 +179,35 @@ export function normalizeSearchQuery(q?: SearchQuery): SearchQuery {
 
   return out;
 }
+
+// Lightweight search/indexing contracts to enable an extensible search subsystem
+export interface SearchHit {
+  documentId: string;
+  field: 'title' | 'content' | 'tags';
+  snippet?: string;
+  score: number;
+}
+
+export interface InvertedIndexSearchHit extends SearchHit {
+  term: string;
+}
+
+export interface IndexStats {
+  docCount: number;
+  termCount: number;
+  topTerms: Array<{ term: string; count: number }>;
+}
+
+export interface InvertedIndex {
+  // Index a document snapshot (idempotent for new ids)
+  indexDocument(doc: DocumentSnapshot): void;
+  // Update an existing document snapshot
+  updateDocument(doc: DocumentSnapshot): void;
+  // Remove a document from the index
+  removeDocument(documentId: string): void;
+  // Search using normalized SearchQuery
+  search(query: SearchQuery): SearchResult[];
+  // Basic stats for observability
+  stats(): IndexStats;
+}
+
