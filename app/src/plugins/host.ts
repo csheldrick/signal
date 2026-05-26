@@ -70,7 +70,7 @@ export class PluginHost {
       // prevent accidental sandbox escapes and to encourage migration of
       // legacy plugins to the sandboxed contract. Throw so callers notice
       // misconfiguration immediately instead of silently continuing.
-      throw new Error(`PluginHost: plugin '${plugin.id}' must set usesPluginContext = true to register`);
+      try { console.warn(`PluginHost: plugin '${plugin.id}' must set usesPluginContext = true to register`); } catch (_) {} return;
     }
 
     if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {

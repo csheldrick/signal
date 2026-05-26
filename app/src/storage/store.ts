@@ -29,6 +29,8 @@ function cloneDocument(d: import('../core/types.js').Document): import('../core/
 }
 
 
+export const SYM_SYNC_ENGINE = Symbol('signal:sync-engine');
+
 export class DocumentStore {
   private static _instances = 0;
 
@@ -77,6 +79,24 @@ export class DocumentStore {
       this.events = new StorageEventBus();
     } else {
       this.events = events ?? new StorageEventBus();
+    }
+  }
+
+  getSyncEngine(): any | undefined {
+    try {
+      return (this as any)[SYM_SYNC_ENGINE];
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  setSyncEngine(engine: any): void {
+    try {
+      // Use a non-enumerable symbol-backed property to avoid leaking on iteration
+      Object.defineProperty(this, SYM_SYNC_ENGINE, { value: engine, writable: true, configurable: true });
+    } catch (_) {
+      // Best-effort fallback for constrained environments
+      try { (this as any)[String(SYM_SYNC_ENGINE)] = engine; } catch (_) { /* swallow */ }
     }
   }
 

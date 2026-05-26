@@ -25,68 +25,101 @@ export class SyncEngine {
   // Registry of SyncEngine instances keyed by the concrete store object to detect accidental duplicates.
   private static _instancesByStore: WeakMap<object, SyncEngine> = new WeakMap<object, SyncEngine>();
 
+  /**
+   * Canonical factory to obtain a SyncEngine bound to a concrete store and peerId.
+   * Preference order:
+   *  1) If the store exposes getSyncEngine/setSyncEngine, use that API to get/create the engine.
+   *  2) Fallback to a WeakMap keyed by the concrete store object.
+   * This centralizes registration and avoids silent duplicate engines.
+   */
+  static getOrCreate(store: DocumentStoreLike, peerId: string): SyncEngine {
+    try {
+      const asAny: any = store as any;
+      if (typeof asAny.getSyncEngine === 'function') {
+        const existing = asAny.getSyncEngine();
+        if (existing && existing !== undefined) return existing;
+        const created = new SyncEngine(store, peerId, { internal: true });
+        try { asAny.setSyncEngine(created); } catch (_) {}
+        return created;
+      }
+    } catch (_) {}
+
+    // Fallback to WeakMap registry
+    const keyObj = (typeof store === 'object' && store !== null) ? (store as unknown as object) : undefined;
+    if (!keyObj) return new SyncEngine(store, peerId, { internal: true });
+
+    try {
+      const existing = SyncEngine._instancesByStore.get(keyObj);
+      if (existing) return existing;
+    } catch (_) {}
+
+    const created = new SyncEngine(store, peerId, { internal: true });
+    try { SyncEngine._instancesByStore.set(keyObj, created); } catch (_) {}
+    return created;
+  }
+
   constructor(
     private readonly store: DocumentStoreLike,
     peerId: string,
+    options?: { internal?: boolean },
   ) {
     this.peerId = peerId;
     this.clock[peerId] = 0;
 
-    // Register this engine keyed by the concrete store object to detect duplicates.
-    // Access the registry carefully: if platform-level WeakMap operations fail
-    // we log and continue, BUT we must not swallow the semantic duplicate-engine
-    // error (existing && existing !== this). That condition should propagate so
-    // callers fail fast on misconfiguration.
-    const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
-
-    // Try to observe any existing registration; if registry access itself fails
-    // we warn but do not fabricate an "existing" entry.
-    let existing: SyncEngine | undefined; let shouldSubscribe = true;
-    try {
-      existing = keyObj ? SyncEngine._instancesByStore.get(keyObj) : undefined;
-    } catch (e) {
-      console.warn('SyncEngine: instance registry unavailable (read)', e);
-      existing = undefined;
-    }
-
-    // If an existing engine is found for the same concrete store object and it
-    // is not this instance, this is a real misconfiguration. Throwing here can
-    // cause surprising crashes in normal application compositions where multiple
-    // managers or startup paths attempt to construct an engine for the same
-    // store object. Log a clear, high-severity message and proceed without
-    // registering this second instance so callers do not unexpectedly crash.
-    // Operators/tests will still see a clear message and can migrate to an
-    // explicit injection/shared-engine approach.
-    if (existing && existing !== this) {
-      // Duplicate engine detected: avoid subscribing to the store events to prevent
-      // duplicate outbound generation. Log and continue without registering.
-      try { console.warn('SyncEngine: multiple engines bound to the same DocumentStore instance — new instance will not subscribe to store events'); } catch (_) {}
-      shouldSubscribe = false;
-    }
-
-    // Attempt to set our registration; if setting fails due to platform issues
-    // we log but proceed (we don't hide the duplicate-engine condition above).
-    try {
-      // Only register this instance if no existing engine is already bound to
-      // the concrete store object. This avoids overwriting the original
-      // engine registration if we detected a duplicate above.
-      if (!existing && keyObj) {
-        SyncEngine._instancesByStore.set(keyObj, this);
+    // If constructed directly (without options.internal), perform duplicate
+    // detection and fail fast so callers discover misconfiguration early.
+    if (!options?.internal) {
+      try {
+        const asAny: any = this.store as any;
+        if (typeof asAny.getSyncEngine === 'function') {
+          const existing = asAny.getSyncEngine();
+          if (existing && existing !== undefined) {
+            throw new Error('SyncEngine: duplicate engine already registered on store');
+          }
+        } else {
+          const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
+          if (keyObj) {
+            try {
+              const existing = SyncEngine._instancesByStore.get(keyObj);
+              if (existing && existing !== undefined) {
+                throw new Error('SyncEngine: duplicate engine already registered for this store');
+              }
+            } catch (e) {
+              // If registry read fails, surface the error to the caller to avoid hiding misconfiguration
+              throw e;
+            }
+          }
+        }
+      } catch (e) {
+        // Fail fast on duplicates / registry errors so callers can migrate to getOrCreate
+        throw e;
       }
-    } catch (e) {
-      console.warn('SyncEngine: instance registry unavailable (write)', e);
     }
 
-    // If the store exposes the event bus with the standard .on() API, subscribe
-    // to all events so a single engine drives outbound message coalescing and
-    // clock progression. This reduces the chance of divergent clocks when
-    // multiple writers exist.
+    // Register only when constructed directly (non-internal). The factory
+    // (getOrCreate) will perform registration itself to avoid double-setting.
+    if (!options?.internal) {
+      try {
+        const asAny: any = this.store as any;
+        if (typeof asAny.setSyncEngine === 'function') {
+          try { asAny.setSyncEngine(this); } catch (_) {}
+        } else {
+          const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
+          if (keyObj) {
+            try { SyncEngine._instancesByStore.set(keyObj, this); } catch (e) { console.warn('SyncEngine: instance registry unavailable (write)', e); }
+          }
+        }
+      } catch (e) {
+        console.warn('SyncEngine: instance registry unavailable (write)', e);
+      }
+    }
+
+    // Subscribe to store events when available. This subscription is orthogonal
+    // to registration but is suppressed by earlier duplicate-detection via
+    // throwing (we want callers to fail fast instead of quietly running).
     try {
-      const bus = shouldSubscribe ? this.store?.events : undefined;
+      const bus = this.store?.events;
       if (bus && typeof bus.on === 'function') {
-        // Decouple heavy sync processing from the storage emitter by buffering
-        // incoming events and flushing them in a microtask. This reduces
-        // synchronous cost on the storage path and coalesces bursts.
         const buffer: StorageEvent[] = [];
         const MAX_BUFFERED_EVENTS = 500;
         let scheduled = false;
@@ -106,18 +139,9 @@ export class SyncEngine {
           }).catch(err => { try { console.error('SyncEngine: flush error', err); } catch (_) {} });
         };
 
-        // Avoid registering a wildcard listener which increases star-listener
-        // fan-out on the StorageEventBus. Subscribe only to concrete event
-        // types that the SyncEngine cares about to limit the number of
-        // listeners routed through the '*' slot.
         const pushAndFlush = (ev: StorageEvent) => {
           try {
-            // Keep the buffer bounded; drop oldest events when overloaded to
-            // avoid unbounded memory/CPU cost. This is a pragmatic trade-off to
-            // maintain responsiveness under bursty load.
-            if (buffer.length >= MAX_BUFFERED_EVENTS) {
-              buffer.shift();
-            }
+            if (buffer.length >= MAX_BUFFERED_EVENTS) buffer.shift();
             buffer.push(ev);
             flush();
           } catch (err) {
@@ -129,10 +153,6 @@ export class SyncEngine {
         try { bus.on('updated', pushAndFlush); } catch (_) {}
         try { bus.on('deleted', pushAndFlush); } catch (_) {}
         try { bus.on('linked', pushAndFlush); } catch (_) {};
-
-        // Note: we intentionally avoid a single '*' listener to keep the
-        // StorageEventBus's star-listener arrays small and reduce per-emit
-        // invocation breadth.
       }
     } catch (err) {
       console.warn('SyncEngine: failed to subscribe to store events', err);
