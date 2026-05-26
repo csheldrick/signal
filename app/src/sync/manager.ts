@@ -27,6 +27,8 @@ export interface SyncManagerOptions {
   conflictStrategy?: ConflictStrategy;
   /** How often (ms) the flush loop runs. Default 200. */
   flushIntervalMs?: number;
+  /** Optional externally-provided SyncEngine instance to avoid duplicate engine creation. */
+  engine?: SyncEngine;
 }
 
 export class SyncManager {
@@ -48,7 +50,7 @@ export class SyncManager {
     this.peerId = opts.peerId;
     this.conflictStrategy = opts.conflictStrategy ?? 'last-write-wins';
 
-    this.engine = new SyncEngine(store, opts.peerId);
+    this.engine = opts.engine ?? new SyncEngine(store, opts.peerId);
     this.queue = new SyncQueue();
 
     // Outbound generation is driven by the SyncEngine. Rather than subscribing
