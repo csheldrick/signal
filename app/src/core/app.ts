@@ -11,6 +11,7 @@ import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 import { PresenceTracker } from '../collaboration/presence.js';
 import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
+import { createLazyGraph, createLazyPluginHost } from './factories.js';
 
 import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
@@ -54,19 +55,7 @@ export class SignalApp {
     // without a globalThis writable slot.
     try { setSignalStorageEventBus(this.events); } catch (_) {}
     this.store = new DocumentStore(this.events);
-    const createLazyGraph = () => {
-      let real: GraphBuilder | undefined;
-      const ensure = () => {
-        if (!real) real = new GraphBuilder(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
-        return real!;
-      };
-      return {
-        buildGraph: () => ensure().buildGraph(),
-        findClusters: () => ensure().findClusters(),
-        findHubs: (minLinks?: number) => ensure().findHubs(minLinks),
-      } as unknown as GraphBuilder;
-    };
-    this.graph = createLazyGraph();
+    this.graph = createLazyGraph(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
     // Create a lightweight inverted index and an Indexer that listens to
     // the StorageEventBus. This keeps indexing responsibilities decoupled
     // from the DocumentStore and reduces direct Document subsystem fan-out.
@@ -270,20 +259,7 @@ export class SignalApp {
     };
     // Lazy PluginHost instantiation to reduce startup fan-out and avoid
     // constructing the full plugin subsystem until it's actually used.
-    const createLazyHost = () => {
-      let real: PluginHost | undefined;
-      const ensure = () => {
-        if (!real) real = new PluginHost(pluginContext);
-        return real!;
-      };
-      return {
-        register(plugin: any) { ensure().register(plugin); },
-        enable(pluginId: string) { return ensure().enable(pluginId); },
-        disable(pluginId: string) { return ensure().disable(pluginId); },
-        list() { return ensure().list(); },
-      } as unknown as PluginHost;
-    };
-    this.plugins = createLazyHost();
+    this.plugins = createLazyPluginHost(pluginContext);
 
     // Background summarization warm-up: schedule lightweight summarization for created/updated docs
     // to provide async job processing and warm caches (reduces remote latency on first real request).
