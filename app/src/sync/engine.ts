@@ -56,19 +56,21 @@ export class SyncEngine {
     // Operators/tests will still see a clear message and can migrate to an
     // explicit injection/shared-engine approach.
     if (existing && existing !== this) {
-      try {
-        console.error('SyncEngine: multiple engines bound to the same DocumentStore instance; continuing without registering this second engine to avoid crashing.');
-      } catch (_) { /* swallow logging errors */ }
-      // Do not overwrite the registry entry for the original engine. Proceed
-      // without registering this instance to avoid surprising throws during
-      // normal composition. Note: callers that require strict ownership should
-      // construct and pass a single shared SyncEngine explicitly.
+      // Duplicate engine detected: fail fast so callers can correct ownership.
+      // This prevents silent divergence caused by multiple engines mutating the
+      // same DocumentStore and producing inconsistent clocks.
+      throw new Error('SyncEngine: multiple engines bound to the same DocumentStore instance');
     }
 
     // Attempt to set our registration; if setting fails due to platform issues
     // we log but proceed (we don't hide the duplicate-engine condition above).
     try {
-      SyncEngine._instancesByStore.set(key, this);
+      // Only register this instance if no existing engine is already bound to
+      // the concrete store object. This avoids overwriting the original
+      // engine registration if we detected a duplicate above.
+      if (!existing) {
+        SyncEngine._instancesByStore.set(key, this);
+      }
     } catch (e) {
       console.warn('SyncEngine: instance registry unavailable (write)', e);
     }
@@ -151,7 +153,9 @@ export class SyncEngine {
 
     switch (event.type) {
       case 'created':
-        message = {
+        message = ({
+          // Stable-ish message id to enable reliable queue lookup/deduplication
+          messageId: `${this.peerId}:${event.document.id}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
           operation: 'create',
           documentId: event.document.id,
           payload: {
@@ -162,10 +166,11 @@ export class SyncEngine {
           clock: { ...this.clock },
           peerId: this.peerId,
           timestamp: event.timestamp,
-        };
+        } as any) as SyncMessage;
         break;
       case 'updated':
-        message = {
+        message = ({
+          messageId: `${this.peerId}:${event.documentId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
           operation: 'update',
           documentId: event.documentId,
           payload: {
@@ -176,17 +181,18 @@ export class SyncEngine {
           clock: { ...this.clock },
           peerId: this.peerId,
           timestamp: event.timestamp,
-        };
+        } as any) as SyncMessage;
         break;
       case 'deleted':
-        message = {
+        message = ({
+          messageId: `${this.peerId}:${event.documentId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
           operation: 'delete',
           documentId: event.documentId,
           payload: null,
           clock: { ...this.clock },
           peerId: this.peerId,
           timestamp: event.timestamp,
-        };
+        } as any) as SyncMessage;
         break;
     }
 
