@@ -12,6 +12,7 @@ import type { DocumentStore } from '../storage/store.js';
 import type { StorageEvent } from '../storage/events.js';
 import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
+import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 import { SyncQueue } from './queue.js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
@@ -66,17 +67,16 @@ export class SyncManager {
       this.engine = opts.engine;
     } else {
       try {
-        const asAny: any = store as any;
-        const fromStore = (typeof asAny.getSyncEngine === 'function') ? asAny.getSyncEngine() : undefined;
-        if (fromStore) {
-          this.engine = fromStore;
-        } else {
-          // Use canonical factory which consults store accessors or falls back
-          // to the internal WeakMap registry. Register on the store if possible.
-          const created = SyncEngine.getOrCreate(store as any, opts.peerId);
-          try { if (typeof asAny.setSyncEngine === 'function') asAny.setSyncEngine(created); } catch (_) { /* swallow */ }
-          this.engine = created;
-        }
+      const fromStore = getSyncEngineFromStore(store as any);
+      if (fromStore) {
+        this.engine = fromStore;
+      } else {
+        // Use canonical factory which consults store accessors or falls back
+        // to the internal WeakMap registry. Register on the store if possible.
+        const created = SyncEngine.getOrCreate(store as any, opts.peerId);
+        try { setSyncEngineOnStore(store as any, created); } catch (_) { /* swallow */ }
+        this.engine = created;
+      }
       } catch (_) {
         // Best-effort fallback to factory when any accessor inspection fails.
         this.engine = SyncEngine.getOrCreate(store as any, opts.peerId);

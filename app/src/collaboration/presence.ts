@@ -45,11 +45,34 @@ export interface PeerPresence {
 }
 
 export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
-  // Deprecated shim: no longer performs synchronous store IO on the realtime path.
-  // This conservative implementation prevents legacy callers from triggering
-  // blocking or IO-bound behaviour while guiding migration to the event-driven
-  // validators (StorageEventBus.attachDocumentValidatorFromEvents).
+  // Backwards-compatible shim. Prefer PluginContext-based validators.
+  // If the caller accidentally passes a PluginContext (duck-typed), use it
+  // to create a safe, non-blocking validator. Otherwise preserve the
+  // conservative behaviour of not performing IO on realtime paths.
   let warned = false;
+
+  try {
+    const maybeCtx = (_store as any) as PluginContext | undefined;
+    if (maybeCtx && typeof (maybeCtx as any).getDocument === 'function') {
+      const ctx = maybeCtx as PluginContext;
+      const validator = async (id: string) => {
+        if (!warned) {
+          try { console.warn('createValidatorFromStore called with a PluginContext: using PluginContext.getDocument for validation. Prefer createValidatorFromPluginContext or PresenceTracker.setPluginContext.'); } catch (_) {}
+          warned = true;
+        }
+        try {
+          const d = ctx.getDocument(id);
+          return !!d;
+        } catch (_) {
+          return false;
+        }
+      };
+      (validator as any).dispose = () => { /* no-op */ };
+      return validator;
+    }
+  } catch (_) {
+    // Fall through to conservative fallback
+  }
 
   const validator = async (id: string) => {
     if (!warned) {
@@ -66,6 +89,30 @@ export function createValidatorFromStore(_store: DocumentStore): (id: string) =>
   // Provide a no-op disposer for compatibility with callers that expect it.
   (validator as any).dispose = () => { /* no-op */ };
 
+  return validator;
+}
+
+/**
+ * Create a safe async validator that uses a PluginContext sandbox to
+ * determine whether a document id is valid. This performs no blocking IO and
+ * is the recommended way to wire presence validation in the refactored code.
+ */
+export function createValidatorFromPluginContext(context?: PluginContext): (id: string) => Promise<boolean> {
+  let warned = false;
+  const validator = async (id: string) => {
+    if (!warned) {
+      try { console.warn('createValidatorFromPluginContext: PluginContext-based validator active. Prefer wiring this via PresenceTracker.setPluginContext.'); } catch (_) {}
+      warned = true;
+    }
+    try {
+      if (!context) return false;
+      const d = context.getDocument(id);
+      return !!d;
+    } catch (_) {
+      return false;
+    }
+  };
+  (validator as any).dispose = () => { /* no-op */ };
   return validator;
 }
 
@@ -117,19 +164,33 @@ export class PresenceTracker {
     // Allow wiring a PluginContext after construction to keep PresenceTracker
     // decoupled from the store and enable sandboxed document access. When the
     // context is removed, clear in-flight validations to avoid memory growth
-    // and accidental continued IO against a stale context.
+    // and accidental continued IO against a stale context. Automatically wire
+    // a safe PluginContext-based validator when a context is provided.
     try {
       if (!context) {
         this.context = undefined;
+        this.validator = undefined;
         try {
           // Drop references to any pending validation promises so they can be GC'd.
           this.pendingValidations.clear();
         } catch (_) { /* swallow */ }
         return;
       }
+
       this.context = context;
+
+      // Wire a safe validator that uses the PluginContext sandbox. This avoids
+      // any synchronous/blocking IO on the realtime path and centralizes the
+      // presence -> document validation coupling to the PluginContext API.
+      try {
+        this.validator = createValidatorFromPluginContext(context);
+      } catch (_) {
+        // If wiring the validator fails for any reason, degrade safely.
+        this.validator = undefined;
+      }
     } catch (_) {
       this.context = context;
+      try { this.validator = createValidatorFromPluginContext(context); } catch (_) { this.validator = undefined; }
     }
   }
 

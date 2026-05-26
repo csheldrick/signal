@@ -11,6 +11,7 @@ import type { PluginContext } from '../plugins/host.js';
 import { SyncEngine } from '../sync/engine.js';
 import { PresenceTracker } from '../collaboration/presence.js';
 import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
+import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 import { createLazyGraph, createLazyPluginHost } from './factories.js';
 
 import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
@@ -143,7 +144,7 @@ export class SignalApp {
               // to avoid accidental duplicate SyncEngine instances and to
               // centralize engine registration. Fall back to the app-local
               // _sync only if the store does not expose a registered engine.
-              const fromStore = (this.store && typeof (this.store as any).getSyncEngine === 'function') ? (this.store as any).getSyncEngine() : undefined;
+              const fromStore = (this.store ? getSyncEngineFromStore(this.store) : undefined);
               if (fromStore && typeof fromStore.getClock === 'function') return fromStore;
             } catch (_) { /* swallow */ }
             try { return (this as any)._sync; } catch (_) { return undefined; }

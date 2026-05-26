@@ -45,7 +45,29 @@ export interface PluginContext {
   summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
 }
 
-export const dire: Record<string, unknown> = Object.freeze({});
+// Deprecated: 'dire' was previously a shared primitive that encouraged
+// cross-subsystem coupling. The refactor routes document access through
+// PluginContext and removes any meaningful behaviour from 'dire'. We keep an
+// inert frozen proxy for compatibility so legacy imports do not crash, but
+// accessing it will be inert and will emit a one-time deprecation warning.
+export const dire: Record<string, unknown> = ((): Record<string, unknown> => {
+  try {
+    const inert: any = {};
+    let warned = false;
+    const proxy = new Proxy(inert, {
+      get(target, prop) {
+        try { if (!warned) { console.warn("PluginHost.dire is deprecated and no longer supported; use PluginContext sandbox APIs instead."); warned = true; } } catch (_) {}
+        return undefined;
+      },
+      ownKeys() { return []; },
+      getOwnPropertyDescriptor() { return undefined as any; },
+    });
+    return Object.freeze(proxy as Record<string, unknown>);
+  } catch (_) {
+    try { console.warn('PluginHost.dire is deprecated and no longer supported; use PluginContext sandbox APIs instead.'); } catch (_) {}
+    return Object.freeze({});
+  }
+})();
 
 export class PluginHost {
   private static readonly MAX_REGISTERED_PLUGINS = 12; // tightened to reduce plugin subsystem fan-out and resource pressure

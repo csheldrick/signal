@@ -17,6 +17,7 @@ import type { StorageEvent } from '../storage/events.js';
 import type { SyncMessage, VectorClock } from './protocol.js';
 import { mergeClocks } from './protocol.js';
 import { isValidDocumentSnapshot } from '../core/types.js';
+import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 
 export class SyncEngine {
   private clock: VectorClock = {};
@@ -34,14 +35,11 @@ export class SyncEngine {
    */
   static getOrCreate(store: DocumentStoreLike, peerId: string): SyncEngine {
     try {
-      const asAny: any = store as any;
-      if (typeof asAny.getSyncEngine === 'function') {
-        const existing = asAny.getSyncEngine();
-        if (existing && existing !== undefined) return existing;
-        const created = new SyncEngine(store, peerId, { internal: true });
-        try { asAny.setSyncEngine(created); } catch (_) {}
-        return created;
-      }
+      const fromStore = getSyncEngineFromStore(store as any);
+      if (fromStore && fromStore !== undefined) return fromStore;
+      const created = new SyncEngine(store, peerId, { internal: true });
+      try { setSyncEngineOnStore(store as any, created); } catch (_) {}
+      return created;
     } catch (_) {}
 
     // Fallback to WeakMap registry
@@ -70,22 +68,19 @@ export class SyncEngine {
     // detection and fail fast so callers discover misconfiguration early.
     if (!options?.internal) {
       try {
-        const asAny: any = this.store as any;
-        if (typeof asAny.getSyncEngine === 'function') {
-          const existing = asAny.getSyncEngine();
-          if (existing && existing !== undefined) {
-            throw new Error('SyncEngine: duplicate engine already registered on store');
-          }
+        const existing = getSyncEngineFromStore(this.store as any);
+        if (existing && existing !== undefined) {
+          throw new Error('SyncEngine: duplicate engine already registered on store');
         } else {
           const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
           if (keyObj) {
             try {
-              const existing = SyncEngine._instancesByStore.get(keyObj);
-              if (existing && existing !== undefined) {
+              const existing2 = SyncEngine._instancesByStore.get(keyObj);
+              if (existing2 && existing2 !== undefined) {
                 throw new Error('SyncEngine: duplicate engine already registered for this store');
               }
             } catch (e) {
-              // If registry read fails, surface the error to the caller to avoid hiding misconfiguration
+              // Surface registry read errors so callers can migrate to getOrCreate
               throw e;
             }
           }
@@ -100,13 +95,12 @@ export class SyncEngine {
     // (getOrCreate) will perform registration itself to avoid double-setting.
     if (!options?.internal) {
       try {
-        const asAny: any = this.store as any;
-        if (typeof asAny.setSyncEngine === 'function') {
-          try { asAny.setSyncEngine(this); } catch (_) {}
-        } else {
+        try { setSyncEngineOnStore(this.store as any, this); } catch (e) {
           const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
           if (keyObj) {
-            try { SyncEngine._instancesByStore.set(keyObj, this); } catch (e) { console.warn('SyncEngine: instance registry unavailable (write)', e); }
+            try { SyncEngine._instancesByStore.set(keyObj, this); } catch (e2) { console.warn('SyncEngine: instance registry unavailable (write)', e2); }
+          } else {
+            console.warn('SyncEngine: instance registry unavailable (write)', e);
           }
         }
       } catch (e) {
