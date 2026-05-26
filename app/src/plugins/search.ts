@@ -27,14 +27,50 @@ export class SearchPlugin implements Plugin {
     this.context = undefined;
   }
 
+  private lastSearchTs = 0;
+  private static readonly MIN_INTERVAL_MS = 50;
+  private static readonly MAX_TEXT_LENGTH = 500;
+  private static readonly MAX_TAGS = 10;
+
   search(query: SearchQuery): ReadonlyArray<SearchResult> {
     if (!this.context) return [];
+
+    // Per-plugin short cooldown to avoid high-frequency probes hitting the
+    // inverted index or backend search implementation. Fail-safe: return an
+    // empty result rather than blocking or throwing.
+    const now = Date.now();
+    if (now - this.lastSearchTs < SearchPlugin.MIN_INTERVAL_MS) return [];
+    this.lastSearchTs = now;
+
     if (!query || (!query.text && (!query.tags || query.tags.length === 0) && !query.dateRange)) {
       // Short-circuit obviously-empty queries to avoid unnecessary work in
       // potentially expensive search implementations.
       return [];
     }
-    return this.context.searchDocuments(query);
+
+    // Sanitize inputs to protect the search/subsystem from pathological
+    // queries (very long text or excessively many tags). This reduces
+    // accidental overload while preserving useful behaviour.
+    const safeQuery: any = { ...query } as any;
+    try {
+      if (typeof safeQuery.text === 'string' && safeQuery.text.length > SearchPlugin.MAX_TEXT_LENGTH) {
+        safeQuery.text = safeQuery.text.slice(0, SearchPlugin.MAX_TEXT_LENGTH);
+      }
+      if (Array.isArray(safeQuery.tags) && safeQuery.tags.length > SearchPlugin.MAX_TAGS) {
+        safeQuery.tags = safeQuery.tags.slice(0, SearchPlugin.MAX_TAGS);
+      }
+    } catch (_) {
+      // If sanitization fails for any reason, avoid escalating the error to
+      // the host; return a safe empty result.
+      return [];
+    }
+
+    try {
+      return this.context.searchDocuments(safeQuery);
+    } catch (_) {
+      // Protect callers from upstream errors in search implementations.
+      return [];
+    }
   }
 }
 

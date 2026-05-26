@@ -226,8 +226,20 @@ export class PluginHost {
               const key = type;
               let mgr = this.pluginEventManagers.get(key);
               if (!mgr) {
-                mgr = { upstreamDispose: undefined, listeners: new Set() };
-                this.pluginEventManagers.set(key, mgr);
+                // Limit the number of distinct event types we actively manage to
+                // avoid unbounded growth of pluginEventManagers (each distinct
+                // type can hold many listeners). If the cap is reached, avoid
+                // adding another manager and fall back to a no-op behaviour.
+                const MAX_EVENT_TYPES = 32;
+                if (this.pluginEventManagers.size >= MAX_EVENT_TYPES) {
+                  try { console.warn('PluginHost: event manager type limit reached; registering noop listener'); } catch (_) {}
+                  mgr = { upstreamDispose: undefined, listeners: new Set() };
+                  // Do NOT insert into the map to avoid growth; the listener will
+                  // still be tracked in the local mgr and removed by the returned disposer.
+                } else {
+                  mgr = { upstreamDispose: undefined, listeners: new Set() };
+                  this.pluginEventManagers.set(key, mgr);
+                }
               }
                             // Prevent runaway listener growth per plugin: cap listeners to a reasonable bound.
               // Reuse existing PluginHost limit for a simple protective heuristic.

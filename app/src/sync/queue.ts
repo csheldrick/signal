@@ -96,10 +96,15 @@ export class SyncQueue {
 
   peek(now = Date.now()): QueueEntry[] {
     // Return entries due now. Keep the returned objects live (not removed)
-    // so callers decide ack/fail semantics.
+    // so callers decide ack/fail semantics. To avoid returning an unbounded
+    // set (which can overload consumers), cap the batch size.
     const out: QueueEntry[] = [];
+    const MAX_BATCH = 50;
     for (const e of this.entries) {
-      if (e.nextRetryAt <= now) out.push(e);
+      if (e.nextRetryAt <= now) {
+        out.push(e);
+        if (out.length >= MAX_BATCH) break;
+      }
     }
     return out;
   }

@@ -18,39 +18,54 @@ export class ExportPlugin implements Plugin {
     this.context = undefined;
   }
 
+  private lastExportTs = 0;
+  private static readonly MIN_EXPORT_INTERVAL_MS = 500;
+
   exportToMarkdown(): string {
     if (!this.context) return '';
 
-    const all = this.context.listDocuments();
-    const MAX_EXPORT = 500;
-    let docs = all;
-    let truncatedNote = '';
-    if (all.length > MAX_EXPORT) {
-      docs = all.slice(0, MAX_EXPORT);
-      truncatedNote = `\n\n[Export truncated: ${all.length} documents, included first ${MAX_EXPORT}]\n`;
-    }
-    const docsTransformed = docs.map(d => ({
-      ...d,
-      links: Array.isArray((d as any).links) ? (d as any).links.map((l: any) => ({ ...l })) : [],
-      tags: Array.isArray((d as any).tags) ? [...(d as any).tags] : [],
-    }));
-    const lines: string[] = [];
+    // Throttle exports to avoid repeated expensive list/cloning operations
+    // that can overload the document store or plugin host. If called too
+    // frequently, return a short empty export rather than blocking.
+    const now = Date.now();
+    if (now - this.lastExportTs < ExportPlugin.MIN_EXPORT_INTERVAL_MS) return '';
+    this.lastExportTs = now;
 
-    for (const doc of docsTransformed) {
-      lines.push(`# ${doc.title}`);
-      lines.push('');
-      lines.push(doc.content);
-      if (doc.tags.length > 0) {
-        lines.push('');
-        lines.push(`Tags: ${doc.tags.join(', ')}`);
+    try {
+      const all = this.context.listDocuments();
+      const MAX_EXPORT = 500;
+      let docs = all;
+      let truncatedNote = '';
+      if (all.length > MAX_EXPORT) {
+        docs = all.slice(0, MAX_EXPORT);
+        truncatedNote = `\n\n[Export truncated: ${all.length} documents, included first ${MAX_EXPORT}]\n`;
       }
-      lines.push('');
-      lines.push('---');
-      lines.push('');
-    }
+      const docsTransformed = docs.map(d => ({
+        ...d,
+        links: Array.isArray((d as any).links) ? (d as any).links.map((l: any) => ({ ...l })) : [],
+        tags: Array.isArray((d as any).tags) ? [...(d as any).tags] : [],
+      }));
+      const lines: string[] = [];
 
-    if (truncatedNote) lines.push(truncatedNote);
-    return lines.join('\n');
+      for (const doc of docsTransformed) {
+        lines.push(`# ${doc.title}`);
+        lines.push('');
+        lines.push(doc.content);
+        if (doc.tags.length > 0) {
+          lines.push('');
+          lines.push(`Tags: ${doc.tags.join(', ')}`);
+        }
+        lines.push('');
+        lines.push('---');
+        lines.push('');
+      }
+
+      if (truncatedNote) lines.push(truncatedNote);
+      return lines.join('\n');
+    } catch (_) {
+      // Fail-safe: never throw from a plugin helper; return empty export on error.
+      return '';
+    }
   }
 }
 

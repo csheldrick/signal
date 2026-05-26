@@ -105,8 +105,22 @@ export class PresenceTracker {
   private context: PluginContext | undefined;
   setPluginContext(context?: PluginContext): void {
     // Allow wiring a PluginContext after construction to keep PresenceTracker
-    // decoupled from the store and enable sandboxed document access.
-    this.context = context;
+    // decoupled from the store and enable sandboxed document access. When the
+    // context is removed, clear in-flight validations to avoid memory growth
+    // and accidental continued IO against a stale context.
+    try {
+      if (!context) {
+        this.context = undefined;
+        try {
+          // Drop references to any pending validation promises so they can be GC'd.
+          this.pendingValidations.clear();
+        } catch (_) { /* swallow */ }
+        return;
+      }
+      this.context = context;
+    } catch (_) {
+      this.context = context;
+    }
   }
 
   /**
@@ -116,7 +130,26 @@ export class PresenceTracker {
    * invoked if present.
    */
   setSessionTracker(tracker?: { openSession?: (id: string, clock?: any) => void; closeSession?: (id: string) => void; list?: () => any[] }): void {
-    try { (this as any).sessionTracker = tracker; } catch (_) { /* swallow */ }
+    // Wrap and store a safe, minimal session-tracker to avoid leaking rich
+    // cross-subsystem objects directly into PresenceTracker. All invocations
+    // are wrapped in try/catch to prevent plugin or external errors from
+    // impacting realtime paths.
+    try {
+      if (!tracker) {
+        (this as any).sessionTracker = undefined;
+        return;
+      }
+      const safe: any = {
+        openSession: typeof tracker.openSession === 'function' ? (id: string, clock?: any) => { try { tracker.openSession!(id, clock); } catch (_) {} } : undefined,
+        closeSession: typeof tracker.closeSession === 'function' ? (id: string) => { try { tracker.closeSession!(id); } catch (_) {} } : undefined,
+        list: typeof tracker.list === 'function' ? () => { try { return tracker.list!(); } catch (_) { return []; } } : undefined,
+      };
+      // Allow optional heartbeat updater if present on the tracker (non-standard).
+      if (typeof (tracker as any).updateHeartbeat === 'function') {
+        safe.updateHeartbeat = (peerId: string) => { try { (tracker as any).updateHeartbeat(peerId); } catch (_) {} };
+      }
+      (this as any).sessionTracker = safe;
+    } catch (_) { /* swallow */ }
   }
   // Cache in-flight validations per document id to deduplicate concurrent
   // validations (reduces redundant IO and CPU when many peers target the same doc).
