@@ -132,8 +132,8 @@ export class StorageEventBus implements StorageEventBusContract {
     // tiers: a microtask yield for moderate listener counts and a macrotask
     // (setTimeout) when listener counts are very large to allow the event
     // loop to recover and avoid long-running synchronous bursts.
-    const MICROTASK_YIELD_THRESHOLD = 2; // previous conservative threshold
-    const MACROTASK_YIELD_THRESHOLD = 20; // when exceeded, use setTimeout to yield more
+    const MICROTASK_YIELD_THRESHOLD = 0; // conservative: yield to microtask for any non-zero listeners
+    const MACROTASK_YIELD_THRESHOLD = 10; // more aggressive macrotask yield to avoid long synchronous bursts
 
     if (totalListeners > MACROTASK_YIELD_THRESHOLD) {
       // Very large listener counts: schedule a macrotask to avoid saturating

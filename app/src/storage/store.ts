@@ -324,15 +324,34 @@ export class DocumentStore {
     }
 
     this.documents.clear();
+    const createdEvents: any[] = [];
     for (const doc of docs) {
-      // Insert the document into the in-memory store and emit a 'created' event
+      // Insert the document into the in-memory store and queue a 'created' event
       // so existing event-driven validators and consumers can discover loaded
       // documents without directly importing the store.
       const stored = cloneDocument(doc);
       this.documents.set(doc.id, stored);
       this.opCounts.create++;
-      // Emit asynchronously to avoid synchronous initialization storms.
-      this.events.emitAsync({ type: 'created', document: createDocumentSnapshot(stored), timestamp: Date.now(), seq: undefined });
+      // Defer emission into a single macrotask to reduce StorageEventBus fan-out
+      // during load initialization.
+      createdEvents.push({ type: 'created', document: createDocumentSnapshot(stored), timestamp: Date.now(), seq: undefined });
+    }
+
+    if (createdEvents.length > 0) {
+      try {
+        setTimeout(() => {
+          for (const ev of createdEvents) {
+            try { this.events.emitAsync(ev); } catch (_) { /* swallow individual emit errors */ }
+          }
+        }, 0);
+      } catch (_) {
+        // Timers may be unavailable in some environments; fall back to emitting
+        // using the existing emitAsync to preserve behavior while avoiding a
+        // synchronous flood inside the load loop.
+        for (const ev of createdEvents) {
+          try { this.events.emitAsync(ev); } catch (_) { /* swallow */ }
+        }
+      }
     }
   }
 
