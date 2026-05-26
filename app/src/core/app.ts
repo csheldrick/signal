@@ -152,7 +152,7 @@ export class SignalApp {
 
           const attempt = async (triesLeft: number): Promise<string | undefined> => {
             try {
-              return await (summarizer as any).summarize(d);
+              return await summarizer.summarize(d);
             } catch (err) {
               if (triesLeft <= 0) return undefined;
               await new Promise(res => setTimeout(res, BASE_MS * Math.pow(2, MAX_RETRIES - triesLeft)));
