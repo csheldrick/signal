@@ -4,6 +4,7 @@
 
 import type { DocumentSnapshot, SearchQuery, SearchResult, SearchResultSnapshot } from '../core/types.js';
 import type { StorageEvent, StorageEventType } from '../storage/events.js';
+export type { StorageEvent, StorageEventType } from '../storage/events.js';
 
 export type { SearchQuery } from '../core/types.js';
 export type { SearchResultSnapshot as SearchResult } from '../core/types.js';
