@@ -5,11 +5,11 @@
 // store or sync engine imports.
 
 import type { Plugin, PluginContext } from '../plugins/host.js';
-import type { Document } from '../core/types.js';
+import type { DocumentSnapshot } from '../core/types.js';
 
 // Types exposed for backwards compatibility — deprecated direct imports.
 // Use PluginContext.listDocuments().map(...) instead.
-export type DocumentStore = Document;
+export type DocumentStore = DocumentSnapshot;
 export type SyncEngine = PluginContext;
 
 // Deprecated interfaces — use PluginContext methods instead.

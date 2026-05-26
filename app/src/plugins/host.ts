@@ -2,10 +2,11 @@
 // Plugin lifecycle manager. Defines the sandbox boundary.
 // Plugins receive a PluginContext — NOT the store directly.
 
-import type { Document, SearchQuery, SearchResult } from '../core/types.js';
+import type { DocumentSnapshot, SearchQuery, SearchResultSnapshot } from '../core/types.js';
 import type { StorageEvent, StorageEventType } from '../storage/events.js';
 
-export type { SearchQuery, SearchResult } from '../core/types.js';
+export type { SearchQuery } from '../core/types.js';
+export type { SearchResultSnapshot as SearchResult } from '../core/types.js';
 
 export interface Plugin {
   id: string;
@@ -24,9 +25,9 @@ export interface PluginContext {
    * Plugins receive readonly snapshots to prevent accidental mutation of
    * core application state and to make the sandbox contract explicit.
    */
-  listDocuments(): ReadonlyArray<Readonly<Document>>;
-  searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResult>>;
-  getDocument(id: string): Readonly<Document> | undefined;
+  listDocuments(): ReadonlyArray<Readonly<DocumentSnapshot>>;
+  searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResultSnapshot>>;
+  getDocument(id: string): Readonly<DocumentSnapshot> | undefined;
   getClock(): { [peerId: string]: number };
 
   /**
@@ -43,7 +44,7 @@ export interface PluginContext {
   summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
 }
 
-export const dire: any = (() => {
+export const dire: Record<string, unknown> = (() => {
   // Backwards-compat stub for removed 'dire' primitive. Accessing it logs a
   // one-time deprecation warning and returns undefined on property access so
   // older plugins don't crash at import-time.

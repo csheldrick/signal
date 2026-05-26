@@ -2,7 +2,7 @@
 // Builds a traversable graph from document links.
 // Imports from core/types and storage — creates cross-module edges.
 
-import type { Document, DocumentLink } from '../core/types.js';
+import type { DocumentSnapshot, DocumentLink } from '../core/types.js';
 
 
 export interface GraphNode {
@@ -20,7 +20,7 @@ export class GraphBuilder {
   private lastSignature: string | undefined;
   private cachedGraph: AdjacencyList | undefined;
 
-  constructor(private readonly listDocuments: () => Document[]) {}
+  constructor(private readonly listDocuments: () => DocumentSnapshot[]) {}
 
   private computeSignature(docs: Document[]): string {
     // Stable short signature: id and updatedAt are sufficient to detect content changes

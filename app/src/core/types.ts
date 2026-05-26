@@ -14,6 +14,19 @@ export interface Document {
   version?: number;
 }
 
+// Minimal, readonly-friendly snapshot used at subsystem/plugin boundaries.
+// This mirrors the main Document shape but is explicit to signal the
+// lightweight, readonly contract for external consumers such as plugins.
+export interface DocumentSnapshot {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  links: DocumentLink[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DocumentLink {
   sourceId: string;
   targetId: string;
@@ -30,6 +43,13 @@ export interface SearchQuery {
 
 export interface SearchResult {
   document: Document;
+  score: number;
+  highlights: string[];
+}
+
+// Snapshot variant of search results where the document is a DocumentSnapshot.
+export interface SearchResultSnapshot {
+  document: DocumentSnapshot;
   score: number;
   highlights: string[];
 }
