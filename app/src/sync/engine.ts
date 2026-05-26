@@ -7,6 +7,8 @@ interface DocumentStoreLike {
   create(id: string, title: string, content: string, tags?: string[]): unknown;
   update(id: string, changes: { title?: string; content?: string; tags?: string[] }): unknown | undefined;
   delete(id: string): boolean;
+  // Optional link operation to create logical document links. Not all stores may implement it.
+  link?(sourceId: string, targetId: string, kind?: string): unknown;
   // Optional events bus compatible with the concrete StorageEventBus implementation
   events?: import('../storage/events.js').StorageEventBusContract;
 }
@@ -145,6 +147,47 @@ export class SyncEngine {
       }
       case 'delete':
         return this.store.delete(message.documentId);
+      case 'linked': {
+        // Attempt to apply a logical link. Many store implementations may
+        // not support an explicit link API; call it if present and return
+        // a boolean-ish success indicator. Be defensive and avoid throwing
+        // so that unsupported operations degrade gracefully.
+        try {
+          const payload = message.payload as { link?: any } | undefined;
+          const link = payload && typeof payload === 'object' ? payload.link ?? payload : undefined;
+          const storeAny: any = this.store;
+          if (typeof storeAny.link === 'function') {
+            if (link && typeof link === 'object') {
+              const sourceId = (link as any).sourceId ?? message.documentId;
+              const targetId = (link as any).targetId ?? message.documentId;
+              const kind = (link as any).kind ?? undefined;
+              try {
+                const res = storeAny.link(sourceId, targetId, kind);
+                return res !== undefined ? !!res : true;
+              } catch (_) {
+                // If calling with object form is supported, try that too.
+              }
+              try {
+                const res2 = storeAny.link(link);
+                return res2 !== undefined ? !!res2 : true;
+              } catch (_) {
+                return false;
+              }
+            }
+
+            // Fallback: attempt to call link with the document id as a single arg
+            try {
+              const res3 = storeAny.link(message.documentId);
+              return res3 !== undefined ? !!res3 : true;
+            } catch (_) {
+              return false;
+            }
+          }
+        } catch (_) {
+          /* swallow and fall through */
+        }
+        return false;
+      }
       default:
         return false;
     }
@@ -211,7 +254,7 @@ export class SyncEngine {
         const docId = link.targetId ?? link.sourceId ?? link.documentId ?? '';
         message = ({
           messageId: makeMessageId(docId),
-          operation: 'link',
+          operation: 'linked',
           documentId: docId,
           payload: {
             link: {
