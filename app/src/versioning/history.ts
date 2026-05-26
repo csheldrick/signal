@@ -39,7 +39,7 @@ export class VersionHistory {
     const version: DocumentVersion = {
       versionId: `${document.id}@v${history.length + 1}`,
       documentId: document.id,
-      snapshot: Object.freeze({ ...document, links: [...document.links] }),
+      snapshot: Object.freeze({ ...document, links: Array.isArray(document.links) ? document.links.map(l => ({ ...l })) : [] }),
       parentVersionId: parent?.versionId,
       createdAt: Date.now(),
       author,

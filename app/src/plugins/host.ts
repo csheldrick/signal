@@ -90,21 +90,22 @@ export class PluginHost {
     const safeCtx: PluginContext = (() => {
       // Non-generic deepFreeze helper to avoid TS generic parsing issues inside method bodies.
       function deepFreeze(obj: any): any {
+        // Non-mutating deep freeze: create frozen copies instead of
+        // mutating the provided object. This preserves host state and
+        // prevents sandbox wrappers from altering core objects.
         if (obj === null || typeof obj !== 'object') return obj;
         if (Array.isArray(obj)) {
-          for (let i = 0; i < obj.length; i++) {
-            obj[i] = deepFreeze(obj[i]);
-          }
-          return Object.freeze(obj);
+          return Object.freeze(obj.map(item => deepFreeze(item)));
         }
+        const out: any = {};
         for (const key of Object.keys(obj)) {
           try {
-            obj[key] = deepFreeze(obj[key]);
+            out[key] = deepFreeze((obj as any)[key]);
           } catch (_) {
-            /* ignore read-only props */
+            try { out[key] = (obj as any)[key]; } catch (_) { out[key] = undefined; }
           }
         }
-        return Object.freeze(obj);
+        return Object.freeze(out);
       }
 
       const searchCache = new Map<string, { ts: number; results: ReadonlyArray<Readonly<SearchResultSnapshot>> }>();
@@ -139,11 +140,17 @@ export class PluginHost {
             const now = Date.now();
             const cached = searchCache.get(key);
             if (cached && (now - cached.ts) < 250) {
-              // Return cached frozen results
               return cached.results;
             }
 
-            const results = this.context.searchDocuments(q).map(r => {
+            // Call host search once and produce safe, frozen clones for plugins.
+            const raw = (() => {
+              try {
+                return this.context.searchDocuments(q);
+              } catch (_) { return []; }
+            })();
+
+            const results = raw.map(r => {
               const d = r?.document;
               if (!d || typeof d.id !== 'string' || typeof d.title !== 'string') return undefined;
               const safeDoc = deepFreeze({
@@ -156,19 +163,6 @@ export class PluginHost {
 
             searchCache.set(key, { ts: now, results });
             return results;
-          } catch (_) { return []; }
-        
-          try {
-            return this.context.searchDocuments(q).map(r => {
-              const d = r?.document;
-              if (!d || typeof d.id !== 'string' || typeof d.title !== 'string') return undefined;
-              const safeDoc = deepFreeze({
-                ...d,
-                links: Array.isArray(d.links) ? d.links.map((l: any) => deepFreeze({ ...l })) : [],
-                tags: Array.isArray(d.tags) ? [...d.tags] : [],
-              });
-              return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights: Array.isArray(r.highlights) ? [...r.highlights] : [] });
-            }).filter((x): x is Readonly<SearchResult> => !!x);
           } catch (_) { return []; }
         },
         getDocument: (id: string) => {

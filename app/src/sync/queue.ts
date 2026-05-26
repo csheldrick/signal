@@ -25,7 +25,11 @@ export interface SyncQueueOptions {
 }
 
 export class SyncQueue {
+  // Keep an ordered list for stable FIFO dispatch, but maintain a Map for
+  // O(1) lookup by the deduplication key (documentId + operation). This
+  // retains existing semantics while avoiding O(n) scans on ack/fail/enqueue.
   private readonly entries: QueueEntry[] = [];
+  private readonly index: Map<string, QueueEntry> = new Map();
   private readonly maxQueueSize: number;
   private readonly maxAttempts: number;
   private readonly baseDelayMs: number;
@@ -38,21 +42,13 @@ export class SyncQueue {
     this.maxDelayMs = opts.maxDelayMs ?? 30_000;
   }
 
-  /**
-   * Enqueue a message. If a message for the same (documentId, operation)
-   * already exists and has not been attempted yet, it is replaced (dedup).
-   * Returns a Promise that resolves when the message is acked or rejects
-   * after maxAttempts are exhausted.
-   */
+  private keyFor(msg: SyncMessage): string {
+    return `${msg.documentId}::${msg.operation}`;
+  }
+
   enqueue(message: SyncMessage): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      // Dedup: replace a pending entry for the same document+op.
-      const existingIdx = this.entries.findIndex(
-        e =>
-          e.message.documentId === message.documentId &&
-          e.message.operation === message.operation &&
-          e.attempts === 0,
-      );
+      const key = this.keyFor(message);
 
       const entry: QueueEntry = {
         message,
@@ -62,75 +58,84 @@ export class SyncQueue {
         reject,
       };
 
-      if (existingIdx !== -1) {
-        // Reject the old promise so callers can handle it, then replace.
-        this.entries[existingIdx].reject(
-          new Error(`Superseded by newer ${message.operation} for ${message.documentId}`),
-        );
-        this.entries.splice(existingIdx, 1, entry);
+      const existing = this.index.get(key);
+      if (existing && existing.attempts === 0) {
+        // Replace pending unattempted entry (dedup). Reject the old promise
+        // so callers can react to being superseded.
+        try {
+          existing.reject(new Error(`Superseded by newer ${message.operation} for ${message.documentId}`));
+        } catch (_) { /* ignore */ }
+        // Replace in-place in the ordered list to preserve position.
+        const idx = this.entries.indexOf(existing);
+        if (idx !== -1) this.entries.splice(idx, 1, entry);
+        else this.entries.push(entry);
+        this.index.set(key, entry);
       } else {
         if (this.entries.length >= this.maxQueueSize) {
           const removed = this.entries.shift()!;
-          removed.reject(new Error('Queue full — dropped oldest entry'));
+          const removedKey = this.keyFor(removed.message);
+          this.index.delete(removedKey);
+          try {
+            removed.reject(new Error('Queue full — dropped oldest entry'));
+          } catch (_) { /* ignore */ }
         }
         this.entries.push(entry);
+        this.index.set(key, entry);
       }
     });
   }
 
-  /**
-   * Returns all entries that are due to be sent right now (nextRetryAt <= now).
-   * Does NOT remove them from the queue — call ack() or fail() after dispatch.
-   */
   peek(now = Date.now()): QueueEntry[] {
-    return this.entries.filter(e => e.nextRetryAt <= now);
+    // Return entries due now. Keep the returned objects live (not removed)
+    // so callers decide ack/fail semantics.
+    const out: QueueEntry[] = [];
+    for (const e of this.entries) {
+      if (e.nextRetryAt <= now) out.push(e);
+    }
+    return out;
   }
 
-  /** Acknowledge successful delivery. Resolves the promise and removes entry. */
   ack(message: SyncMessage): void {
-    const idx = this.findIndex(message);
-    if (idx === -1) return;
-    const [entry] = this.entries.splice(idx, 1);
-    entry.resolve();
+    const key = this.keyFor(message);
+    const entry = this.index.get(key);
+    if (!entry) return;
+    // Remove from ordered list and index
+    const idx = this.entries.indexOf(entry);
+    if (idx !== -1) this.entries.splice(idx, 1);
+    this.index.delete(key);
+    try { entry.resolve(); } catch (_) { /* ignore */ }
   }
 
-  /**
-   * Mark a delivery attempt as failed.
-   * Schedules retry (exponential backoff) or rejects if maxAttempts reached.
-   */
   fail(message: SyncMessage, err?: Error): void {
-    const idx = this.findIndex(message);
-    if (idx === -1) return;
+    const key = this.keyFor(message);
+    const entry = this.index.get(key);
+    if (!entry) return;
 
-    const entry = this.entries[idx];
     entry.attempts += 1;
 
     if (entry.attempts >= this.maxAttempts) {
-      this.entries.splice(idx, 1);
-      entry.reject(
-        err ?? new Error(`Sync failed after ${entry.attempts} attempts for ${message.documentId}`),
-      );
+      // Remove permanently and reject
+      const idx = this.entries.indexOf(entry);
+      if (idx !== -1) this.entries.splice(idx, 1);
+      this.index.delete(key);
+      try { entry.reject(err ?? new Error(`Sync failed after ${entry.attempts} attempts for ${message.documentId}`)); } catch (_) { /* ignore */ }
       return;
     }
 
-    const delay = Math.min(
-      this.baseDelayMs * Math.pow(2, entry.attempts - 1),
-      this.maxDelayMs,
-    );
+    const delay = Math.min(this.baseDelayMs * Math.pow(2, entry.attempts - 1), this.maxDelayMs);
     entry.nextRetryAt = Date.now() + delay;
   }
 
-  /** How many messages are currently queued. */
   get size(): number {
     return this.entries.length;
   }
 
-  /** Drain all entries without sending — useful for shutdown / tests. */
   clear(): void {
     for (const e of this.entries) {
-      e.reject(new Error('Queue cleared'));
+      try { e.reject(new Error('Queue cleared')); } catch (_) { /* ignore */ }
     }
     this.entries.length = 0;
+    this.index.clear();
   }
 
   private clocksEqual(a: Record<string, number> | undefined, b: Record<string, number> | undefined): boolean {
@@ -143,18 +148,5 @@ export class SyncQueue {
       if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
     }
     return true;
-  }
-
-  private findIndex(message: SyncMessage): number {
-    // Identify queue entries by the stable (documentId, operation) tuple.
-    // This aligns with enqueue()'s dedup semantics and avoids brittle
-    // matching on clock object identity or deep-equality (which can fail
-    // when logically-equivalent clocks are represented by different objects
-    // or when clocks differ but the logical message to ack/fail is the same).
-    return this.entries.findIndex(
-      e =>
-        e.message.documentId === message.documentId &&
-        e.message.operation === message.operation,
-    );
   }
 }

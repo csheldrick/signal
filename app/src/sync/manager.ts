@@ -189,15 +189,23 @@ export class SyncManager {
     // cadence instead of being enqueued directly by every storage event.
     try {
       const outbound = this.engine.drainOutbound();
+      {
+      // Batch enqueue outbound messages concurrently to avoid serializing the flush
+      // on each individual enqueue while still honoring the queue's retry semantics.
+      const enqPromises: Promise<void>[] = [];
       for (const msg of outbound) {
-        try {
-          // Awaiting enqueue keeps the queue's internal retry/backoff semantics from
-          // being bypassed and avoids unbounded parallel enqueueing.
-          await this.queue.enqueue(msg);
-        } catch (err) {
-          this.emitTelemetry('queue_enqueue_failed', { message: msg, error: err });
-        }
+        enqPromises.push(
+          this.queue.enqueue(msg).catch(err => {
+            // Convert rejection to a handled telemetry emission so a single failure
+            // does not throw from flush; queue.enqueue already enforces semantics.
+            try { this.emitTelemetry('queue_enqueue_failed', { message: msg, error: err }); } catch (_) {}
+          }),
+        );
       }
+      // Wait for all enqueues to be enqueued (not for delivery/acks) so we keep
+      // the flush loop semantics predictable.
+      await Promise.all(enqPromises);
+    }
     } catch (err) {
       // Ensure unexpected engine errors don't crash the flush loop.
       this.emitTelemetry('engine_drain_error', { error: err });

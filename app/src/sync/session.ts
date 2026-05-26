@@ -13,6 +13,8 @@ export class PeerSession {
 
   /** Buffered inbound messages received while in 'syncing' state. */
   private inboundBuffer: SyncMessage[] = [];
+  // Prevent unbounded growth under heavy inbound traffic; drop oldest when full.
+  private readonly maxInboundBufferSize = 200;
 
   constructor(peerId: string, initialClock: VectorClock = {}) {
     this.peerId = peerId;
@@ -97,6 +99,10 @@ export class PeerSession {
   // once the current sync round completes.
 
   buffer(message: SyncMessage): void {
+    // Drop oldest when buffer reaches capacity to avoid unbounded memory use.
+    if (this.inboundBuffer.length >= this.maxInboundBufferSize) {
+      this.inboundBuffer.shift();
+    }
     this.inboundBuffer.push(message);
   }
 
