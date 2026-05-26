@@ -198,12 +198,11 @@ export class SignalApp {
 
         // Deny network summarization when caller does not explicitly request it.
         try {
-          const sSumm: Summarizer = summarizer;
           if (summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
             return undefined;
           }
 
-          const isRemote = !!(summarizer && (summarizer as any).isRemote);
+          const isRemote = summarizer.isRemote;
           // If remote, enforce a simple concurrency cap to avoid unbounded
           // in-flight remote requests that can backlog and affect realtime flows.
           if (isRemote && remoteSummarizeInFlight >= MAX_CONCURRENT_REMOTE_SUMMARIES) {
