@@ -7,12 +7,12 @@
 // dependency. Weave can use this to detect when a node's history diverges
 // from its declared intent (e.g., a "draft" document that never stabilises).
 
-import type { Document } from '../core/types.js';
+import type { DocumentSnapshot } from '../core/types.js';
 
 export interface DocumentVersion {
   versionId: string;
   documentId: string;
-  snapshot: Readonly<Document>;
+  snapshot: Readonly<DocumentSnapshot>;
   parentVersionId: string | undefined;
   createdAt: number;
   author: string;
@@ -28,7 +28,7 @@ export class VersionHistory {
   private chains: Map<string, DocumentVersion[]> = new Map();
   private byId: Map<string, DocumentVersion> = new Map();
 
-  snapshot(document: Document, author: string): DocumentVersion {
+  snapshot(document: DocumentSnapshot, author: string): DocumentVersion {
     if (!author || author.trim() === '') {
       throw new Error('VersionHistory.snapshot requires a non-empty author (authentication required).');
     }
@@ -102,6 +102,17 @@ export class VersionHistory {
         l => !toLines.includes(l) && l.trim() !== '',
       ),
       unchanged: toLines.filter(l => fromLines.has(l)).length,
+    };
+  }
+
+  // Get the current internal state as a snapshot for inspection/debugging
+  getState(): {
+    chains: Map<string, DocumentVersion[]>;
+    byId: Map<string, DocumentVersion>;
+  } {
+    return {
+      chains: new Map(this.chains),
+      byId: new Map(this.byId),
     };
   }
 }

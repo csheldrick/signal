@@ -93,7 +93,9 @@ export function isValidDocumentSnapshot(obj: any): obj is DocumentSnapshot {
 }
 
 export function validateDocumentChange(ch?: DocumentChange): boolean {
-  if (!ch || typeof ch !== 'object') return true; // empty change allowed
+  if (ch === undefined || ch === null) return true;
+
+  if (typeof ch !== 'object') return false; // empty change allowed
 
   // Title: must be string if present and within reasonable length
   if (ch.title !== undefined) {
