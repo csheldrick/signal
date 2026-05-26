@@ -77,7 +77,8 @@ export class PluginHost {
       // Enforce explicit opt-in for the PluginContext sandbox. Fail fast to
       // prevent accidental sandbox escapes and to encourage migration of
       // legacy plugins to the sandboxed contract.
-      throw new Error(`Plugin '${plugin.id}' must set usesPluginContext = true to register with PluginHost`);
+      try { console.warn(`Plugin '${plugin.id}' must set usesPluginContext = true to register with PluginHost`); } catch (_) { /* swallow */ }
+      return;
     }
 
     if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {

@@ -386,9 +386,30 @@ export class PresenceTracker {
       this.validator = undefined;
       return;
     }
+
+    // Wrap the provided async validator with defensive guards:
+    // - normalize exceptions to false
+    // - enforce a generous timeout so slow IO cannot block presence paths
+    // This keeps the realtime path resilient while allowing IO-backed validators.
     this.validator = async (id: string) => {
       try {
-        return await validate(id);
+        const timeoutMs = 2500; // upper-bound for store/network checks
+
+        const guarded = (async (): Promise<boolean> => {
+          try {
+            const r = await validate(id);
+            return !!r;
+          } catch (_) {
+            return false;
+          }
+        })();
+
+        const result = await Promise.race([
+          guarded,
+          new Promise<boolean>(resolve => setTimeout(() => resolve(false), timeoutMs)),
+        ]);
+
+        return !!result;
       } catch (_) {
         return false;
       }

@@ -2,7 +2,7 @@
 // Builds a traversable graph from document links.
 // Imports from core/types and storage — creates cross-module edges.
 
-import type { DocumentSnapshot, Document } from '../core/types.js';
+import type { DocumentSnapshot } from '../core/types.js';
 
 
 export interface GraphNode {
@@ -22,9 +22,9 @@ export class GraphBuilder {
   private lastSignature: string | undefined;
   private cachedGraph: AdjacencyList | undefined;
 
-  constructor(private readonly listDocuments: () => Array<Document | DocumentSnapshot>) {}
+  constructor(private readonly listDocuments: () => Array<DocumentSnapshot>) {}
 
-  private computeSignature(docs: Array<Document | DocumentSnapshot>): string {
+  private computeSignature(docs: Array<DocumentSnapshot>): string {
     // Stable short signature: id and updatedAt are sufficient to detect content changes
     return docs.map(d => `${d.id}:${d.updatedAt}`).join('|');
   }
@@ -39,7 +39,7 @@ export class GraphBuilder {
 
   async buildGraph(): Promise<AdjacencyList> {
     const docs = this.listDocuments();
-    const signature = this.computeSignature(docs as Array<Document | DocumentSnapshot>);
+    const signature = this.computeSignature(docs);
     if (this.lastSignature === signature && this.cachedGraph) {
       return this.cloneAdjacency(this.cachedGraph);
     }

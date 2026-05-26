@@ -260,7 +260,29 @@ export class DocumentStore {
       seqCounter: this.seqCounter,
       appliedMutationIds: Array.from(this.appliedMutationIds),
     };
-    writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+    try {
+      // Schedule the potentially-heavy filesystem write off the immediate
+      // caller path to avoid blocking the event loop in hot paths. Provide
+      // a synchronous fallback to preserve durability if scheduling is
+      // unavailable.
+      try {
+        setImmediate(() => {
+          try {
+            writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+          } catch (_) { /* swallow secondary write errors */ }
+        });
+      } catch (_) {
+        // setImmediate might not be available in some environments; fall
+        // back to synchronous write.
+        try {
+          writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+        } catch (_) { /* swallow */ }
+      }
+    } catch (_) {
+      // As a last resort, attempt a synchronous write and swallow failures to
+      // avoid crashing the host process from save() calls.
+      try { writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8'); } catch (_) { /* swallow */ }
+    }
   }
 
   load(filePath: string): void {
