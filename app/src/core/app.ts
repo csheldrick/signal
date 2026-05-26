@@ -12,7 +12,7 @@ import { PresenceTracker } from '../collaboration/presence.js';
 
 import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
 import type { Summarizer } from '../ai/summarizer.js';
-import type { Document } from '../core/types.js';
+import type { Document, DocumentSnapshot } from '../core/types.js';
 
 export interface AppConfig {
   dataPath: string;
@@ -64,14 +64,25 @@ export class SignalApp {
     };
 
     const pluginContext: PluginContext = {
-      listDocuments: () => {
-        try {
-          const list = this.store.list();
-          return Array.isArray(list) ? list.map((d: any) => cloneDoc(d)) : [];
-        } catch (_) {
-          return [];
-        }
-      },
+      listDocuments: (() => {
+        // Short-lived cache to reduce repeated expensive cloning for plugin calls.
+        let cachedTs = 0;
+        let cached: ReadonlyArray<Readonly<DocumentSnapshot>> = [];
+        const TTL_MS = 100;
+        return () => {
+          try {
+            const now = Date.now();
+            if (now - cachedTs < TTL_MS) return cached;
+            const list = this.store.list();
+            const results = Array.isArray(list) ? list.map((d: any) => cloneDoc(d)) : [];
+            cachedTs = now;
+            cached = results;
+            return results;
+          } catch (_) {
+            return [];
+          }
+        };
+      })(),
       searchDocuments: (query) => {
         try {
           const res = this.store.search(query) as any[];
@@ -172,7 +183,7 @@ export class SignalApp {
           // requested it by passing allowNetwork = true. The summarizer's own
           // allowsNetwork flag still controls whether it was constructed to
           // permit network usage, but callers must opt-in to allow remote calls.
-          if (sSumm.isRemote && (!allowNetwork || !sSumm.allowsNetwork)) {
+          if ((typeof (sSumm as any).isRemote === 'boolean' ? (sSumm as any).isRemote : false) && (!allowNetwork || !(typeof (sSumm as any).allowsNetwork === 'boolean' ? (sSumm as any).allowsNetwork : false))) {
             return undefined;
           }
 
@@ -239,6 +250,13 @@ export class SignalApp {
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
     this.presence = new PresenceTracker();
+    try {
+      // Wire the sandboxed PluginContext into PresenceTracker so it can validate
+      // documents without directly accessing the store.
+      if (typeof (this.presence as any).setPluginContext === 'function') {
+        (this.presence as any).setPluginContext(pluginContext);
+      }
+    } catch (_) { /* swallow */ }
     const initialIds = this.store.list().map(d => d.id);
 
     // Provide a synchronous snapshot validator for the realtime path so callers

@@ -106,6 +106,11 @@ export class PresenceTracker {
   private validator?: (id: string) => Promise<boolean>;
 
   private context: PluginContext | undefined;
+  setPluginContext(context?: PluginContext): void {
+    // Allow wiring a PluginContext after construction to keep PresenceTracker
+    // decoupled from the store and enable sandboxed document access.
+    this.context = context;
+  }
   // Cache in-flight validations per document id to deduplicate concurrent
   // validations (reduces redundant IO and CPU when many peers target the same doc).
   private pendingValidations: Map<string, Promise<boolean>> = new Map();

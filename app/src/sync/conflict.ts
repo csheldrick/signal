@@ -54,25 +54,25 @@ export function resolveConflict(
       // apply a deterministic tie-breaker: prefer the version with larger
       // serialized content size (more content), then lexicographically by id.
       if (rdoc.updatedAt > ldoc.updatedAt) {
-        winner = remote;
+        winner = { ...rdoc };
       } else if (rdoc.updatedAt < ldoc.updatedAt) {
-        winner = local;
+        winner = { ...ldoc };
       } else {
         const remoteSize =
           (rdoc.content ? rdoc.content.length : 0) + (rdoc.title ? rdoc.title.length : 0);
         const localSize =
           (ldoc.content ? ldoc.content.length : 0) + (ldoc.title ? ldoc.title.length : 0);
         if (remoteSize !== localSize) {
-          winner = remoteSize > localSize ? rdoc : ldoc;
+          winner = remoteSize > localSize ? { ...rdoc } : { ...ldoc };
         } else {
-          winner = rdoc.id >= ldoc.id ? rdoc : ldoc;
+          winner = rdoc.id >= ldoc.id ? { ...rdoc } : { ...ldoc };
         }
       }
       break;
     }
 
     case 'first-write-wins':
-      winner = ldoc.createdAt <= rdoc.createdAt ? ldoc : rdoc;
+      winner = ldoc.createdAt <= rdoc.createdAt ? { ...ldoc } : { ...rdoc };
       break;
 
     case 'merge-content': {
@@ -100,7 +100,7 @@ export function resolveConflict(
     }
 
     default:
-      winner = remote;
+      winner = { ...rdoc };
   }
 
   const record: ConflictRecord = {

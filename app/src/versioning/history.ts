@@ -91,8 +91,10 @@ export class VersionHistory {
     const to = this.byId.get(toVersionId);
     if (!from || !to) return undefined;
 
-    const fromLines = new Set(from.snapshot.content.split('\n'));
-    const toLines = to.snapshot.content.split('\n');
+    const fromContent = typeof from.snapshot.content === 'string' ? from.snapshot.content : '';
+    const toContent = typeof to.snapshot.content === 'string' ? to.snapshot.content : '';
+    const fromLines = new Set(fromContent.split('\n'));
+    const toLines = toContent.split('\n');
 
     return {
       added: toLines.filter(l => !fromLines.has(l) && l.trim() !== ''),

@@ -59,7 +59,7 @@ export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   }
 
   // Bound size to prevent unbounded growth in large deployments
-  const MAX_CLOCK_ENTRIES = 1000;
+  const MAX_CLOCK_ENTRIES = 200;
   const entries = Object.entries(merged);
   if (entries.length > MAX_CLOCK_ENTRIES) {
     entries.sort(([, aTick], [, bTick]) => (bTick as number) - (aTick as number));

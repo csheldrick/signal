@@ -212,6 +212,15 @@ export class PluginHost {
                 mgr = { upstreamDispose: undefined, listeners: new Set() };
                 this.pluginEventManagers.set(key, mgr);
               }
+                            // Prevent runaway listener growth per plugin: cap listeners to a reasonable bound.
+              // Reuse existing PluginHost limit for a simple protective heuristic.
+              try {
+                if (mgr.listeners.size >= PluginHost.MAX_REGISTERED_PLUGINS) {
+                  try { console.warn('PluginHost: per-event listener registration limit reached'); } catch (_) {}
+                  // Return a no-op disposer to keep caller expectations consistent.
+                  return () => {};
+                }
+              } catch (_) {}
               mgr.listeners.add(listener);
 
               // Install upstream listener when first plugin subscribes for this type.
