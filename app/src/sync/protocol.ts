@@ -37,7 +37,7 @@ export interface VectorClock {
 }
 
 export interface SyncMessage {
-  operation: 'create' | 'update' | 'delete' | 'link';
+  operation: 'create' | 'update' | 'delete' | 'linked';
   documentId: string;
   payload: unknown;
   clock: VectorClock;
