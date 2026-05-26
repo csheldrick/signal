@@ -91,6 +91,9 @@ export class PluginHost {
     if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {
       throw new Error(`PluginHost: cannot register plugin '${plugin.id}': plugin registration limit reached`);
     }
+    if (this.plugins.has(plugin.id)) {
+      throw new Error(`PluginHost: plugin '${plugin.id}' is already registered`);
+    }
     this.plugins.set(plugin.id, plugin);
   }
 

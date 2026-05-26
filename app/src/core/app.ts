@@ -362,7 +362,36 @@ export class SignalApp {
         // engine. If no engine is installed, rethrow the error so callers can
         // observe the misconfiguration.
         try {
-          const created = new SyncEngine(this.store, this._peerId);
+          let created: SyncEngine;
+          try {
+            // Attempt to create a new engine. If another actor created one
+            // concurrently, the SyncEngine constructor may throw to signal a
+            // duplicate binding; handle that deterministically below.
+            created = new SyncEngine(this.store, this._peerId);
+          } catch (err) {
+            // If construction failed, prefer an already-installed engine on the
+            // store (the preferred shared instance). If one exists, adopt it;
+            // otherwise rethrow to surface the configuration error to callers.
+            const installed = (this.store as any)[ENGINE_KEY] as SyncEngine | undefined;
+            if (installed) {
+              this._sync = installed;
+              created = installed;
+            } else {
+              throw err;
+            }
+          }
+
+          // If we don't yet have a cached engine reference, publish the one
+          // we created/adopted on the store so other callers can reuse it.
+          if (!this._sync) {
+            this._sync = created;
+            try {
+              Object.defineProperty(this.store, ENGINE_KEY, { value: created, configurable: true, enumerable: false, writable: true });
+            } catch (_) {
+              // Best-effort fallback for environments that disallow defineProperty
+              (this.store as any)[ENGINE_KEY] = created;
+            }
+          }
           try {
             Object.defineProperty(this.store, ENGINE_KEY, { value: created, enumerable: false, configurable: true });
           } catch (_){

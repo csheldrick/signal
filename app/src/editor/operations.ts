@@ -2,7 +2,8 @@
 // High-level document editing operations.
 // Imports from core/types, storage/store, and storage/events.
 
-import type { Document, DocumentChange, LinkKind } from '../core/types.js';
+import type { DocumentSnapshot, DocumentChange, LinkKind } from '../core/types.js';
+import { createDocumentSnapshot } from '../core/types.js';
 import type { DocumentStore } from '../storage/store.js';
 
 let nextId = 1;
@@ -16,17 +17,19 @@ export function createDocument(
   title: string,
   content: string,
   tags: string[] = [],
-): Document {
+): DocumentSnapshot {
   const id = generateId();
-  return store.create(id, title, content, tags);
+  const d = store.create(id, title, content, tags);
+  return createDocumentSnapshot(d);
 }
 
 export function updateDocument(
   store: DocumentStore,
   id: string,
   changes: DocumentChange,
-): Document | undefined {
-  return store.update(id, changes);
+): DocumentSnapshot | undefined {
+  const updated = store.update(id, changes);
+  return updated ? createDocumentSnapshot(updated) : undefined;
 }
 
 export function linkDocuments(
