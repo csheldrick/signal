@@ -50,22 +50,47 @@ export interface PluginContext {
 // PluginContext and removes any meaningful behaviour from 'dire'. We keep an
 // inert frozen proxy for compatibility so legacy imports do not crash, but
 // accessing it will be inert and will emit a one-time deprecation warning.
-export const dire: Record<string, unknown> = ((): Record<string, unknown> => {
+export const dire: any = ((): any => {
+  // Back-compat shim: provide a forgiving, callable proxy that will not
+  // throw if legacy plugins attempt chained property access or invocation.
+  // Emit a single deprecation warning on first use.
   try {
-    const inert: any = {};
     let warned = false;
-    const proxy = new Proxy(inert, {
-      get(target, prop) {
-        try { if (!warned) { console.warn("PluginHost.dire is deprecated and no longer supported; use PluginContext sandbox APIs instead."); warned = true; } } catch (_) {}
+    const warnOnce = () => {
+      if (!warned) {
+        try { console.warn('PluginHost.dire is deprecated and no longer supported; use PluginContext sandbox APIs instead.'); } catch (_) {}
+        warned = true;
+      }
+    };
+
+    // Create a function-like proxy that is callable and also returns itself
+    // for any property access. This prevents TypeError for patterns like
+    // dire.foo().bar or dire().foo and graceful no-op behaviour when called.
+    const base = function() { warnOnce(); return undefined; };
+
+    const handler: ProxyHandler<any> = {
+      apply(_target, _thisArg, _args) {
+        warnOnce();
         return undefined;
+      },
+      get(_target, _prop) {
+        // Return the same proxy for any accessed property so chained access
+        // remains safe. Warn on first access.
+        warnOnce();
+        return proxy;
       },
       ownKeys() { return []; },
       getOwnPropertyDescriptor() { return undefined as any; },
-    });
-    return Object.freeze(proxy as Record<string, unknown>);
+      has() { return false; },
+      set() { return true; },
+      defineProperty() { return true; },
+    };
+
+    const proxy = new Proxy(base as any, handler);
+    return Object.freeze(proxy);
   } catch (_) {
     try { console.warn('PluginHost.dire is deprecated and no longer supported; use PluginContext sandbox APIs instead.'); } catch (_) {}
-    return Object.freeze({});
+    return Object.freeze(() => undefined);
   }
 })();
 

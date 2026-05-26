@@ -1,4 +1,4 @@
-export const SYM_SYNC_ENGINE = Symbol('signal:sync-engine');
+import { SYM_SYNC_ENGINE } from './store.js';
 
 /**
  * Retrieve a SyncEngine previously attached to a concrete store object.

@@ -165,7 +165,9 @@ export function createInvertedIndex(): InvertedIndex {
   return new InvertedIndexImpl();
 }
 
-export class Indexer {
+export interface IndexerContract { dispose(): void; }
+
+export class Indexer implements IndexerContract {
   private disposers: Array<() => void> = [];
   constructor(events: any, private readonly index: InvertedIndex) {
     if (!events || !this.index) return;

@@ -3,7 +3,7 @@
 // from every module — gives Loom a central hub in the graph.
 
 import { DocumentStore } from '../storage/store.js';
-import { StorageEventBus } from '../storage/events.js';
+import { StorageEventBus, StorageEventBusContract } from '../storage/events.js';
 import { GraphBuilder } from '../graph/builder.js';
 import { createInvertedIndex, Indexer } from '../index/inverted.js';
 import { PluginHost } from '../plugins/host.js';
@@ -32,6 +32,7 @@ export interface AppConfig {
 export class SignalApp {
   readonly store: DocumentStore;
   readonly events: StorageEventBus;
+  readonly eventsContract: StorageEventBusContract;
   readonly graph: GraphBuilder;
   readonly plugins: PluginHost;
   readonly presence: PresenceTracker;
@@ -49,6 +50,12 @@ export class SignalApp {
 
   constructor(config: AppConfig) {
     this.events = new StorageEventBus();
+    // Provide a contract-typed view over the concrete event bus instance so
+    // lightly-coupled components can depend on the StorageEventBusContract
+    // without requiring the concrete class. This preserves existing callers
+    // that expect the concrete StorageEventBus while making the contract
+    // discoverable for architectural analysis and decoupling.
+    this.eventsContract = this.events;
     // Expose the app StorageEventBus on a small, well-known global slot so
     // lightly-coupled components (e.g. PresenceTracker wrappers) can emit
     // session lifecycle events without requiring an additional constructor
