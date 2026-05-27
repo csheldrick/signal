@@ -3,6 +3,7 @@
 // Plugins receive a PluginContext — NOT the store directly.
 
 import type { DocumentSnapshot, SearchQuery, SearchResult, SearchResultSnapshot } from '../core/types.js';
+import { normalizeSearchQuery } from '../core/types.js';
 import type { StorageEvent, StorageEventType } from '../storage/events.js';
 export type { StorageEvent, StorageEventType } from '../storage/events.js';
 
@@ -192,7 +193,12 @@ export class PluginHost {
             // sufficient for typical plugin queries; fallback to String(q)
             // on serialization errors.
             const key = (() => {
-              try { return JSON.stringify(q); } catch (_) { return String(q); }
+              try {
+                  const nq = normalizeSearchQuery(q as any);
+                  return JSON.stringify(nq);
+                } catch (_) {
+                  try { return JSON.stringify(q); } catch (_) { return String(q); }
+                }
             })();
 
             const now = Date.now();

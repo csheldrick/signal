@@ -130,7 +130,7 @@ class InvertedIndexImpl implements InvertedIndex {
       }
 
       results.sort((a, b) => b.score - a.score);
-      return results.slice(0, 100).map(r => ({ document: r.doc, score: r.score, highlights: r.highlights }));
+      return results.slice(0, 50).map(r => ({ document: r.doc, score: r.score, highlights: r.highlights }));
     } catch (_) {
       return [];
     }
