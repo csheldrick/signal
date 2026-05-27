@@ -414,37 +414,44 @@ export class SignalApp {
           return;
         }
 
+        // Mark this job active so global concurrency accounting is accurate.
+        try { (this as any)._bgSummarizeActive = ((this as any)._bgSummarizeActive ?? 0) + 1; } catch (_) {}
         const t = setTimeout(async () => {
-          // Clear per-doc timer slot immediately (we're running it now)
-          try { timers.delete(id); } catch (_) {}
           try {
-            const doc = this.store.read(id);
-            if (doc) {
-              try {
-                // Use the configured summarizer (may be remote) instead of always using local.
-                // This allows background work to benefit from remote summarization when available.
-                if (!this._summarizer && !this._localSummarizer) { const Lc = getLocalSummarizerClass(); if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } } }
-                const summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
-                if (summarizer && typeof summarizer.summarize === 'function') await summarizer.summarize(doc);
-                try { lastMap.set(id, Date.now()); } catch (_) {}
-                try { console.debug && console.debug(`background summarization completed for ${id}`); } catch (_) {}
-              } catch (_) {
-                // swallow summarization errors; do not update lastMap so future attempts can retry
+            // Clear per-doc timer slot immediately (we're running it now)
+            try { timers.delete(id); } catch (_) {}
+            try {
+              const doc = this.store.read(id);
+              if (doc) {
+                try {
+                  // Use the configured summarizer (may be remote) instead of always using local.
+                  // This allows background work to benefit from remote summarization when available.
+                  if (!this._summarizer && !this._localSummarizer) { const Lc = getLocalSummarizerClass(); if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } } }
+                  const summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
+                  if (summarizer && typeof summarizer.summarize === 'function') await summarizer.summarize(doc);
+                  try { lastMap.set(id, Date.now()); } catch (_) {}
+                  try { console.debug && console.debug(`background summarization completed for ${id}`); } catch (_) {}
+                } catch (_) {
+                  // swallow summarization errors; do not update lastMap so future attempts can retry
+                }
               }
-            }
-          } catch (_) { /* swallow background errors */ }
-          // Mark job finished and try to drain a queued job.
-          try {
-            try { const Lr = getLocalSummarizerClass(); if (Lr && typeof Lr.releaseRequest === 'function') Lr.releaseRequest(); } catch (_) {}
-            const next = (this as any)._bgSummarizeQueue.shift();
-            if (next) {
-              // Use a short defer to avoid deep synchronous recursion and to
-              // give the event loop a chance to schedule other work.
-              setTimeout(() => {
-                try { scheduleSummarize(next); } catch (_) {}
-              }, 0);
-            }
-          } catch (_) { /* swallow */ }
+            } catch (_) { /* swallow background errors */ }
+            // Mark job finished and try to drain a queued job.
+            try {
+              try { const Lr = getLocalSummarizerClass(); if (Lr && typeof Lr.releaseRequest === 'function') Lr.releaseRequest(); } catch (_) {}
+              const next = (this as any)._bgSummarizeQueue.shift();
+              if (next) {
+                // Use a short defer to avoid deep synchronous recursion and to
+                // give the event loop a chance to schedule other work.
+                setTimeout(() => {
+                  try { scheduleSummarize(next); } catch (_) {}
+                }, 0);
+              }
+            } catch (_) { /* swallow */ }
+          } finally {
+            // Decrement global active counter defensively so the accounting stays accurate even on errors.
+            try { (this as any)._bgSummarizeActive = Math.max(0, ((this as any)._bgSummarizeActive ?? 1) - 1); } catch (_) {}
+          }
         }, 2000);
 
         timers.set(id, t);
