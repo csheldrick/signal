@@ -19,7 +19,9 @@ export class ExportPlugin implements Plugin {
   }
 
   private lastExportTs = 0;
+  private cachedExport: string | undefined;
   private static readonly MIN_EXPORT_INTERVAL_MS = 500;
+  private static readonly EXPORT_CACHE_TTL_MS = 5000;
 
   exportToMarkdown(): string {
     if (!this.context) return '';
@@ -28,7 +30,13 @@ export class ExportPlugin implements Plugin {
     // that can overload the document store or plugin host. If called too
     // frequently, return a short empty export rather than blocking.
     const now = Date.now();
-    if (now - this.lastExportTs < ExportPlugin.MIN_EXPORT_INTERVAL_MS) return '';
+    if (now - this.lastExportTs < ExportPlugin.MIN_EXPORT_INTERVAL_MS) {
+      // Return a cached export if it's still fresh to avoid re-scanning
+      // the document list on rapid repeated calls which can overload the
+      // store and plugin host.
+      if (this.cachedExport && (now - this.lastExportTs) < ExportPlugin.EXPORT_CACHE_TTL_MS) return this.cachedExport;
+      return '';
+    }
     this.lastExportTs = now;
 
     try {
@@ -71,7 +79,9 @@ export class ExportPlugin implements Plugin {
       }
 
       if (truncatedNote) lines.push(truncatedNote);
-      return lines.join('\n');
+      const out = lines.join('\n');
+      this.cachedExport = out;
+      return out;
     } catch (_) {
       // Fail-safe: never throw from a plugin helper; return empty export on error.
       return '';

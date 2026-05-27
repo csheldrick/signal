@@ -13,7 +13,7 @@ export function createLazyGraph(storeGetter: () => any[]): GraphBuilder {
     if (!real) real = new GraphBuilder(() => {
       try {
         const l = storeGetter();
-        return Array.isArray(l) ? l.slice(0, 500) : [];
+        return Array.isArray(l) ? l.slice(0, 300) : [];
       } catch (_) {
         return [];
       }

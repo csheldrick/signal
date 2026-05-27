@@ -1,14 +1,14 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
-import type { DocumentChange } from '../core/types.js';
-import { normalizeDocumentChange } from '../core/types.js';
 
+// OfflineSyncQueue stores an opaque payload (any) so it can be used to
+// persist SyncManager outbound messages or DocumentChange mutations.
 export interface OfflineEntry {
   id: string; // stable id for the queued mutation
   peerId: string;
   documentId: string;
-  change: DocumentChange;
+  payload: any;
   timestamp: number;
   seq: number;
 }
@@ -23,8 +23,8 @@ export interface OfflineSyncQueueOptions {
 /**
  * OfflineSyncQueue
  *
- * Durable, per-peer queue that persists DocumentChange mutations to disk
- * when network transport is unavailable. Ensures causal (timestamp/seq)
+ * Durable, per-peer queue that persists opaque payloads to disk when
+ * network transport is unavailable. Ensures causal (timestamp/seq)
  * ordering when draining and provides robust rewrite behaviour so partially
  * applied drains do not lose remaining entries.
  */
@@ -50,25 +50,24 @@ export class OfflineSyncQueue extends EventEmitter {
     return join(this.dataDir, name);
   }
 
-  private makeEntry(peerId: string, documentId: string, change: DocumentChange): OfflineEntry {
+  private makeEntry(peerId: string, documentId: string, payload: any): OfflineEntry {
     return {
       id: `${peerId}:${documentId}:${Date.now()}:${Math.floor(Math.random() * 1e9).toString(36)}`,
       peerId,
       documentId,
-      change,
+      payload,
       timestamp: Date.now(),
       seq: Number(process.hrtime.bigint() % BigInt(Number.MAX_SAFE_INTEGER)),
     };
   }
 
   /**
-   * Enqueue a change for the given peer. Synchronously persists to disk
-   * before resolving to provide a conservative durability guarantee.
+   * Enqueue a payload for the given peer. Durably appends to disk
+   * asynchronously while returning quickly to the caller.
    */
-  async enqueue(peerId: string, documentId: string, change: DocumentChange): Promise<void> {
+  async enqueue(peerId: string, documentId: string, payload: any): Promise<void> {
     if (!peerId) throw new Error('peerId required');
-    const safeChange = normalizeDocumentChange(change) ?? {};
-    const entry = this.makeEntry(peerId, documentId, safeChange);
+    const entry = this.makeEntry(peerId, documentId, payload);
 
     // append to in-memory queue immediately (fast, non-blocking)
     const q = this.memQueues.get(peerId) ?? [];

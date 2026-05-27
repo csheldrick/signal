@@ -62,7 +62,7 @@ export interface DocumentChange {
   tags?: string[];
 }
 
-export type DeprecatedDocumentChange = DocumentChange;
+// DeprecatedDocumentChange removed: use DocumentChange and normalizeDocumentChange; do NOT import this deprecated alias.
 
 // Utility: create a lightweight, readonly-friendly DocumentSnapshot from a Document.
 // Encourages passing snapshots across subsystem boundaries to avoid accidental

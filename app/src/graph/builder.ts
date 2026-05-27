@@ -25,21 +25,29 @@ export class GraphBuilder {
   constructor(private readonly listDocuments: () => Array<DocumentSnapshot>) {}
 
   private computeSignature(docs: Array<DocumentSnapshot>): string {
-    // Stable short signature: id and updatedAt are sufficient to detect content changes
-    // Build a compact numeric signature rather than concatenating many strings
-    // This reduces temporary string allocation and GC pressure for large doc sets.
-    let hash = 2166136261 >>> 0;
-    for (const d of docs) {
+    // Fast, lightweight signature computation to reduce CPU pressure.
+    // Instead of hashing every id string, sample a bounded prefix of
+    // documents and combine a checksum with the max updatedAt and total
+    // count. This provides a good heuristic for detecting meaningful
+    // changes while keeping per-build cost low under high load.
+    const cap = Math.max(0, Math.min(docs.length, GraphBuilder.MAX_DOCS_PROCESS));
+    let maxUpdated = 0;
+    let checksum = 0;
+    for (let i = 0; i < cap; i++) {
+      const d = docs[i];
+      const updated = Number((d as any).updatedAt ?? 0) || 0;
+      if (updated > maxUpdated) maxUpdated = updated;
       const id = String(d.id || '');
-      for (let i = 0; i < id.length; i++) {
-        hash = Math.imul(hash ^ id.charCodeAt(i), 16777619) >>> 0;
-      }
-      const updatedStr = String((d as any).updatedAt ?? 0);
-      for (let i = 0; i < updatedStr.length; i++) {
-        hash = Math.imul(hash ^ updatedStr.charCodeAt(i), 16777619) >>> 0;
+      // Sample up to 8 chars from each id to bound work and still vary
+      // the checksum for different ids.
+      for (let j = 0; j < Math.min(8, id.length); j++) {
+        checksum = (checksum * 31 + id.charCodeAt(j)) >>> 0;
       }
     }
-    return String(hash);
+
+    const total = docs.length;
+    const sig = (((checksum ^ (maxUpdated >>> 0)) * 16777619) ^ total) >>> 0;
+    return String(sig);
   }
 
   private cloneAdjacency(adj: AdjacencyList): AdjacencyList {
@@ -58,8 +66,8 @@ export class GraphBuilder {
   // long synchronous loops when the doc set is large.
   private building?: Promise<AdjacencyList> | undefined;
   private lastBuildTs: number = 0;
-  private static readonly BUILD_THROTTLE_MS = 250; // short throttle window
-  private static readonly MAX_DOCS_PROCESS = 500; // cap documents per build to bound work
+  private static readonly BUILD_THROTTLE_MS = 1000; // increased throttle window to reduce rebuild frequency under load
+  private static readonly MAX_DOCS_PROCESS = 300; // reduced cap to bound per-build work
 
   async buildGraph(): Promise<AdjacencyList> {
     const docs = this.listDocuments() || [];

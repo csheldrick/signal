@@ -1,5 +1,5 @@
 # signal — Comprehension Report
-> Graph v3 · Project type: **web-api**
+> Graph v2 · Project type: **web-api**
 
 ## Module Boundaries
 
@@ -319,24 +319,12 @@ Confidence: 95%
 ## Detected Invariants
 
 - **guard: Guard clause (null/undefined check)**: Detected 24 occurrence(s) of guard pattern across 13 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
-- **error-boundary: Error boundary (try/catch)**: Detected 152 occurrence(s) of error-boundary pattern across 21 file(s) in module 'signal-app'. Example: "try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } cat" _(88%)_
+- **error-boundary: Error boundary (try/catch)**: Detected 169 occurrence(s) of error-boundary pattern across 22 file(s) in module 'signal-app'. Example: "try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } cat" _(88%)_
 - **validation: Input validation boundary**: Detected 13 occurrence(s) of validation pattern across 5 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
-- **sanitization: Input sanitization**: Detected 3 occurrence(s) of sanitization pattern across 2 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
+- **sanitization: Input sanitization**: Detected 4 occurrence(s) of sanitization pattern across 3 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
 
 ## Architectural Decisions (Lineage)
 
-- **[REFACTOR] refactor: replace Document type with DocumentSnapshot for improved readonly cont** `20ae1ff` 2026-05-26
-  refactor: replace Document type with DocumentSnapshot for improved readonly contract
-
-- Updated presence.ts to use Docum
-- **[REFACTOR] fix(presence): refactor to use PluginContext for document access and remove dire** `2b3326d` 2026-05-25
-  fix(presence): refactor to use PluginContext for document access and remove direct imports
-
- 
-- **[REFACTOR] Refactor code structure for improved readability and maintainability** `7542e4c` 2026-05-25
-  Refactor code structure for improved readability and maintainability
-
- 
 - **[REFACTOR] refactor: replace Document type with DocumentSnapshot for improved readonly cont** `20ae1ff` 2026-05-26
   refactor: replace Document type with DocumentSnapshot for improved readonly contract
 
@@ -426,13 +414,13 @@ Confidence: 95%
 
 ## Services
 
-- **DocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
-- **SyncEngine**: Service inferred from type in app/src/collaboration/presence.ts
-- **DeprecatedDocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
-- **ClockProvider**: Service inferred from interface in app/src/collaboration/presence.ts
-- **SnapshotStore**: Service inferred from interface in app/src/storage/snapshot-service.ts
-- **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts
-- **SyncManager**: Service inferred from class in app/src/sync/manager.ts
+- **DocumentStore**: type in app/src/collaboration/presence.ts
+- **SyncEngine**: type in app/src/collaboration/presence.ts
+- **DeprecatedDocumentStore**: type in app/src/collaboration/presence.ts
+- **ClockProvider**: interface in app/src/collaboration/presence.ts
+- **SnapshotStore**: interface in app/src/storage/snapshot-service.ts
+- **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
+- **SyncManager**: class in app/src/sync/manager.ts
 - **DocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
 - **SyncEngine**: Service inferred from type in app/src/collaboration/presence.ts
 - **DeprecatedDocumentStore**: Service inferred from type in app/src/collaboration/presence.ts

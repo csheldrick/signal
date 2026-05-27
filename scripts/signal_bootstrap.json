@@ -1,162 +1,142 @@
 [
   {
     "type": "goal",
-    "description": "Provide robust real-time collaboration for documents via SignalApp, ensuring low-latency presence updates (PresenceTracker, PeerPresence) and consistent document state (DocumentStore, SyncEngine, SyncManager)."
+    "description": "Provide real-time, eventually-consistent document synchronization for SignalApp using SyncEngine and SyncManager so peers converge on a consistent DocumentSnapshot across peers."
   },
   {
     "type": "goal",
-    "description": "Support extensible indexing and search across documents using InvertedIndex, GraphBuilder, and SearchPlugin so users can query documents with SearchQuery and receive SearchResult/SearchHit."
+    "description": "Support multi-modal summarization: fast local summarization via LocalSummarizer.summarize and larger/remote models via RemoteSummarizer.summarize while preserving correctness and latency SLAs."
   },
   {
     "type": "goal",
-    "description": "Offer AI-assisted document summarization with pluggable implementations: LocalSummarizer for fast local summaries and RemoteSummarizer for higher-quality remote summaries (Summarizer contract)."
+    "description": "Offer an extensible search and indexing subsystem (InvertedIndex, Indexer, IndexWorker, GraphBuilder) that keeps IndexStats and SearchResultSnapshot up-to-date with new DocumentChange events."
   },
   {
     "type": "goal",
-    "description": "Expose a PluginHost/PluginContext model so plugins (ExportPlugin, SearchPlugin) can safely access documents and storage events (StorageEventBus, StorageEvent types) without breaking core invariants."
+    "description": "Maintain presence and collaboration metadata through PresenceTracker, PeerPresence and PresenceStatus so the UI and sync logic can make correct availability decisions."
   },
   {
     "type": "goal",
-    "description": "Ensure operational quality: observability, persistent storage durability, async job processing (background summarization/sync), authentication and adequate test coverage as first-class requirements."
+    "description": "Enable plugin extensibility (Plugin, PluginHost, PluginContext, ExportPlugin, SearchPlugin) without breaking core invariants like data integrity and authenticated access (AppConfig + Authentication required)."
+  },
+  {
+    "type": "goal",
+    "description": "Ensure robust offline-first behavior: offline edits are queued (OfflineSyncQueue, SyncQueue) and reconciled using ConflictCandidate, ConflictResolution and VectorClock semantics."
   },
   {
     "type": "architecture",
-    "description": "Module boundary signal-app contains core runtime: app/* implements services DocumentStore, SyncEngine, SyncManager, ClockProvider and host-level SignalApp which composes these services."
+    "description": "Monolithic 'signal-app' module boundary at app/ groups services (DocumentStore, SnapshotStore, SyncManager) and contracts—intended single module where most domain logic resides."
   },
   {
     "type": "architecture",
-    "description": "Contract-driven design: many domain interfaces (Summarizer, DocumentReader, PresenceStatus, InvertedIndex, PluginContext) define behaviors; implementations (LocalSummarizer, RemoteSummarizer, PresenceTracker) are wired in the app module."
+    "description": "Dual summarizer strategy: LocalSummarizer is pure and synchronous-friendly; RemoteSummarizer encapsulates IO and longer-running async calls, separating concerns for latency and failure handling."
   },
   {
     "type": "architecture",
-    "description": "Event-driven storage model: StorageEventBus plus typed StorageEventCreated/Updated/Deleted/Linked form the observable boundary for indexing, plugin notifications, and sync propagation."
+    "description": "Event-driven storage layer: StorageEventBusContract/StorageEventBus and typed events (StorageEventCreated/Updated/Deleted/Linked) are the primary mechanism to propagate changes to indexing, snapshots and plugins."
   },
   {
     "type": "architecture",
-    "description": "Sync and conflict model: SyncEngine, SyncManager, VectorClock, ConflictCandidate, and ConflictResolution indicate a vector-clock-based synchronization design with explicit conflict resolution strategies."
+    "description": "Worker-pool indexing: IndexerContract + IndexWorker + WorkerPoolOptions implies asynchronous background indexing with separate IndexStats reporting to avoid blocking user writes."
   },
   {
     "type": "architecture",
-    "description": "Plugin isolation: PluginHost and PluginContext are intended to give plugins controlled access to DocumentStore and runtime services (refactor note: Presence refactor uses PluginContext for document access)."
+    "description": "Decoupled snapshot service: DocumentSnapshotService and SnapshotStore abstract snapshot creation and retrieval from the authoritative DocumentStore to support read-optimized queries and versioning."
+  },
+  {
+    "type": "architecture",
+    "description": "Sync queue and session tracking: SyncQueue, OfflineSyncQueue, SyncSessionTracker and SyncSessionState implement ordered delivery and session hygiene to reconcile peer edits and acks (SyncAck). "
   },
   {
     "type": "observation",
-    "description": "LocalSummarizer is implemented as a pure function (LocalSummarizer.summarize) in app/src/ai/summarizer.ts; RemoteSummarizer is asynchronous and has side effects — two distinct runtime profiles for the Summarizer contract."
+    "description": "LocalSummarizer.summarize is implemented as a pure function (no detected side effects) while RemoteSummarizer.summarize is marked as having IO/async side effects — callers must handle both deterministically."
   },
   {
     "type": "observation",
-    "description": "PresenceTracker exposes join(peerId, documentId?) returning PeerPresence and has async side effects; leave() is marked pure in the analysis which may mask necessary cleanup I/O."
+    "description": "There are duplicated/parallel service nodes: DocumentStore and DeprecatedDocumentStore exist concurrently, suggesting a migration in progress and potential code paths still referencing the deprecated API."
   },
   {
     "type": "observation",
-    "description": "createValidatorFromStore(_store: DocumentStore) performs I/O and is used in presence validation; this ties presence logic directly to DocumentStore visibility/integrity."
+    "description": "Presence logic was refactored to use PluginContext for document access (refactor note), indicating plugins now mediate some access that was previously direct (risk of permission or latency regressions)."
   },
   {
     "type": "observation",
-    "description": "There is an explicit refactor: '[REFACTOR] fix(presence): refactor to use PluginContext for document access and remove dire' — code changed to route document access through PluginContext but the note 'remove dire' suggests a removed primitive that other modules might still depend on."
+    "description": "A large set of contracts (e.g., IndexerContract, StorageEventBusContract, SyncQueueOptions) is defined but several corresponding concrete implementations are either duplicated or not apparent in the topology—possible gaps between contract and implementation."
   },
   {
     "type": "observation",
-    "description": "Multiple service nodes are duplicated in the topology (DocumentStore, SyncEngine, ClockProvider, SyncManager appear more than once) — the runtime likely has multiple instances or name collisions in analysis."
+    "description": "Sync and snapshot-related services appear twice in the topology report (two SyncEngine/SyncManager and two DocumentStore/SnapshotStore entries), which likely reflects multiple instantiations or stale analysis artifacts that could hide coupling issues."
   },
   {
     "type": "observation",
-    "description": "StorageEvent types (Created, Updated, Deleted, Linked) and StorageEventBus exist but there's no explicit Contract: StorageEventBus implementation node surfaced — potential gap between contract and concrete event broker."
+    "description": "Constraints include Authentication required and Test coverage required, but there is no explicit authentication service node in the primary topology and Testing adoption is an undecided node—authentication and tests may be incomplete."
   },
   {
     "type": "observation",
-    "description": "Indexing components (InvertedIndex, GraphBuilder, AdjacencyList, IndexStats) are present; GraphBuilder and inverted index roles are separate which implies offline or async indexing stages."
+    "description": "Observability is listed as a constraint, however there is no dedicated Observability service node (metrics/tracing/logging) surfaced; IndexStats exists but cross-cutting telemetry is not visible."
   },
   {
     "type": "observation",
-    "description": "Decision nodes 'TypeScript adoption' and 'Testing adoption' exist — the project contains an explicit decision to adopt TypeScript and increase test coverage, but 'Test coverage required' is flagged as a constraint indicating coverage is not yet sufficient."
+    "description": "Offline sync primitives (OfflineSyncQueue, SyncQueue) and conflict primitives (ConflictCandidate, ConflictResolution, VectorClock) exist, but the presence of DeprecatedDocumentChange indicates legacy change formats may still be produced or consumed."
   },
   {
     "type": "observation",
-    "description": "Top-level module signal-app contains ~20 source files; overall graph reports 187 nodes and 220 edges implying substantial unexposed or library code beyond the app module."
+    "description": "TypeScript adoption and Testing adoption are explicit decision nodes—TypeScript appears largely adopted (many contract/symbol nodes), but Testing adoption remains a decision indicating tests may be incomplete or uneven."
   },
   {
     "type": "constraint",
-    "description": "Authentication required: all remote operations (RemoteSummarizer calls, SyncEngine transport) must validate credentials/authorization before accessing documents or performing sync."
+    "description": "All document mutations must be authenticated and authorized (Authentication required) before being accepted into DocumentStore or SnapshotStore to prevent unauthorized edits."
   },
   {
     "type": "constraint",
-    "description": "Persistent storage: DocumentStore must persist document versions and version history; SyncEngine/SyncManager rely on durable storage to compute VectorClock, VersionHistory, and ConflictResolution correctly."
+    "description": "Background indexing and summarization must be treated as async jobs (Async job processing): IndexWorker and RemoteSummarizer calls must be resilient and backpressure-aware to avoid blocking user commits."
   },
   {
     "type": "constraint",
-    "description": "Async job processing: background tasks (summarization, indexing, conflict resolution) must be resilient, idempotent, and observable — failures should not cause data loss or inconsistent indices."
+    "description": "Persistent storage invariants: DocumentStore, SnapshotStore and VersionHistory must persist authoritative DocumentSnapshot and VectorClock state so sync/merge decisions are deterministic after restart."
   },
   {
     "type": "constraint",
-    "description": "Observability: StorageEventBus and SyncManager must emit sufficient events/metrics to reconstruct system state and diagnose sync/conflict incidents (IndexStats, StorageEvent traces)."
+    "description": "Observability: critical flows (SyncEngine, Indexer, RemoteSummarizer) must emit metrics and structured events (latency, failures, queue depth) to make regressions diagnosable."
   },
   {
     "type": "constraint",
-    "description": "Input validation boundary and guard clauses: domain invariants (Document, DocumentChange, SearchQuery) must be validated at module boundaries to avoid corrupting InvertedIndex or GraphBuilder state."
+    "description": "Minimum automated test coverage (unit + integration) is required for contract-critical components (SyncManager, ConflictResolution, OfflineSyncQueue, Indexer) to avoid regression and reduce reliance on manual QA."
   },
   {
     "type": "hypothesis",
-    "description": "RemoteSummarizer network failures or rate limits will cause visible delays in summarization pipelines; without retries and backpressure the summarization queue could backlog and affect SyncManager."
+    "description": "RemoteSummarizer.summarize will be a frequent source of latency spikes and transient errors under load; without standardized retries and timeouts this will cause user-facing stalls in summary-dependent features."
   },
   {
     "type": "hypothesis",
-    "description": "PresenceTracker.join/leave race conditions will surface under concurrent peers: if leave() is implemented as a pure function (no I/O) but must update shared state, presence may leak stale PeerPresence entries."
+    "description": "Flows still using DeprecatedDocumentStore will diverge from DocumentStore state and produce hard-to-reproduce consistency bugs during merges, especially when OfflineSyncQueue replays edits."
   },
   {
     "type": "hypothesis",
-    "description": "Index staleness: if StorageEventBus implementation is missing or not hooked into DocumentStore, InvertedIndex and GraphBuilder will be out of sync after DocumentStore updates, causing incorrect SearchResult sets."
+    "description": "Indexer worker-pool sizing (IndexWorker + WorkerPoolOptions) is likely under-provisioned causing indexing lag and stale SearchResultSnapshots; search quality will degrade as write throughput increases."
   },
   {
     "type": "hypothesis",
-    "description": "After the refactor to use PluginContext for document access, some plugins or consumers still referencing the removed 'dire' primitive will break at runtime causing plugin initialization failures in PluginHost."
+    "description": "PresenceTracker refactor to PluginContext removed direct document access; plugins without proper permission checks will either fail silently or leak access if PluginContext boundaries are not enforced."
   },
   {
     "type": "hypothesis",
-    "description": "ConflictResolution quality will degrade if SyncEngine instances are duplicated or misconfigured (duplicate DocumentStore/SyncEngine nodes observed); redundant instances may create divergent VectorClock histories."
+    "description": "Lack of centralized observability will make diagnosing sync conflicts and vector clock regressions (VectorClock, ConflictRecord) take significantly longer, increasing mean time to resolution."
   },
   {
-    "type": "goal",
-    "description": "Implement offline-first document sync via an OfflineSyncQueue (app/src/sync/offline-queue.ts) that buffers DocumentChange mutations when the transport is unavailable, persists them durably, and drains them in causal order when the peer reconnects — ensuring no mutations are lost across network interruptions."
+    "type": "tension",
+    "description": "TypeScript adoption and the presence of many Contract nodes suggests strong typing intent, yet legacy artifacts like DeprecatedDocumentStore and DeprecatedDocumentChange contradict a clean migration path."
   },
   {
-    "type": "goal",
-    "description": "Provide a SyncSessionTracker (app/src/sync/session-tracker.ts) that manages per-peer sync session lifecycle: session open/close, heartbeat emission, stale-session detection via configurable timeout, and a SyncSessionEvent bus so SyncManager and PresenceTracker share a single authoritative view of active sessions."
+    "type": "tension",
+    "description": "The system aims for real-time convergence (SyncEngine/SyncManager) while also supporting offline-first replay (OfflineSyncQueue), introducing conflicting requirements for ordering guarantees, latency and resource usage."
   },
   {
-    "type": "goal",
-    "description": "Introduce a DocumentSnapshotService (app/src/storage/snapshot-service.ts) that periodically compacts document history into versioned snapshots, bounds VectorClock vector size, and exposes a SnapshotStore contract so SyncEngine can use the latest snapshot as a fast-forward base during conflict resolution."
+    "type": "tension",
+    "description": "Plugin-driven access (PluginHost, PluginContext) increases extensibility but conflicts with strict authentication/authorization constraints unless plugins are strictly sandboxed and audited."
   },
   {
-    "type": "observation",
-    "description": "No offline mutation buffer currently exists between DocumentStore and SyncEngine; if the transport drops mid-session, in-flight DocumentChange records are discarded and re-creation depends on the user repeating edits — a data-loss surface that OfflineSyncQueue would close."
-  },
-  {
-    "type": "observation",
-    "description": "VectorClock vectors grow unboundedly as peers join and leave; without periodic snapshot compaction the clock comparison cost in ConflictResolution grows O(n) with peer count, which will become a bottleneck in long-running collaborative sessions."
-  },
-  {
-    "type": "observation",
-    "description": "SyncManager has no session-level state today — it treats every sync attempt as stateless. A SyncSessionTracker would let it distinguish a reconnecting peer (needs delta replay from last known clock) from a first-time peer (needs full snapshot), eliminating redundant full-sync transfers."
-  },
-  {
-    "type": "constraint",
-    "description": "OfflineSyncQueue must persist buffered mutations to durable storage (same DocumentStore backend) with a monotonic sequence number so drain order is deterministic and idempotent on replay; duplicate application of a mutation must be a no-op, not a conflict."
-  },
-  {
-    "type": "constraint",
-    "description": "SyncSessionTracker must emit SyncSessionOpened, SyncSessionHeartbeat, SyncSessionStale, and SyncSessionClosed events on StorageEventBus so downstream consumers (PresenceTracker, SyncManager, observability layer) can react without polling."
-  },
-  {
-    "type": "constraint",
-    "description": "DocumentSnapshotService must write snapshots atomically (write-then-swap, never partial) and retain at least the two most recent snapshots so a rollback is always possible without a full history replay; snapshot creation must not block live document writes."
-  },
-  {
-    "type": "hypothesis",
-    "description": "Without OfflineSyncQueue, mobile or flaky-network clients will produce silent edit loss: SyncEngine will report success (local apply) but the mutation will never reach peers, causing invisible divergence that ConflictResolution cannot detect because the missing change was never transmitted."
-  },
-  {
-    "type": "hypothesis",
-    "description": "A DocumentSnapshotService that snapshots on a fixed wall-clock interval (e.g. every 5 minutes) will be insufficient under burst-edit workloads; snapshot frequency should be change-count-triggered (e.g. every N DocumentChange events) to keep VectorClock bounds tight regardless of edit rate."
+    "type": "tension",
+    "description": "Goals to require test coverage and observability are at odds with duplicated/unclear implementations (multiple SyncEngine/DocumentStore entries) which make writing deterministic tests and instrumentation more difficult."
   }
 ]

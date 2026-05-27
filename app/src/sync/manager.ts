@@ -15,6 +15,7 @@ import { SyncEngine } from './engine.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 import { createLazySyncEngine } from './lazyEngine.js';
 import { SyncQueue } from './queue.js';
+import { OfflineSyncQueue } from './offline-queue.js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
 import { isConflict, resolveConflict } from './conflict.js';
@@ -36,6 +37,8 @@ export interface SyncManagerOptions {
   sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
   /** Optional snapshot service to compact vector clocks and expose snapshot hooks. */
   snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
+  /** Optional durable offline queue to persist outbound messages when enqueue fails */
+  offlineQueue?: OfflineSyncQueue;
 }
 
 export class SyncManager {
@@ -43,6 +46,7 @@ export class SyncManager {
   private readonly queue: SyncQueue;
   private readonly sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
   private readonly snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
+  private readonly offlineQueue?: import('./offline-queue.js').OfflineSyncQueue;
   // Observability for sessions: track last-seen and stale state and emit
   // lifecycle events on the store event bus so downstream consumers can
   // react without polling. These are best-effort and do not throw.
@@ -139,6 +143,8 @@ export class SyncManager {
     // Attach optional external hooks (readonly assignment allowed in constructor)
     this.sessionTracker = opts.sessionTracker;
     this.snapshotService = opts.snapshotService;
+    this.offlineQueue = opts.offlineQueue;
+    this.offlineQueue = opts.offlineQueue;
 
     // Outbound generation is driven by the SyncEngine. Rather than subscribing
     // directly to store.events and enqueueing immediately (which can cause
@@ -329,13 +335,18 @@ export class SyncManager {
           this.queue.enqueue(prepared).catch(err => {
             try { this.emitTelemetry('queue_enqueue_failed', { message: prepared, error: err }); } catch (_) {}
             try {
-              const path = `.signal_offline_${this.peerId}.json`;
-              let arr: any[] = [];
-              if (existsSync(path)) {
-                try { arr = JSON.parse(readFileSync(path, 'utf-8') || '[]'); } catch (_) { arr = []; }
+              if (this.offlineQueue) {
+                // Best-effort: persist into the provided offline queue
+                try { (this.offlineQueue as any).enqueue(this.peerId, prepared.documentId ?? '', prepared).catch(() => {}); } catch (_) {}
+              } else {
+                const path = `.signal_offline_${this.peerId}.json`;
+                let arr: any[] = [];
+                if (existsSync(path)) {
+                  try { arr = JSON.parse(readFileSync(path, 'utf-8') || '[]'); } catch (_) { arr = []; }
+                }
+                arr.push(prepared);
+                try { writeFileSync(path, JSON.stringify(arr), 'utf-8'); } catch (_) {}
               }
-              arr.push(prepared);
-              try { writeFileSync(path, JSON.stringify(arr), 'utf-8'); } catch (_) {}
             } catch (_) {}
           }),
         );

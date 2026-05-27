@@ -14,7 +14,7 @@ export type DocumentStore = DocumentSnapshot;
 export type SyncEngine = PluginContext;
 
 // Deprecated aliases removed to reduce cross-subsystem coupling. Prefer PluginContext APIs.
-export type DeprecatedDocumentStore = DocumentSnapshot;
+// DeprecatedDocumentStore removed: prefer PluginContext APIs and core/types.DocumentSnapshot for compatibility; do NOT import this deprecated alias from presence module.
 
 // Deprecated interfaces — use PluginContext methods instead.
 export interface DocumentReader {
