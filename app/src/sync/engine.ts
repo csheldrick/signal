@@ -143,10 +143,20 @@ export class SyncEngine {
           }
         };
 
-        try { bus.on('created', pushAndFlush); } catch (_) {}
-        try { bus.on('updated', pushAndFlush); } catch (_) {}
-        try { bus.on('deleted', pushAndFlush); } catch (_) {}
-        try { bus.on('linked', pushAndFlush); } catch (_) {};
+        try {
+          if (typeof bus.onAsync === 'function') {
+            try { bus.onAsync('created', pushAndFlush); } catch (_) {}
+            try { bus.onAsync('updated', pushAndFlush); } catch (_) {}
+            try { bus.onAsync('deleted', pushAndFlush); } catch (_) {}
+            try { bus.onAsync('linked', pushAndFlush); } catch (_) {}
+          } else {
+            try { bus.on('created', pushAndFlush); } catch (_) {}
+            try { bus.on('updated', pushAndFlush); } catch (_) {}
+            try { bus.on('deleted', pushAndFlush); } catch (_) {}
+            try { bus.on('linked', pushAndFlush); } catch (_) {}
+          }
+        } catch (_) {};
+
       }
     } catch (err) {
       console.warn('SyncEngine: failed to subscribe to store events', err);

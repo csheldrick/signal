@@ -31,7 +31,8 @@ export class WorkerPool {
     for (let i = 0; i < numWorkers; i++) {
       this.workers.push({ work: () => this.processWork(i, maxDocsPerWorker) });
     }
-    this.activeWorkers = this.numWorkers;
+    // No workers are active until work() is invoked; start at 0 to reflect idle state.
+    this.activeWorkers = 0;
   }
 
   private processWork(workerIndex: number, maxDocs: number): void {

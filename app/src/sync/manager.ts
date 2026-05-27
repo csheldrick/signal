@@ -147,7 +147,6 @@ export class SyncManager {
     this.sessionTracker = opts.sessionTracker;
     this.snapshotService = opts.snapshotService;
     this.offlineQueue = opts.offlineQueue;
-    this.offlineQueue = opts.offlineQueue;
 
     // Outbound generation is driven by the SyncEngine. Rather than subscribing
     // directly to store.events and enqueueing immediately (which can cause
