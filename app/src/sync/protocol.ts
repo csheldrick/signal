@@ -62,10 +62,10 @@ export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
     if ((tick ?? 0) <= 0) delete merged[peer];
   }
 
-  // Bound size to prevent unbounded growth in large deployments
-  // Bound size to prevent unbounded growth in large deployments
-  // Reduced from 200 to 64 to limit per-message vector-clock fan-out and memory pressure.
-  const MAX_CLOCK_ENTRIES = 64;
+  // Bound size to prevent unbounded growth in large deployments.
+  // Use a generous limit to reduce frequent truncation which can cause
+  // unnecessary synchronization churn (restore previous safe default).
+  const MAX_CLOCK_ENTRIES = 200;
   const entries = Object.entries(merged);
   if (entries.length > MAX_CLOCK_ENTRIES) {
     entries.sort(([, aTick], [, bTick]) => (bTick as number) - (aTick as number));

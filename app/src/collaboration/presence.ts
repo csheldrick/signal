@@ -10,7 +10,6 @@ import { getSignalStorageEventBus } from '../core/globals.js';
 
 // Types exposed for backwards compatibility — deprecated direct imports.
 // Use PluginContext.listDocuments().map(...) instead.
-export type DocumentStore = DocumentSnapshot;
 export type SyncEngine = PluginContext;
 
 // Deprecated aliases removed to reduce cross-subsystem coupling. Prefer PluginContext APIs.
@@ -44,7 +43,7 @@ export interface PeerPresence {
   seq: number;
 }
 
-export function createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean> {
+export function createValidatorFromStore(_store: any): (id: string) => Promise<boolean> {
   // Deprecated: direct store validators are no longer supported for realtime
   // presence validation. Require a PluginContext to avoid accidental
   // synchronous IO on realtime paths and to make the sandbox contract

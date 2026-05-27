@@ -14,13 +14,14 @@ export class PeerSession {
   /** Buffered inbound messages received while in 'syncing' state. */
   private inboundBuffer: SyncMessage[] = [];
   // Prevent unbounded growth under heavy inbound traffic; drop oldest when full.
-  private readonly maxInboundBufferSize = 100;
+  private maxInboundBufferSize: number;
 
-  constructor(peerId: string, initialClock: VectorClock = {}) {
+  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 100) {
     this.peerId = peerId;
     this._clock = { ...initialClock };
     this._state = 'idle';
     this._lastSeen = 0;
+    this.maxInboundBufferSize = maxInboundBufferSize;
   }
 
   // ── State ──────────────────────────────────────────────────
@@ -106,5 +107,20 @@ export class PeerSession {
 
   get bufferSize(): number {
     return this.inboundBuffer.length;
+  }
+
+  /**
+   * Adjust the maximum inbound buffer size at runtime. This allows callers
+   * to tighten the landing capacity if memory pressure or subsystem overload
+   * is observed. Values are clamped to a sensible range to avoid extremes.
+   */
+  setMaxInboundBufferSize(size: number): void {
+    try {
+      this.maxInboundBufferSize = Math.max(10, Math.min(1000, Math.floor(size)));
+      // Trim the buffer immediately if it currently exceeds the new cap.
+      if (this.inboundBuffer.length > this.maxInboundBufferSize) {
+        this.inboundBuffer = this.inboundBuffer.slice(-this.maxInboundBufferSize);
+      }
+    } catch (_) { /* swallow */ }
   }
 }

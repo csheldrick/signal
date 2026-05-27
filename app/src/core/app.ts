@@ -123,7 +123,7 @@ export class SignalApp {
     };
 
     let remoteSummarizeInFlight = 0;
-    const MAX_CONCURRENT_REMOTE_SUMMARIES = 3;
+    const MAX_CONCURRENT_REMOTE_SUMMARIES = 2;
 
     const pluginContext: PluginContext = {
       listDocuments: (() => {
