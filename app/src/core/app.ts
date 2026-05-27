@@ -190,7 +190,7 @@ export class SignalApp {
           // calling summarizeDocument for the same documents, reducing LocalSummarizer overload.
           const lastSummarizedMap: Map<string, number> = ((this as any)._bgSummarizeLast as Map<string, number>) || new Map();
           (this as any)._bgSummarizeLast = lastSummarizedMap;
-          const MIN_SUMMARIZE_INTERVAL_MS = 10_000; // at least 10 seconds between summaries for same doc
+          const MIN_SUMMARIZE_INTERVAL_MS = 30_000; // at least 30 seconds between summaries for same doc (increased to reduce repeated work)
           const now = Date.now();
           const last = lastSummarizedMap.get(documentId) ?? 0;
           if (now - last < MIN_SUMMARIZE_INTERVAL_MS) {
@@ -322,8 +322,8 @@ export class SignalApp {
     // Global resonance loop protection: prevent cascading summarization triggers
     // by limiting total background summarization activity and adding a global cooldown.
     let globalSummarizeActive = 0;
-    const GLOBAL_MAX_ACTIVE = 5;
-    const GLOBAL_COOLDOWN_MS = 2000;
+    const GLOBAL_MAX_ACTIVE = 2;
+    const GLOBAL_COOLDOWN_MS = 5000;
     let globalCooldownUntil = 0;
     const scheduleSummarize = (docId: string) => {
       const disabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
@@ -359,7 +359,7 @@ export class SignalApp {
       // succession which can create a resonance loop under high update rates.
       const lastMap: Map<string, number> = ((this as any)._bgSummarizeLast as Map<string, number>) || new Map();
       (this as any)._bgSummarizeLast = lastMap;
-      const MIN_INTERVAL_MS = 5_000; // do not summarize the same doc more frequently than this
+      const MIN_INTERVAL_MS = 15_000; // do not summarize the same doc more frequently than this (increased to reduce load)
       var now = Date.now();
       const last = lastMap.get(docId) ?? 0;
 
@@ -376,12 +376,33 @@ export class SignalApp {
 
       // Concurrency & queueing: bound concurrent background summarization jobs
       // to avoid unbounded CPU/network pressure from many timers firing.
-      const MAX_CONCURRENT_BG = 2; // conservative default
-      const MAX_QUEUE = 1000; // bounded queue size to avoid memory growth
+      const MAX_CONCURRENT_BG = 1; // conservative default (reduced to lower LocalSummarizer pressure)
+      const MAX_QUEUE = 200; // bounded queue size to avoid memory growth and limit queued background jobs
 
       // Initialize shared counters/queue on the app instance if absent.
       if (!((this as any)._bgSummarizeActive)) (this as any)._bgSummarizeActive = 0;
       if (!((this as any)._bgSummarizeQueue)) (this as any)._bgSummarizeQueue = [] as string[];
+
+      // Check LocalSummarizer's global active requests to avoid overload
+      // This prevents background timers from overwhelming the local summarizer
+      const Lclass = getLocalSummarizerClass();
+      // Prefer the class-declared GLOBAL_MAX_CONCURRENT when available so
+      // the app's scheduling respects the summarizer's own concurrency policy.
+      const maxLocalConcurrent = (Lclass && typeof (Lclass as any).GLOBAL_MAX_CONCURRENT === 'number')
+        ? (Lclass as any).GLOBAL_MAX_CONCURRENT
+        : (Lclass && typeof Lclass.getGlobalActiveRequests === 'function' ? 5 : 10);
+      if (Lclass && Lclass.getGlobalActiveRequests && Lclass.getGlobalActiveRequests() >= maxLocalConcurrent) {
+        // LocalSummarizer is saturated; set a short backoff timer
+        const backoffT = setTimeout(() => {
+          if (Lclass && typeof Lclass.getGlobalActiveRequests === 'function') {
+            const active = Lclass.getGlobalActiveRequests();
+            if (active < maxLocalConcurrent) globalCooldownUntil = 0;
+          }
+        }, 500);
+        const placeholder = setTimeout(() => { try { timers.delete(docId); } catch (_) {} }, 50);
+        timers.set(docId, placeholder);
+        return;
+      }
 
       const active = (this as any)._bgSummarizeActive as number;
       const queue = (this as any)._bgSummarizeQueue as string[];
@@ -391,10 +412,34 @@ export class SignalApp {
         // Use LocalSummarizer's concurrency control to prevent overload
         // when many timers fire concurrently.
 
+        // Check LocalSummarizer's global active requests before running
+        // to avoid over-subscribing when many timers fire concurrently.
+        const Lclass = getLocalSummarizerClass();
+        // Use the summarizer-declared concurrency limit when present to keep
+        // background scheduling aligned with the summarizer implementation.
+        const maxLocalConcurrent = (Lclass && typeof (Lclass as any).GLOBAL_MAX_CONCURRENT === 'number')
+          ? (Lclass as any).GLOBAL_MAX_CONCURRENT
+          : (Lclass && typeof Lclass.getGlobalActiveRequests === 'function' ? 5 : 10);
+        if (Lclass && Lclass.getGlobalActiveRequests && Lclass.getGlobalActiveRequests() >= maxLocalConcurrent) {
+          // LocalSummarizer is saturated; re-enqueue with backoff
+          try {
+            const queue = (this as any)._bgSummarizeQueue as string[];
+            if (Array.isArray(queue) && queue.length < 1000) {
+              queue.push(id);
+              const placeholder = setTimeout(() => { try { timers.delete(id); } catch (_) {} }, 500);
+              timers.set(id, placeholder);
+              return;
+            }
+          } catch (_) {}
+          const shortT = setTimeout(() => { try { timers.delete(id); } catch (_) {} }, 750);
+          timers.set(id, shortT);
+          return;
+        }
+
         // Attempt to acquire a LocalSummarizer slot; if we cannot, re-enqueue
         // the job with a short backoff to avoid over-subscribing the local summarizer.
-        const Lclass = getLocalSummarizerClass();
-          const acquired = Lclass ? (typeof Lclass.tryRecordRequest === 'function' ? Lclass.tryRecordRequest() : (typeof Lclass.recordRequest === 'function' ? (Lclass.recordRequest(), true) : true)) : true;
+        const Lclass2 = getLocalSummarizerClass();
+          const acquired = Lclass2 ? (typeof Lclass2.tryRecordRequest === 'function' ? Lclass2.tryRecordRequest() : (typeof Lclass2.recordRequest === 'function' ? (Lclass2.recordRequest(), true) : true)) : true;
         if (!acquired) {
           // Couldn't acquire: attempt to enqueue for later. If the queue is full
           // set a short placeholder timer and drop the heavy work.
@@ -610,6 +655,23 @@ export class SignalApp {
   shutdown(dataPath?: string): void {
     if (!this.started) return;
     this.started = false;
+
+    // Remove any active background summarization timers
+    const timers = (this as any)._bgSummarizeTimers;
+    if (timers && typeof timers.clear === 'function') {
+      try { timers.clear(); } catch (_) {}
+    }
+
+    // Clear the background summarization counters and queue to prevent memory leaks
+    const bgActive = (this as any)._bgSummarizeActive;
+    const bgQueue = (this as any)._bgSummarizeQueue;
+    if (bgActive !== undefined) (this as any)._bgSummarizeActive = 0;
+    if (bgQueue !== undefined) (this as any)._bgSummarizeQueue = [];
+
+    // Disable all plugins
+    for (const p of this.plugins.list()) {
+      if (p.enabled) this.plugins.disable(p.id);
+    }
 
     // Disable all plugins
     for (const p of this.plugins.list()) {

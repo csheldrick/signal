@@ -69,6 +69,7 @@ export class LocalSummarizer implements Summarizer {
     return true;
   }
 
+
   // Per-document pending tracking to coalesce concurrent requests
   // and avoid duplicate work for the same document.
   private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
@@ -156,6 +157,7 @@ export class LocalSummarizer implements Summarizer {
     LocalSummarizer.globalActiveRequests = Math.max(0, LocalSummarizer.globalActiveRequests - 1);
   }
 
+
   /**
    * Check if we're currently in a global cooldown due to prior failures.
    */
@@ -182,6 +184,13 @@ export class RemoteSummarizer implements Summarizer {
   // overloading the remote service and downstream subsystems.
   private static globalActiveRequests: number = 0;
   private static readonly GLOBAL_MAX_CONCURRENT = 6;
+  // Rate limit the total number of remote summarization attempts to avoid
+  // overwhelming the remote service. This is separate from concurrency
+  // control and provides protection against burst traffic.
+  private static totalAttemptsInWindow: number = 0;
+  private static lastAttemptWindowAt: number = 0;
+  private static readonly RATE_LIMIT_WINDOW_MS = 5000;
+  private static readonly RATE_LIMIT_MAX_ATTEMPTS = 30;
 
   static getGlobalActiveRequests(): number {
     return RemoteSummarizer.globalActiveRequests;
@@ -195,6 +204,10 @@ export class RemoteSummarizer implements Summarizer {
 
   static releaseRequest(): void {
     RemoteSummarizer.globalActiveRequests = Math.max(0, RemoteSummarizer.globalActiveRequests - 1);
+  }
+
+  static isInRateLimitWindow(): boolean {
+    return Date.now() < RemoteSummarizer.lastAttemptWindowAt + RemoteSummarizer.RATE_LIMIT_WINDOW_MS;
   }
 
   private static getPending(id: string): Promise<string> | undefined {
@@ -307,7 +320,7 @@ export class RemoteSummarizer implements Summarizer {
   async summarize(document: Document): Promise<string> {
     const id = document?.id ?? '';
 
-    const now = this.now();
+    let now = this.now();
 
     if (!this.allowNetwork) {
       // Explicit opt-in required for network calls — fallback deterministically.
@@ -347,6 +360,19 @@ export class RemoteSummarizer implements Summarizer {
       // Remote concurrency cap is reached; return a local summary immediately.
       return this.fallback.summarize(document);
     }
+
+    // Check rate limit to avoid overwhelming the remote service with burst traffic.
+    now = Date.now();
+    if (now - RemoteSummarizer.lastAttemptWindowAt > RemoteSummarizer.RATE_LIMIT_WINDOW_MS) {
+      RemoteSummarizer.totalAttemptsInWindow = 0;
+      RemoteSummarizer.lastAttemptWindowAt = now;
+    }
+    if (RemoteSummarizer.totalAttemptsInWindow >= RemoteSummarizer.RATE_LIMIT_MAX_ATTEMPTS) {
+      // Rate limit exceeded; return a local summary to avoid overwhelming the remote service.
+      RemoteSummarizer.releaseRequest();
+      return this.fallback.summarize(document);
+    }
+    RemoteSummarizer.totalAttemptsInWindow++;
 
     // Encapsulate the remote attempt so we can register it in the pending map
     // Encapsulate the remote attempt with a bounded retry/backoff strategy
