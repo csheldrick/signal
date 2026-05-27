@@ -88,6 +88,19 @@ export class DocumentStore {
   }
   private static _instances = 0;
 
+  // Optional synchronous auth validator. If set, operations such as create/update/delete/recordBufferedMutation
+  // will consult this validator and reject unauthorized mutations. The validator must be synchronous and
+  // return a truthy value to allow the operation. Asynchronous validators are not supported on the realtime path.
+  private authValidator?: (op: string, payload: any) => boolean;
+
+  setAuthValidator(fn?: (op: string, payload: any) => boolean): void {
+    try {
+      this.authValidator = typeof fn === 'function' ? fn : undefined;
+    } catch (_) {
+      this.authValidator = undefined;
+    }
+  }
+
   private documents: Map<string, Document> = new Map();
   readonly events: StorageEventBus;
 
@@ -163,6 +176,30 @@ export class DocumentStore {
       throw new Error('DocumentStore.create: invalid tags');
     }
 
+    // Authorization hook: if present, enforce synchronous authorization predicate.
+    // NOTE: create is part of the realtime API surface and callers/types assume
+    // it returns a Document synchronously. To preserve that contract we throw
+    // synchronously on authorization failure rather than returning undefined.
+    try {
+      if (typeof (this as any).authValidator === 'function') {
+        try {
+          const allowed = (this as any).authValidator('create', { id, title, content, tags });
+          if (!allowed) {
+            try { console.warn('DocumentStore.create: unauthorized'); } catch (_) {}
+            throw new Error('DocumentStore.create: unauthorized');
+          }
+        } catch (e) {
+          // If the validator itself throws, fail closed to avoid applying
+          // potentially unauthorized mutations.
+          throw new Error('DocumentStore.create: unauthorized');
+        }
+      }
+    } catch (e) {
+      // Propagate the authorization failure as an exception to keep the
+      // API deterministic and type-stable for callers.
+      throw e instanceof Error ? e : new Error('DocumentStore.create: unauthorized');
+    }
+
     // Clamp inputs to reasonable bounds to avoid passing pathological
     // payloads into downstream subsystems (indexers, sync, graph builders).
     const safeTitle = title.length > 5000 ? title.slice(0, 5000) : title;
@@ -201,6 +238,21 @@ export class DocumentStore {
     }
 
     const existing = this.documents.get(id);
+    // Authorization hook: enforce synchronous validator if present.
+    try {
+      if (typeof (this as any).authValidator === 'function') {
+        try {
+          const allowed = (this as any).authValidator('update', { id, changes: normalized });
+          if (!allowed) {
+            try { console.warn('DocumentStore.update: unauthorized'); } catch (_) {}
+            return undefined;
+          }
+        } catch (_) {
+          return undefined;
+        }
+      }
+    } catch (_) {}
+
     if (!existing) return undefined;
 
     const now = Date.now();
@@ -227,6 +279,20 @@ export class DocumentStore {
   }
 
   delete(id: string): boolean {
+    // Authorization hook: enforce synchronous validator if present.
+    try {
+      if (typeof (this as any).authValidator === 'function') {
+        try {
+          const allowed = (this as any).authValidator('delete', { id });
+          if (!allowed) {
+            try { console.warn('DocumentStore.delete: unauthorized'); } catch (_) {}
+            return false;
+          }
+        } catch (_) {
+          return false;
+        }
+      }
+    } catch (_) {}
     const existed = this.documents.delete(id);
     if (existed) {
       // When a document is deleted, remove links referencing it and emit
@@ -270,6 +336,21 @@ export class DocumentStore {
     const source = this.documents.get(sourceId);
     const target = this.documents.get(targetId);
     if (!source || !target) return undefined;
+
+    // Authorization hook: enforce synchronous validator if present.
+    try {
+      if (typeof (this as any).authValidator === 'function') {
+        try {
+          const allowed = (this as any).authValidator('link', { sourceId, targetId, kind });
+          if (!allowed) {
+            try { console.warn('DocumentStore.link: unauthorized'); } catch (_) {}
+            return undefined;
+          }
+        } catch (_) {
+          return undefined;
+        }
+      }
+    } catch (_) {}
 
     // Validate the provided link kind against the canonical list to avoid
     // propagating unknown/typo'd kinds across subsystems.
@@ -553,6 +634,20 @@ export class DocumentStore {
       }
     } catch (_) { /* swallow normalization errors */ }
 
+    // Authorization hook: enforce synchronous validator if present.
+    try {
+      if (typeof (this as any).authValidator === 'function') {
+        try {
+          const allowed = (this as any).authValidator(op, { mutationId, payload });
+          if (!allowed) {
+            try { console.warn('DocumentStore.recordBufferedMutation: unauthorized'); } catch (_) {}
+            return 0;
+          }
+        } catch (_) {
+          return 0;
+        }
+      }
+    } catch (_) {}
     this.seqCounter += 1;
     const entry = { seq: this.seqCounter, id: mutationId, op, payload };
     this.mutationLog.push(entry);
