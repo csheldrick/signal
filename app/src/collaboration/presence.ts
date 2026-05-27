@@ -115,10 +115,10 @@ export class PresenceTracker {
   private leaveBatch: Map<string, string | undefined> = new Map();
   private leaveBatchScheduled: boolean = false;
 
-  private static readonly MAX_PEERS = 500;
+  private static readonly MAX_PEERS = 200; // tightened to reduce memory/processing pressure
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
-  private static readonly MAX_PENDING_VALIDATIONS = 20;
+  private static readonly MAX_PENDING_VALIDATIONS = 8; // lower cap to avoid IO burst when many peers reference many docs
 
   private evictIfNeeded(): void {
     try {
@@ -248,7 +248,7 @@ export class PresenceTracker {
   private lastClock: { [peerId: string]: number } = {};
 
   private cleanupTimer?: ReturnType<typeof setInterval>;
-  private static readonly INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
+  private static readonly INACTIVITY_MS = 3 * 60 * 1000; // 3 minutes (shorter to free inactive peers sooner)
 
   constructor(context?: PluginContext) {
     this.context = context;
@@ -269,7 +269,7 @@ export class PresenceTracker {
         } catch (_) {
           /* swallow cleanup errors */
         }
-      }, 2 * 60 * 1000);
+      }, 60 * 1000); // run cleanup every 1 minute to reduce stale entries faster
     } catch (_) {
       // If timers are not available for any reason (test envs), degrade silently.
     }
@@ -417,7 +417,7 @@ export class PresenceTracker {
                 } else {
                   // Add to the batch; latest entry for a peerId wins
                   try {
-                    const MAX_LEAVE_BATCH = 200;
+                    const MAX_LEAVE_BATCH = 50; // smaller batch to bound macrotask coalescing work
                     if (this.leaveBatch.size >= MAX_LEAVE_BATCH) {
                       // Batch full: avoid unbounded growth. Invoke the hook immediately
                       // for this peer as a best-effort, swallowing errors to keep the
