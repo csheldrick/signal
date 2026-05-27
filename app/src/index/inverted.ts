@@ -4,6 +4,7 @@
 
 import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex } from '../core/types.js';
 import { normalizeSearchQuery } from '../core/types.js';
+import { WorkerPool, WorkerPoolOptions } from './workerPool.js';
 
 // Basic tokenizer: split on non-alphanumerics and lowercase
 function tokenize(text: string | undefined): Set<string> {
@@ -169,11 +170,16 @@ export interface IndexerContract { dispose(): void; }
 
 export class Indexer implements IndexerContract {
   private disposers: Array<() => void> = [];
+  private readonly workerPool: WorkerPool;
+  private pendingDocs: Array<{ doc: any; id: string; text: string }> = [];
+  private processing: boolean = false;
+
   constructor(events: any, private readonly index: InvertedIndex) {
+    this.workerPool = new WorkerPool({ numWorkers: 4, maxDocsPerWorker: 500 });
     if (!events || !this.index) return;
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) this.index.indexDocument(ev.document); } catch (_) {} };
-      const updated = (ev: any) => { try { if (ev && ev.current) this.index.updateDocument(ev.current); } catch (_) {} };
+      const created = (ev: any) => { try { if (ev && ev.document) this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); } catch (_) {} };
+      const updated = (ev: any) => { try { if (ev && ev.current) this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
 
       if (typeof events.onAsync === 'function') {
@@ -194,7 +200,21 @@ export class Indexer implements IndexerContract {
     } catch (_) { /* swallow */ }
   }
 
+  private async processPending(): Promise<void> {
+    if (this.pendingDocs.length === 0 || this.processing) return;
+    this.processing = true;
+    try {
+      await this.workerPool.process(this.pendingDocs.map(d => ({ id: d.id, text: d.text })));
+      this.pendingDocs = [];
+    } catch (_) {
+      // Worker error - retry later
+    } finally {
+      this.processing = false;
+    }
+  }
+
   dispose(): void {
+    this.workerPool.shutdown();
     for (const d of this.disposers) {
       try { d(); } catch (_) {}
     }

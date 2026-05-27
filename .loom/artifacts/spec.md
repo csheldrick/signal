@@ -4,7 +4,7 @@
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 20 source file(s).
+Module boundary at app containing 33 source file(s).
 _Path: `app`_
 Confidence: 95%
 
@@ -64,6 +64,18 @@ Confidence: 85%
 ### Contract: DeprecatedDocumentChange
 Confidence: 85%
 
+### Contract: SearchHit
+Confidence: 85%
+
+### Contract: InvertedIndexSearchHit
+Confidence: 85%
+
+### Contract: IndexStats
+Confidence: 85%
+
+### Contract: InvertedIndex
+Confidence: 85%
+
 ### Contract: GraphNode
 Confidence: 85%
 
@@ -76,16 +88,19 @@ Confidence: 85%
 ### Contract: GraphBuilder
 Confidence: 85%
 
-### Contract: IndexStats
+### Contract: IndexerContract
 Confidence: 85%
 
-### Contract: SearchHit
+### Contract: Indexer
 Confidence: 85%
 
-### Contract: InvertedIndexSearchHit
+### Contract: IndexWorker
 Confidence: 85%
 
-### Contract: InvertedIndex
+### Contract: WorkerPoolOptions
+Confidence: 85%
+
+### Contract: WorkerPool
 Confidence: 85%
 
 ### Contract: ExportPlugin
@@ -127,6 +142,9 @@ Confidence: 85%
 ### Contract: StorageEventBus
 Confidence: 85%
 
+### Contract: DocumentSnapshotServiceOptions
+Confidence: 85%
+
 ### Contract: ConflictCandidate
 Confidence: 85%
 
@@ -140,6 +158,15 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: SyncManagerOptions
+Confidence: 85%
+
+### Contract: OfflineEntry
+Confidence: 85%
+
+### Contract: OfflineSyncQueueOptions
+Confidence: 85%
+
+### Contract: OfflineSyncQueue
 Confidence: 85%
 
 ### Contract: SyncState
@@ -172,6 +199,18 @@ Confidence: 85%
 ### Contract: SyncQueue
 Confidence: 85%
 
+### Contract: SyncSessionState
+Confidence: 85%
+
+### Contract: SyncSessionEvent
+Confidence: 85%
+
+### Contract: SyncSessionTrackerOptions
+Confidence: 85%
+
+### Contract: SyncSessionTracker
+Confidence: 85%
+
 ### Contract: PeerSession
 Confidence: 85%
 
@@ -202,6 +241,10 @@ Confidence: 95%
 
 ### createValidatorFromStore
 Exported function `createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: io.
+Confidence: 95%
+
+### createValidatorFromPluginContext
+Exported function `createValidatorFromPluginContext(context?: PluginContext): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: io.
 Confidence: 95%
 
 ### PresenceTracker
@@ -265,22 +308,20 @@ Exported function `SignalApp` in app/src/core/app.ts. Side effects: database, io
 Confidence: 88%
 
 ### SignalApp.enableRemoteSummarizer
-Exported function `SignalApp.enableRemoteSummarizer(fetcher: (document: Document) => Promise<string>, options?: {
+Exported function `SignalApp.enableRemoteSummarizer(fetcher: (document: Document, opts?: {
+    authToken?: string;
+}) => Promise<string>, options?: {
     allowNetwork?: boolean;
     maxSentences?: number;
 }): boolean` in app/src/core/app.ts. Pure function (no detected side effects).
 Confidence: 95%
 
-### SignalApp.disableRemoteSummarizer
-Exported function `SignalApp.disableRemoteSummarizer(): void` in app/src/core/app.ts. Pure function (no detected side effects).
-Confidence: 70%
-
 ## Detected Invariants
 
-- **guard: Guard clause (null/undefined check)**: Detected 14 occurrence(s) of guard pattern across 8 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
-- **error-boundary: Error boundary (try/catch)**: Detected 72 occurrence(s) of error-boundary pattern across 10 file(s) in module 'signal-app'. Example: "try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } cat" _(88%)_
+- **guard: Guard pattern checking for missing Map entry before access. This is a legitimate structural guard that prevents undefined access.**: Detected 24 occurrence(s) of guard pattern across 13 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **error-boundary: Error boundary around console.warn call. While unnecessary for warn(), this is a consistent defensive pattern the codebase uses.**: Detected 153 occurrence(s) of error-boundary pattern across 21 file(s) in module 'signal-app'. Example: "try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } cat" _(88%)_
 - **validation: Input validation boundary**: Detected 13 occurrence(s) of validation pattern across 5 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
-- **sanitization: Input sanitization**: Detected 1 occurrence(s) of sanitization pattern across 1 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(65%)_
+- **sanitization: Input sanitization**: Detected 3 occurrence(s) of sanitization pattern across 2 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
 
 ## Architectural Decisions (Lineage)
 
@@ -317,14 +358,19 @@ Confidence: 70%
 - **SearchResultSnapshot**: interface in app/src/core/types.ts
 - **DocumentChange**: interface in app/src/core/types.ts
 - **DeprecatedDocumentChange**: type in app/src/core/types.ts
+- **SearchHit**: interface in app/src/core/types.ts
+- **InvertedIndexSearchHit**: interface in app/src/core/types.ts
+- **IndexStats**: interface in app/src/core/types.ts
+- **InvertedIndex**: interface in app/src/core/types.ts
 - **GraphNode**: interface in app/src/graph/builder.ts
 - **AdjacencyList**: interface in app/src/graph/builder.ts
 - **GraphAdjacencyList**: type in app/src/graph/builder.ts
 - **GraphBuilder**: class in app/src/graph/builder.ts
-- **IndexStats**: interface in app/src/indexing/index.ts
-- **SearchHit**: interface in app/src/indexing/index.ts
-- **InvertedIndexSearchHit**: type in app/src/indexing/index.ts
-- **InvertedIndex**: class in app/src/indexing/index.ts
+- **IndexerContract**: interface in app/src/index/inverted.ts
+- **Indexer**: class in app/src/index/inverted.ts
+- **IndexWorker**: interface in app/src/index/workerPool.ts
+- **WorkerPoolOptions**: interface in app/src/index/workerPool.ts
+- **WorkerPool**: class in app/src/index/workerPool.ts
 - **ExportPlugin**: class in app/src/plugins/export.ts
 - **Plugin**: interface in app/src/plugins/host.ts
 - **PluginContext**: interface in app/src/plugins/host.ts
@@ -338,11 +384,15 @@ Confidence: 70%
 - **StorageEvent**: type in app/src/storage/events.ts
 - **StorageEventBusContract**: interface in app/src/storage/events.ts
 - **StorageEventBus**: class in app/src/storage/events.ts
+- **DocumentSnapshotServiceOptions**: interface in app/src/storage/snapshot-service.ts
 - **ConflictCandidate**: interface in app/src/sync/conflict.ts
 - **ConflictResolution**: interface in app/src/sync/conflict.ts
 - **ConflictCandidateRecord**: Detect whether a remote document write genuinely conflicts with the local version (concurrent vector clocks) or is simply a causally-later update.
 - **TransportSend**: Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc.
 - **SyncManagerOptions**: interface in app/src/sync/manager.ts
+- **OfflineEntry**: interface in app/src/sync/offline-queue.ts
+- **OfflineSyncQueueOptions**: interface in app/src/sync/offline-queue.ts
+- **OfflineSyncQueue**: OfflineSyncQueue Durable, per-peer queue that persists DocumentChange mutations to disk when network transport is unavailable. Ensures causal (timestamp/seq) ordering when draining and provides robust rewrite behaviour so partially applied drains do not lose remaining entries.
 - **SyncState**: type in app/src/sync/protocol.ts
 - **ConflictStrategy**: type in app/src/sync/protocol.ts
 - **PeerInfo**: interface in app/src/sync/protocol.ts
@@ -353,6 +403,10 @@ Confidence: 70%
 - **QueueEntry**: interface in app/src/sync/queue.ts
 - **SyncQueueOptions**: interface in app/src/sync/queue.ts
 - **SyncQueue**: class in app/src/sync/queue.ts
+- **SyncSessionState**: type in app/src/sync/session-tracker.ts
+- **SyncSessionEvent**: interface in app/src/sync/session-tracker.ts
+- **SyncSessionTrackerOptions**: interface in app/src/sync/session-tracker.ts
+- **SyncSessionTracker**: SyncSessionTracker Manages per-peer sync session lifecycle. Emits events on an internal bus so multiple subsystems (SyncManager, PresenceTracker) can observe a single authoritative session view.
 - **PeerSession**: class in app/src/sync/session.ts
 - **DocumentVersion**: interface in app/src/versioning/history.ts
 - **VersionDiff**: interface in app/src/versioning/history.ts
@@ -364,11 +418,15 @@ Confidence: 70%
 - **SyncEngine**: type in app/src/collaboration/presence.ts
 - **DeprecatedDocumentStore**: type in app/src/collaboration/presence.ts
 - **ClockProvider**: interface in app/src/collaboration/presence.ts
+- **SnapshotStore**: interface in app/src/storage/snapshot-service.ts
+- **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
 - **SyncManager**: class in app/src/sync/manager.ts
 - **DocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
 - **SyncEngine**: Service inferred from type in app/src/collaboration/presence.ts
 - **DeprecatedDocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
 - **ClockProvider**: Service inferred from interface in app/src/collaboration/presence.ts
+- **SnapshotStore**: Service inferred from interface in app/src/storage/snapshot-service.ts
+- **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts
 - **SyncManager**: Service inferred from class in app/src/sync/manager.ts
 - **app**: Module: app
 

@@ -20,7 +20,6 @@ export class InvertedIndex {
   private posting: Map<string, Set<string>> = new Map();
   private docTerms: Map<string, Set<string>> = new Map();
 
-  private totalTerms: number = 0;
   // Per-term cap to avoid unbounded posting list growth under heavy ingestion.
   private static readonly MAX_DOCS_PER_TERM: number = 10000;
   // Cached stats to avoid frequent recomputation under high read pressure.
@@ -53,7 +52,6 @@ export class InvertedIndex {
 
     const termSet = new Set(ordered);
     this.docTerms.set(documentId, termSet);
-    this.totalTerms += termSet.size;
     this.statsDirty = true;
 
     // To avoid long synchronous CPU bursts when indexing extremely large
@@ -123,7 +121,6 @@ export class InvertedIndex {
     }
 
     this.docTerms.delete(documentId);
-    this.totalTerms = Math.max(0, this.totalTerms - terms.size);
     // Mark cached stats dirty due to mutation.
     this.statsDirty = true;
   }
@@ -188,10 +185,20 @@ export class InvertedIndex {
     if (!this.statsDirty && this.cachedStats && (now - this.lastStatsTs) < InvertedIndex.STATS_TTL_MS) return { ...this.cachedStats };
 
     const docCount = this.docTerms.size;
+    const termCount = this.posting.size;
+    // Calculate unique terms as the union of all posting lists
+    // Use a Set to track unique terms without mutating the posting map
+    const uniqueTerms = new Set<string>();
+    for (const terms of this.docTerms.values()) {
+      for (const term of terms) {
+        uniqueTerms.add(term);
+      }
+    }
+    const totalTerms = uniqueTerms.size;
     const computed: IndexStats = {
-      termCount: this.posting.size,
+      termCount: termCount,
       documentCount: docCount,
-      avgTermsPerDoc: docCount === 0 ? 0 : this.totalTerms / docCount,
+      avgTermsPerDoc: docCount === 0 ? 0 : totalTerms / docCount,
     };
 
     this.cachedStats = computed;

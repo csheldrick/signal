@@ -2,10 +2,6 @@
 
 Generated from crystallized comprehension. Review and prioritize based on drift events and confidence scores.
 
-## Low-Confidence Items (review first)
-
-- [ ] Verify: **sanitization: Input sanitization** (65% confidence)
-
 ## Next Steps
 
 - [ ] Run `loom drift` to detect divergence from baseline

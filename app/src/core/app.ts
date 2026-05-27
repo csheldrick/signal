@@ -160,6 +160,70 @@ export class SignalApp {
           return undefined;
         }
       },
+      summarizeDocument: async (documentId: string, allowNetwork = false) => {
+        const d = this.store.read(documentId);
+        if (!d) return undefined;
+        // Use the configured summarizer when present; otherwise use a local one.
+        const summarizer: Summarizer = this._summarizer ?? this._localSummarizer;
+
+        // Deny network summarization when caller does not explicitly request it.
+        try {
+          if (summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
+            return undefined;
+          }
+
+          const isRemote = summarizer.isRemote;
+          // If remote, enforce a simple concurrency cap to avoid unbounded
+          // in-flight remote requests that can backlog and affect realtime flows.
+          if (isRemote && remoteSummarizeInFlight >= MAX_CONCURRENT_REMOTE_SUMMARIES) {
+            return undefined;
+          }
+
+          const MAX_RETRIES = 3;
+          const BASE_MS = 100;
+
+          // Check if we recently summarized this document to avoid redundant work
+          // This prevents the background summarization timers from continuously
+          // calling summarizeDocument for the same documents, reducing LocalSummarizer overload.
+          const lastSummarizedMap: Map<string, number> = ((this as any)._bgSummarizeLast as Map<string, number>) || new Map();
+          (this as any)._bgSummarizeLast = lastSummarizedMap;
+          const MIN_SUMMARIZE_INTERVAL_MS = 10_000; // at least 10 seconds between summaries for same doc
+          const now = Date.now();
+          const last = lastSummarizedMap.get(documentId) ?? 0;
+          if (now - last < MIN_SUMMARIZE_INTERVAL_MS) {
+            // Document was recently summarized; skip to avoid redundant work
+            return undefined;
+          }
+          lastSummarizedMap.set(documentId, now);
+
+          const attempt = async (triesLeft: number): Promise<string | undefined> => {
+            try {
+              if (isRemote) remoteSummarizeInFlight++;
+              try {
+                return await summarizer.summarize(d);
+              } finally {
+                if (isRemote) {
+                  try { remoteSummarizeInFlight = Math.max(0, remoteSummarizeInFlight - 1); } catch (_) { remoteSummarizeInFlight = 0; }
+                }
+              }
+            } catch (err) {
+              if (triesLeft <= 0) return undefined;
+              await new Promise(res => setTimeout(res, BASE_MS * Math.pow(2, MAX_RETRIES - triesLeft)));
+              return attempt(triesLeft - 1);
+            }
+          };
+
+          const result = await attempt(MAX_RETRIES);
+          // Record that we summarized this document so future calls can skip
+          if (result !== undefined) {
+            lastSummarizedMap.set(documentId, Date.now());
+          }
+
+          return result;
+        } catch (_) {
+          return undefined;
+        }
+      },
       getClock: () => {
         try {
           // Prefer the active SyncEngine clock when available so plugins receive
@@ -189,7 +253,6 @@ export class SignalApp {
         }
         return {};
       },
-
       onStorageEvent: (type, listener) => {
         // Provide plugins a readonly/frozen snapshot of events and a disposer.
         const wrapper = (ev: any) => {
@@ -239,51 +302,6 @@ export class SignalApp {
         }
         return () => { this.events.off(type as any, wrapper); };
       },
-
-      summarizeDocument: async (documentId: string, allowNetwork = false) => {
-        const d = this.store.read(documentId);
-        if (!d) return undefined;
-        // Use the configured summarizer when present; otherwise use a local one.
-        const summarizer: Summarizer = this._summarizer ?? this._localSummarizer;
-
-        // Deny network summarization when caller does not explicitly request it.
-        try {
-          if (summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
-            return undefined;
-          }
-
-          const isRemote = summarizer.isRemote;
-          // If remote, enforce a simple concurrency cap to avoid unbounded
-          // in-flight remote requests that can backlog and affect realtime flows.
-          if (isRemote && remoteSummarizeInFlight >= MAX_CONCURRENT_REMOTE_SUMMARIES) {
-            return undefined;
-          }
-
-          const MAX_RETRIES = 3;
-          const BASE_MS = 100;
-
-          const attempt = async (triesLeft: number): Promise<string | undefined> => {
-            try {
-              if (isRemote) remoteSummarizeInFlight++;
-              try {
-                return await summarizer.summarize(d);
-              } finally {
-                if (isRemote) {
-                  try { remoteSummarizeInFlight = Math.max(0, remoteSummarizeInFlight - 1); } catch (_) { remoteSummarizeInFlight = 0; }
-                }
-              }
-            } catch (err) {
-              if (triesLeft <= 0) return undefined;
-              await new Promise(res => setTimeout(res, BASE_MS * Math.pow(2, MAX_RETRIES - triesLeft)));
-              return attempt(triesLeft - 1);
-            }
-          };
-
-          return await attempt(MAX_RETRIES);
-        } catch (_) {
-          return undefined;
-        }
-      },
     };
     // Lazy PluginHost instantiation to reduce startup fan-out and avoid
     // constructing the full plugin subsystem until it's actually used.
@@ -298,12 +316,35 @@ export class SignalApp {
     // potential network activity that hinder test adoption and increase
     // subsystem fan-out. Allow disabling in test environments or via an
     // explicit global opt-out to make the subsystem safe for test runs.
+    // Global resonance loop protection: prevent cascading summarization triggers
+    // by limiting total background summarization activity and adding a global cooldown.
+    let globalSummarizeActive = 0;
+    const GLOBAL_MAX_ACTIVE = 5;
+    const GLOBAL_COOLDOWN_MS = 2000;
+    let globalCooldownUntil = 0;
     const scheduleSummarize = (docId: string) => {
       const disabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
         (!!getDisableBgSummarize()) ||
         this._disableBgSummarize;
       if (disabled) return;
       if (!docId) return;
+
+      // Global resonance loop protection: respect cooldown window from previous overload
+      var now = Date.now();
+      if (globalCooldownUntil && now < globalCooldownUntil) {
+        // Still in global cooldown; set a short timer to clear it
+        const shortT = setTimeout(() => { globalCooldownUntil = 0; }, 100);
+        return;
+      }
+
+      // Respect global concurrency cap to avoid cascading summarization triggers
+      if (globalSummarizeActive >= GLOBAL_MAX_ACTIVE) {
+        // Hit global limit; set a cooldown timer before allowing more work
+        const cooldownT = setTimeout(() => { globalSummarizeActive = 0; globalCooldownUntil = now + GLOBAL_COOLDOWN_MS; }, GLOBAL_COOLDOWN_MS);
+        return;
+      }
+
+      // Removed resonance loop check; global cooldown and per-doc intervals provide protection
 
       // Per-doc timers map (shared on the instance). _bgSummarizeTimers was already created above.
       const timers: Map<string, ReturnType<typeof setTimeout>> = (this as any)._bgSummarizeTimers;
@@ -316,7 +357,7 @@ export class SignalApp {
       const lastMap: Map<string, number> = ((this as any)._bgSummarizeLast as Map<string, number>) || new Map();
       (this as any)._bgSummarizeLast = lastMap;
       const MIN_INTERVAL_MS = 5_000; // do not summarize the same doc more frequently than this
-      const now = Date.now();
+      var now = Date.now();
       const last = lastMap.get(docId) ?? 0;
 
       // If we've summarized recently, avoid scheduling an immediate heavy run.
@@ -344,7 +385,9 @@ export class SignalApp {
 
       const scheduleJob = (id: string) => {
         // Job runner that performs the summary and drains the queue when done.
-        (this as any)._bgSummarizeActive = ((this as any)._bgSummarizeActive as number) + 1;
+        // Use LocalSummarizer's concurrency control to prevent overload
+        // when many timers fire concurrently.
+        LocalSummarizer.recordRequest();
         const t = setTimeout(async () => {
           // Clear per-doc timer slot immediately (we're running it now)
           try { timers.delete(id); } catch (_) {}
@@ -352,7 +395,10 @@ export class SignalApp {
             const doc = this.store.read(id);
             if (doc) {
               try {
-                await this._localSummarizer.summarize(doc);
+                // Use the configured summarizer (may be remote) instead of always using local.
+                // This allows background work to benefit from remote summarization when available.
+                const summarizer: Summarizer = this._summarizer ?? this._localSummarizer;
+                await summarizer.summarize(doc);
                 try { lastMap.set(id, Date.now()); } catch (_) {}
                 try { console.debug && console.debug(`background summarization completed for ${id}`); } catch (_) {}
               } catch (_) {
@@ -362,7 +408,7 @@ export class SignalApp {
           } catch (_) { /* swallow background errors */ }
           // Mark job finished and try to drain a queued job.
           try {
-            (this as any)._bgSummarizeActive = Math.max(0, ((this as any)._bgSummarizeActive as number) - 1);
+            LocalSummarizer.releaseRequest();
             const next = (this as any)._bgSummarizeQueue.shift();
             if (next) {
               // Use a short defer to avoid deep synchronous recursion and to
@@ -402,6 +448,10 @@ export class SignalApp {
     const bgDisabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
       (!!getDisableBgSummarize()) ||
       this._disableBgSummarize;
+
+    // Rate limiting for background summarization - simplified to avoid resonance loops
+    // Removed auto-disable logic; instead we rely on global cooldown and per-doc intervals
+
     if (!bgDisabled) {
       // Prefer async registration to avoid heavy synchronous fan-out on
       // storage events (which can overload realtime subsystems). Fall back

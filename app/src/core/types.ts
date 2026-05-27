@@ -200,14 +200,14 @@ export interface IndexStats {
 
 export interface InvertedIndex {
   // Index a document snapshot (idempotent for new ids)
-  indexDocument(doc: DocumentSnapshot): void;
+  indexDocument(doc: DocumentSnapshot, maxDocs?: number): void;
   // Update an existing document snapshot
-  updateDocument(doc: DocumentSnapshot): void;
+  updateDocument(doc: DocumentSnapshot, maxDocs?: number): void;
   // Remove a document from the index
   removeDocument(documentId: string): void;
   // Search using normalized SearchQuery
-  search(query: SearchQuery): SearchResult[];
+  search(query: SearchQuery, maxDocs?: number): SearchResult[];
   // Basic stats for observability
-  stats(): IndexStats;
+  stats(maxDocs?: number): IndexStats;
 }
 

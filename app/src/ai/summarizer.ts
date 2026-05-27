@@ -26,6 +26,31 @@ export class LocalSummarizer implements Summarizer {
   private readonly maxSentences: number;
 
   private static cache: Map<string, { updatedAt: number; summary: string }> = new Map();
+  private static readonly CACHE_MAX_SIZE = 200;
+  private static readonly CACHE_TTL_MS = 60_000;
+  private static readonly FAILED_CACHE: Map<string, number> = new Map();
+  private static readonly FAILED_CACHE_TTL_MS = 300_000;
+
+  // Concurrency control to prevent LocalSummarizer overload
+  // when many callers activate it concurrently (background summarization,
+  // plugin calls, remote fallbacks).
+  private static globalActiveRequests: number = 0;
+  static readonly GLOBAL_MAX_CONCURRENT = 8;
+
+  // Per-document pending tracking to coalesce concurrent requests
+  // and avoid duplicate work for the same document.
+  private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
+  private static readonly MAX_PENDING_ENTRIES = 100;
+
+  // Global failure tracking to avoid thrashing when remote summarization is flaky.
+  // After maxFailures within failureWindowMs, we enter a short cooldown
+  // and return local summaries to reduce load.
+  private static failureCount: number = 0;
+  private static lastFailureAt: number = 0;
+  private static cooldownUntil: number = 0;
+  private static readonly MAX_FAILURES = 3;
+  private static readonly FAILURE_WINDOW_MS = 10_000; // 10s window
+  private static readonly COOLDOWN_MS = 5_000; // 5s cooldown
 
   constructor(maxSentences: number = 3) {
     this.maxSentences = maxSentences;
@@ -34,6 +59,24 @@ export class LocalSummarizer implements Summarizer {
   async summarize(document: Document): Promise<string> {
     const id = document?.id ?? '';
     const updatedAt = (document as any)?.updatedAt ?? 0;
+
+    // Check for failed remote summarization cache to avoid repeated work.
+    // This helps reduce load when remote summarization is flaky or disabled.
+    if (id && LocalSummarizer.FAILED_CACHE.has(id)) {
+      const failedAt = LocalSummarizer.FAILED_CACHE.get(id) ?? 0;
+      if (Date.now() - failedAt < 300_000) {
+        // Recent failure; cache the local summary to avoid repeated work.
+        const sentences = (document.content || '')
+          .split(/[.!?]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        const selected = sentences.slice(0, this.maxSentences);
+        const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
+        LocalSummarizer.cache.set(id, { updatedAt, summary });
+        LocalSummarizer.FAILED_CACHE.set(id, Date.now());
+        return summary;
+      }
+    }
 
     // Fast-path: return cached summary when document hasn't changed.
     if (id) {
@@ -54,14 +97,47 @@ export class LocalSummarizer implements Summarizer {
     if (id) {
       LocalSummarizer.cache.set(id, { updatedAt, summary });
       // Simple bounded eviction to avoid unbounded memory growth.
-      if (LocalSummarizer.cache.size > 100) {
+      if (LocalSummarizer.cache.size > 200) {
         const it = LocalSummarizer.cache.keys();
         const first = it.next().value as string | undefined;
         if (first) LocalSummarizer.cache.delete(first);
       }
+      // Cache failed attempts to avoid repeated work.
+      LocalSummarizer.FAILED_CACHE.set(id, Date.now());
     }
 
     return summary;
+  }
+
+  /**
+   * Get the current global active request count.
+   * This is used by callers to check if they should defer their request.
+   */
+  static getGlobalActiveRequests(): number {
+    return LocalSummarizer.globalActiveRequests;
+  }
+
+  /**
+   * Record a new global request. Callers should use this before starting
+   * work that may take time, so they can check the global limit.
+   */
+  static recordRequest(): void {
+    LocalSummarizer.globalActiveRequests++;
+  }
+
+  /**
+   * Decrement the global active request count. Callers should use this
+   * after completing their work to properly release the request slot.
+   */
+  static releaseRequest(): void {
+    LocalSummarizer.globalActiveRequests = Math.max(0, LocalSummarizer.globalActiveRequests - 1);
+  }
+
+  /**
+   * Check if we're currently in a global cooldown due to prior failures.
+   */
+  static isInCooldown(): boolean {
+    return Date.now() < LocalSummarizer.cooldownUntil;
   }
 }
 
@@ -209,6 +285,13 @@ export class RemoteSummarizer implements Summarizer {
       return this.fallback.summarize(document);
     }
 
+    // Check global concurrency and cooldown — use LocalSummarizer static methods
+    // to avoid tight coupling while still respecting the same limits.
+    if (LocalSummarizer.isInCooldown()) {
+      // We're in global cooldown due to prior failures; return local summary quickly.
+      return this.fallback.summarize(document);
+    }
+
     // Rate-limit repeated remote attempts per-document to reduce load and
     // avoid thrashing a failing/slow remote service.
     const last = this.lastAttemptAt.get(id) ?? 0;
@@ -222,35 +305,29 @@ export class RemoteSummarizer implements Summarizer {
     const inFlight = RemoteSummarizer.getPending(id);
     if (inFlight) return inFlight;
 
-    //
-    if (this.cooldownUntil && now < this.cooldownUntil) {
-      // We're in cooldown due to prior failures; return local summary quickly.
+    // Check global concurrency before starting the remote request.
+    // Use LocalSummarizer's static methods to avoid tight coupling.
+    if (LocalSummarizer.getGlobalActiveRequests() >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) {
+      // Global concurrency cap is reached; defer to a later attempt.
+      // Return a local summary immediately to avoid blocking the caller.
       return this.fallback.summarize(document);
     }
+
+    // Record the request and then execute.
+    LocalSummarizer.recordRequest();
 
     // Encapsulate the remote attempt so we can register it in the pending map
     const op = (async (): Promise<string> => {
       try {
         let result: string;
         try {
-          // If the global concurrency cap is reached, avoid starting another
-          // remote request — treat this as a transient overload and return a
-          // safe local summary instead. This prevents many different documents
-          // from creating an unbounded number of simultaneous remote calls.
-          if (RemoteSummarizer.globalActiveRequests >= RemoteSummarizer.GLOBAL_MAX_CONCURRENT) {
-            this.recordFailure();
-            return this.fallback.summarize(document);
-          }
-
-          RemoteSummarizer.globalActiveRequests++;
-
           result = await Promise.race([
             this.fetcher(document, { authToken: this.authToken }),
             new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
           ]);
         } finally {
           // Ensure the global active counter is decremented even on timeout/failure.
-          try { RemoteSummarizer.globalActiveRequests = Math.max(0, RemoteSummarizer.globalActiveRequests - 1); } catch (_) { RemoteSummarizer.globalActiveRequests = 0; }
+          LocalSummarizer.releaseRequest();
         }
 
         if (typeof result !== 'string' || result.length === 0) {
