@@ -510,6 +510,21 @@ export class DocumentStore {
    * mutation so OfflineSyncQueue can drain deterministically.
    */
   recordBufferedMutation(mutationId: string, op: 'create' | 'update' | 'delete' | 'link', payload: any): number {
+    // Guard against accidental use of a document id as the mutation id.
+    // If callers accidentally pass a document id as the mutation id (common
+    // shapes include payload.documentId or payload.change.id), generate a
+    // distinct mutation id to avoid idempotency collisions and nondeterministic
+    // replay behavior.
+    try {
+      const maybeDocId = payload && typeof payload === 'object'
+        ? (payload.documentId ?? (payload.payload && payload.payload.documentId) ?? (payload.change && payload.change.id) ?? (payload.payload && payload.payload.change && payload.payload.change.id))
+        : undefined;
+      if (maybeDocId !== undefined && String(maybeDocId) === String(mutationId)) {
+        try { console.warn('DocumentStore.recordBufferedMutation: mutationId appears to equal a document id; generating distinct mutation id to avoid collisions'); } catch (_) {}
+        mutationId = mutationId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+      }
+    } catch (_) { /* swallow */ }
+
     // Respect idempotency at the logging layer: if a mutation with the same
     // id already appears in the log, return its existing seq.
     const existing = this.mutationLog.find(m => m.id === mutationId);
@@ -574,6 +589,16 @@ export class DocumentStore {
       try {
         await Promise.resolve(applyFn(m));
         this.appliedMutationIds.add(m.id);
+        // Best-effort persist of applied markers to make replay idempotency durable
+        // across process restarts. If a host configures __SIGNAL_STORE_FILEPATH
+        // we attempt to save so already-applied entries are less likely to be
+        // replayed after a crash.
+        try {
+          const configured = (globalThis as any).__SIGNAL_STORE_FILEPATH;
+          if (typeof configured === 'string' && configured.length > 0) {
+            try { this.save(configured); } catch (_) { /* swallow */ }
+          }
+        } catch (_) { /* swallow */ }
       } catch (_) {
         // Swallow to continue processing subsequent mutations; callers can
         // re-run replay to attempt failed entries later.
@@ -617,9 +642,32 @@ export class DocumentStore {
    * semantics. This method provides a backward-compatible name used by some
    * callers and forwards to the authoritative recordBufferedMutation.
    */
-  enqueueOfflineMutation(op: 'create' | 'update' | 'delete' | 'link', mutationId: string, payload: any): number {
+  enqueueOfflineMutation(op: 'create' | 'update' | 'delete' | 'link', mutationIdOrPayload: any, payload?: any): number {
     try {
-      return this.recordBufferedMutation(mutationId, op, payload);
+      let mutationId = mutationIdOrPayload;
+      let finalPayload = payload;
+
+      // Backwards-compat: callers may call enqueueOfflineMutation(op, payload)
+      // (omitting an explicit mutation id). Detect that shape and generate a
+      // stable-looking unique mutation id.
+      if (finalPayload === undefined && mutationIdOrPayload && typeof mutationIdOrPayload === 'object') {
+        finalPayload = mutationIdOrPayload;
+        mutationId = 'm-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
+      }
+
+      // If a caller supplied a mutation id that appears to equal a document id
+      // contained in the payload, expand it to avoid identity collisions.
+      try {
+        const maybeDocId = finalPayload && typeof finalPayload === 'object'
+          ? (finalPayload.documentId ?? (finalPayload.payload && finalPayload.payload.documentId) ?? (finalPayload.change && finalPayload.change.id) ?? (finalPayload.payload && finalPayload.payload.change && finalPayload.payload.change.id))
+          : undefined;
+        if (maybeDocId !== undefined && mutationId !== undefined && String(maybeDocId) === String(mutationId)) {
+          try { console.warn('DocumentStore.enqueueOfflineMutation: provided mutation id appears to be a document id; generating a distinct mutation id to avoid idempotency collisions'); } catch (_) {}
+          mutationId = String(mutationId) + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+        }
+      } catch (_) { /* swallow detection errors */ }
+
+      return this.recordBufferedMutation(String(mutationId), op, finalPayload);
     } catch (_) {
       // Best-effort fallback
       try { return 0; } catch (_) { return 0; }
