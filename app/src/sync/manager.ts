@@ -13,7 +13,7 @@ import type { StorageEvent } from '../storage/events.js';
 import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
-import { createLazySyncEngine } from './lazyEngine.js';
+
 import { SyncQueue } from './queue.js';
 import { OfflineSyncQueue } from './offline-queue.js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -74,7 +74,10 @@ export class SyncManager {
     if (opts.engine) {
       this.engine = opts.engine;
     } else {
-      this.engine = createLazySyncEngine(store as any, opts.peerId);
+      // Use the canonical SyncEngine factory/registry to avoid duplicate
+      // engine instances and duplicate event subscriptions. This central
+      // registration reduces surprises in tests and runtime.
+      this.engine = SyncEngine.getOrCreate(store as any, opts.peerId);
     }
     this.queue = new SyncQueue();
 

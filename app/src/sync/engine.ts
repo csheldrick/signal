@@ -304,19 +304,12 @@ export class SyncEngine {
     }
 
     if (message) {
-      // Best-effort: persist outbound message into the store's durable mutation
-      // log to reduce the data-loss surface when a transport drops mid-session.
-      // This is intentionally conservative and does not throw if the store
-      // doesn't support persistence.
-      try {
-        const storeAny: any = this.store;
-        const persistedId = (message as any).messageId ?? makeMessageId((message as any).documentId ?? '');
-        if (storeAny && typeof storeAny.recordBufferedMutation === 'function') {
-          try { storeAny.recordBufferedMutation(persistedId, message.operation as any, message); } catch (_) { /* swallow */ }
-        } else if (storeAny && typeof storeAny.appendMutationLog === 'function') {
-          try { storeAny.appendMutationLog({ id: persistedId, op: message.operation, payload: message, messageId: persistedId, clock: message.clock, peerId: message.peerId, timestamp: message.timestamp }); } catch (_) { /* swallow */ }
-        }
-      } catch (_) { /* swallow */ }
+      // Persistence of outbound messages is a responsibility of the SyncManager
+      // or an explicitly provided OfflineSyncQueue. The engine must avoid
+      // durably persisting outbound messages to prevent duplicated writes and
+      // conflicting ordering when both engine and manager attempt persistence.
+      // Keep the engine stateless with respect to durable outbound logs.
+      // No-op: durable buffering should be handled by the manager layer.
 
       // Coalesce outbound messages per-document to avoid noisy churn. Behavior:
       // - delete takes precedence and will replace earlier create/update entries.
