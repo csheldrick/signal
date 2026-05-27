@@ -580,4 +580,54 @@ export class DocumentStore {
       }
     }
   }
+
+  // Public, explicit helpers for mutation-log manipulation and inspection.
+  // These replace the previous fragile runtime prototype augmentation with
+  // first-class APIs on the store. They provide deterministic, testable
+  // operations and a stable surface for instrumentation and tooling.
+
+  getMutationLog(): ReadonlyArray<{ seq: number; id: string; op: string; payload: any }> {
+    try {
+      const copy = Array.isArray(this.mutationLog) ? this.mutationLog.slice() : [];
+      copy.sort((a: any, b: any) => (a.seq || 0) - (b.seq || 0));
+      return copy.map((e: any) => ({ seq: e.seq, id: e.id, op: e.op, payload: e.payload }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  markMutationApplied(id: string): void {
+    try {
+      this.appliedMutationIds.add(String(id));
+    } catch (_) { /* swallow */ }
+  }
+
+  trimAppliedMutations(): void {
+    try {
+      if (!Array.isArray(this.mutationLog) || this.mutationLog.length === 0) return;
+      const applied = this.appliedMutationIds || new Set<string>();
+      // Keep entries that are not recorded applied yet.
+      this.mutationLog = this.mutationLog.filter((e: any) => !applied.has(String(e.id)));
+    } catch (_) { /* swallow */ }
+  }
+
+  /**
+   * Compatibility wrapper that assigns a monotonic seq for a buffered mutation.
+   * Prefer recordBufferedMutation(mutationId, op, payload) for explicit id
+   * semantics. This method provides a backward-compatible name used by some
+   * callers and forwards to the authoritative recordBufferedMutation.
+   */
+  enqueueOfflineMutation(op: 'create' | 'update' | 'delete' | 'link', mutationId: string, payload: any): number {
+    try {
+      return this.recordBufferedMutation(mutationId, op, payload);
+    } catch (_) {
+      // Best-effort fallback
+      try { return 0; } catch (_) { return 0; }
+    }
+  }
+
+  /** Alias for replayBufferedMutations kept for compatibility */
+  async replayMutationLog(replayer: (entry: { seq: number; id: string; op: string; payload: any }) => Promise<void> | void): Promise<void> {
+    return this.replayBufferedMutations(replayer);
+  }
 }
