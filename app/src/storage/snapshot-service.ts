@@ -39,7 +39,11 @@ export class DocumentSnapshotService {
 
   constructor(store?: SnapshotStore, opts?: DocumentSnapshotServiceOptions) {
     this.store = store;
-    this.compactionIntervalMs = typeof opts?.compactionIntervalMs === 'number' ? opts!.compactionIntervalMs : (5 * 60 * 1000);
+    // Default to a longer interval (15 minutes) to reduce periodic IO bursts;
+    // enforce a minimum of 60s to avoid pathological rapid compaction.
+    const defaultInterval = 15 * 60 * 1000; // 15min default to reduce IO pressure
+    const requested = typeof opts?.compactionIntervalMs === 'number' ? opts!.compactionIntervalMs : defaultInterval;
+    this.compactionIntervalMs = Math.max(60_000, requested);
     this.maxClockEntries = typeof opts?.maxClockEntries === 'number' ? Math.max(4, opts!.maxClockEntries) : 64;
 
     if (this.store && this.compactionIntervalMs > 0) {

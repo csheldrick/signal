@@ -110,6 +110,8 @@ export class GraphBuilder {
       // request again later when the background load subsides.
       const toProcess = docs.slice(0, GraphBuilder.MAX_DOCS_PROCESS);
 
+      const BATCH_SIZE = 25;
+      let processed = 0;
       for (const doc of toProcess) {
         nodes.set(doc.id, {
           id: doc.id,
@@ -129,6 +131,12 @@ export class GraphBuilder {
             // Defensive: ignore malformed link entries to keep the builder
             // robust under partial/malformed data.
           }
+        }
+
+        processed++;
+        if ((processed % BATCH_SIZE) === 0) {
+          // Yield to the event loop to avoid long synchronous blocking under load.
+          await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
 

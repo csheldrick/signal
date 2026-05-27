@@ -167,12 +167,12 @@ export class PluginHost {
       // Small TTL-backed clock cache to reduce repeated deep-clone work for plugin callers.
       let lastClockTs = 0;
       let lastClock: { [peerId: string]: number } = {};
-      const CLOCK_CACHE_TTL = 500; // milliseconds
+      const CLOCK_CACHE_TTL = 250; // milliseconds (reduced to limit repeated deep clones under load)
 
       const ctx: PluginContext = {
         listDocuments: () => {
           // Validate and provide only well-formed document snapshots to plugins.
-          return (this.context.listDocuments().slice(0, 200)).map(d => {
+          return (this.context.listDocuments().slice(0, 100)).map(d => {
             try {
               if (!d || typeof d.id !== 'string' || typeof d.title !== 'string' || typeof d.content !== 'string' || !Array.isArray(d.links) || !Array.isArray(d.tags)) return undefined;
               const safeDoc = {
@@ -226,7 +226,7 @@ export class PluginHost {
                 tags: Array.isArray(d.tags) ? [...d.tags] : [],
               });
               return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights });
-            }).filter((x): x is Readonly<SearchResult> => !!x).slice(0, 10);
+            }).filter((x): x is Readonly<SearchResult> => !!x).slice(0, 5);
 
             searchCache.set(key, { ts: now, results });
             return results;
@@ -279,7 +279,7 @@ export class PluginHost {
                 // avoid unbounded growth of pluginEventManagers (each distinct
                 // type can hold many listeners). If the cap is reached, avoid
                 // adding another manager and fall back to a no-op behaviour.
-                const MAX_EVENT_TYPES = 12;
+                const MAX_EVENT_TYPES = 8;
                 if (this.pluginEventManagers.size >= MAX_EVENT_TYPES) {
                   try { console.warn('PluginHost: event manager type limit reached; registering noop listener'); } catch (_) {}
                   mgr = { upstreamDispose: undefined, listeners: new Set() };

@@ -21,6 +21,8 @@ export class WorkerPool {
   private readonly numWorkers: number;
   private readonly maxDocsPerWorker: number;
   private readonly onWorkerFinish: ((workerIndex: number) => void) | null = null;
+  // Whether the pool has been shut down; prevents scheduling additional work
+  private stopped: boolean = false;
 
   constructor(options: WorkerPoolOptions, onWorkerFinish?: (workerIndex: number) => void) {
     const provided = options && typeof options.numWorkers === 'number' ? Math.max(1, options.numWorkers) : undefined;
@@ -28,7 +30,14 @@ export class WorkerPool {
     // Default to (cpus - 1) but at least 2 workers; cap to avoid extreme parallelism
     const defaultWorkers = Math.max(2, Math.min(16, Math.max(1, cpus - 1)));
     this.numWorkers = Math.min(64, provided ?? defaultWorkers);
-    this.maxDocsPerWorker = options.maxDocsPerWorker;
+
+    // Ensure a safe default and a lower bound for maxDocsPerWorker to avoid
+    // pathological chunk sizes that could create extremely large macrotasks.
+    const defaultMax = 250;
+    this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
+      ? Math.max(1, options.maxDocsPerWorker)
+      : defaultMax;
+
     this.onWorkerFinish = onWorkerFinish || null;
     this.initWorkers();
   }
@@ -57,6 +66,8 @@ export class WorkerPool {
   }
 
   process(documents: Array<{ id: string; text: string }>): Promise<void> {
+    if (this.stopped) return Promise.resolve();
+
     // Copy the documents array to avoid mutating the caller's array.
     const docsCopy = documents.slice();
 
@@ -87,6 +98,13 @@ export class WorkerPool {
       let active = 0;
 
       const scheduleNext = () => {
+        if (this.stopped) {
+          // If shutdown has been requested, stop scheduling new work and
+          // resolve when currently active tasks drain.
+          if (active === 0) resolve();
+          return;
+        }
+
         // If no remaining work and no active workers, we're done.
         if (idx >= chunks.length && active === 0) {
           resolve();
@@ -94,7 +112,7 @@ export class WorkerPool {
         }
 
         // While we have capacity, start new chunk tasks.
-        while (active < this.numWorkers && idx < chunks.length) {
+        while (active < Math.min(this.numWorkers, chunks.length) && idx < chunks.length) {
           const { workerIndex, docs } = chunks[idx++];
           active++;
 

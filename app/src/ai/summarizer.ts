@@ -36,7 +36,9 @@ export class LocalSummarizer implements Summarizer {
   // when many callers activate it concurrently (background summarization,
   // plugin calls, remote fallbacks).
   private static globalActiveRequests: number = 0;
-  static readonly GLOBAL_MAX_CONCURRENT = 4;
+  // Timestamp of the last recorded acquisition; used to recover from leaked slots.
+  private static lastAcquireAt: number = 0;
+  static readonly GLOBAL_MAX_CONCURRENT = 3;
 
   /**
    * Attempt to acquire a global LocalSummarizer request slot.
@@ -44,8 +46,26 @@ export class LocalSummarizer implements Summarizer {
    * call releaseRequest() when finished.
    */
   static tryRecordRequest(): boolean {
-    if (LocalSummarizer.globalActiveRequests >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) return false;
+    const now = Date.now();
+    try {
+      // Recover from possible leaked/inconsistent counts by reclaiming
+      // stale slots if there has been no recent activity. This prevents
+      // permanent saturation if a caller forgets to release.
+      if (LocalSummarizer.globalActiveRequests >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) {
+        if (now - (LocalSummarizer.lastAcquireAt || 0) > 30_000) {
+          // Assume previous holders are stale and reset counters conservatively.
+          LocalSummarizer.globalActiveRequests = 0;
+        } else {
+          return false;
+        }
+      }
+    } catch (_) {
+      // In case of any error, fall back to conservative denial to avoid overload.
+      if (LocalSummarizer.globalActiveRequests >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) return false;
+    }
+
     LocalSummarizer.globalActiveRequests++;
+    LocalSummarizer.lastAcquireAt = now;
     return true;
   }
 
