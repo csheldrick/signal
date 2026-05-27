@@ -12,6 +12,8 @@ import type { DocumentStore } from '../storage/store.js';
 import type { StorageEvent } from '../storage/events.js';
 import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
+import { createLazySyncEngine } from './lazyEngine.js';
+import { telemetry } from './telemetry.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 
 import { SyncQueue } from './queue.js';
@@ -77,10 +79,16 @@ export class SyncManager {
     if (opts.engine) {
       this.engine = opts.engine;
     } else {
-      // Use the canonical SyncEngine factory/registry to avoid duplicate
-      // engine instances and duplicate event subscriptions. This central
-      // registration reduces surprises in tests and runtime.
-      this.engine = SyncEngine.getOrCreate(store as any, opts.peerId);
+      // Use a lazy SyncEngine proxy to defer constructing the concrete
+      // SyncEngine (and subscribing to store events) until the manager
+      // actually needs it. This reduces startup fan-out and avoids
+      // unnecessary buffering in short-lived hosts.
+      try {
+        this.engine = createLazySyncEngine(store as any, opts.peerId) as unknown as SyncEngine;
+      } catch (_) {
+        // Fallback to canonical factory when lazy creation fails
+        this.engine = SyncEngine.getOrCreate(store as any, opts.peerId);
+      }
     }
     this.queue = new SyncQueue();
 
@@ -151,6 +159,13 @@ export class SyncManager {
     this.snapshotService = opts.snapshotService;
     this.offlineQueue = opts.offlineQueue;
 
+    // If an offlineQueue is provided, attempt a best-effort drain when the
+    // manager starts or when a transport is attached so that offline-first
+    // persisted messages are replayed in causal order before live sends.
+    // Do not block construction; perform drains asynchronously and emit
+    // telemetry for observability.
+
+
     // Outbound generation is driven by the SyncEngine. Rather than subscribing
     // directly to store.events and enqueueing immediately (which can cause
     // duplicate enqueues and high synchronous fan-out when many listeners exist),
@@ -158,6 +173,18 @@ export class SyncManager {
     // provides a single controlled point for backpressure and avoids duplicate
     // work when other engines/listeners are present.
     // (Previously this block subscribed to store.events and enqueued directly.)
+
+    // If an OfflineSyncQueue is provided, attempt an asynchronous best-effort
+    // replay of persisted entries. This supports offline-first workflows while
+    // ensuring that replay does not block the manager construction. Replayed
+    // entries will be handed to the manager's transport when available via
+    // start/attach logic below — for now we emit telemetry to indicate presence.
+    if (this.offlineQueue) {
+      try {
+        // Emit size/health telemetry to help operators know there's pending offline data
+        try { telemetry.emit('offline_queue_attached', { peerId: this.peerId, size: this.offlineQueue.size(this.peerId), timestamp: Date.now() }); } catch (_) {}
+      } catch (_) {}
+    }
   }
 
   // ── Transport wiring ──────────────────────────────────────
@@ -187,6 +214,34 @@ export class SyncManager {
         return Promise.reject(err);
       }
     };
+
+    // If an OfflineSyncQueue was provided, attempt an asynchronous best-effort
+    // replay of persisted entries into the in-memory queue so normal flush
+    // logic will send them in causal order. We perform this asynchronously
+    // to avoid blocking callers and emit telemetry for observability.
+    if (this.offlineQueue) {
+      try {
+        (async () => {
+          try {
+            await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
+              try {
+                // Re-enqueue the payload into the in-memory SyncQueue so it
+                // participates in normal flush/ack semantics. If enqueue fails
+                // we propagate the error to cause the remaining entries to be
+                // preserved on disk by OfflineSyncQueue.drain rewrite logic.
+                const msg = entry.payload as SyncMessage;
+                await this.queue.enqueue(msg);
+              } catch (err) {
+                throw err;
+              }
+            });
+            try { telemetry.emit('offline_queue_drained', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
+          } catch (err) {
+            try { telemetry.emit('offline_queue_drain_failed', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+          }
+        })();
+      } catch (_) {}
+    }
   }
 
   /**

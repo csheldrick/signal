@@ -5,6 +5,7 @@
 import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex } from '../core/types.js';
 import { normalizeSearchQuery } from '../core/types.js';
 import { WorkerPool, WorkerPoolOptions } from './workerPool.js';
+import { telemetry } from '../sync/telemetry.js';
 
 // Basic tokenizer: split on non-alphanumerics and lowercase
 function tokenize(text: string | undefined): Set<string> {
@@ -178,7 +179,7 @@ export class Indexer implements IndexerContract {
     this.workerPool = new WorkerPool({ numWorkers: 4, maxDocsPerWorker: 500 });
     if (!events || !this.index) return;
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
+      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 1000) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const updated = (ev: any) => { try { if (ev && ev.current) { this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
 
@@ -205,11 +206,14 @@ export class Indexer implements IndexerContract {
 
   private async processPending(): Promise<void> {
     if (this.pendingDocs.length === 0 || this.processing) return;
-    this.processing = true;
+      this.processing = true;
     try {
+      try { telemetry.emit('indexer_process_start', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {}
       await this.workerPool.process(this.pendingDocs.map(d => ({ id: d.id, text: d.text })));
       this.pendingDocs = [];
-    } catch (_) {
+      try { telemetry.emit('indexer_process_complete', { timestamp: Date.now() }); } catch (_) {}
+    } catch (err) {
+      try { telemetry.emit('indexer_process_error', { error: String(err), timestamp: Date.now() }); } catch (_) {}
       // Worker error - retry later
     } finally {
       this.processing = false;

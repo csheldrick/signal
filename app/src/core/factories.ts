@@ -32,10 +32,10 @@ export function createLazyGraph(storeGetter: () => any[]): GraphBuilder {
  * pattern so the app doesn't inline the logic and so tests/factories can
  * reuse the same behavior.
  */
-export function createLazyPluginHost(pluginContext: PluginContext): PluginHost {
+export function createLazyPluginHost(pluginContext: PluginContext, options?: { allowNetworkSummaries?: boolean; allowedNetworkPlugins?: string[] }): PluginHost {
   let real: PluginHost | undefined;
   const ensure = () => {
-    if (!real) real = new PluginHost(pluginContext); // TODO: consider passing policy options from app configuration to PluginHost
+    if (!real) real = new PluginHost(pluginContext, options); // pass host-level plugin policy options through
     return real!;
   };
   return {

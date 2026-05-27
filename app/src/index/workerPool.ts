@@ -143,6 +143,9 @@ export class WorkerPool {
   }
 
   shutdown(): void {
+    // Mark stopped to prevent scheduling further work and allow in-flight
+    // tasks to drain cleanly. Clear worker list to free references.
+    this.stopped = true;
     this.workers = [];
     this.activeWorkers = 0;
   }

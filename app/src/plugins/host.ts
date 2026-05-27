@@ -3,6 +3,7 @@
 // Plugins receive a PluginContext — NOT the store directly.
 
 import type { DocumentSnapshot, SearchQuery, SearchResult, SearchResultSnapshot } from '../core/types.js';
+import { telemetry } from '../sync/telemetry.js';
 import { normalizeSearchQuery } from '../core/types.js';
 import type { StorageEvent, StorageEventType } from '../storage/events.js';
 export type { StorageEvent, StorageEventType } from '../storage/events.js';
@@ -122,6 +123,7 @@ export class PluginHost {
   }
 
   register(plugin: Plugin): void {
+    try { telemetry.emit('plugin_registered', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
     // Enforce explicit opt-in for the PluginContext sandbox. Legacy plugins
     // that do not set usesPluginContext === true must be migrated. This
     // prevents accidental sandbox escapes and makes the boundary explicit.
@@ -134,12 +136,15 @@ export class PluginHost {
     }
 
     if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {
+      try { telemetry.emit('plugin_register_failed_limit', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
       throw new Error(`PluginHost: cannot register plugin '${plugin.id}': plugin registration limit reached`);
     }
     if (this.plugins.has(plugin.id)) {
+      try { telemetry.emit('plugin_register_failed_duplicate', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
       throw new Error(`PluginHost: plugin '${plugin.id}' is already registered`);
     }
     this.plugins.set(plugin.id, plugin);
+    try { telemetry.emit('plugin_registered_success', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
   }
 
   enable(pluginId: string): boolean {
@@ -404,33 +409,46 @@ export class PluginHost {
                 } catch (_) { return false; }
               })();
 
-              return await maybe(documentId, allowNetwork && pluginAllowed);
+              try { telemetry.emit('plugin_summarize_request', { pluginId: plugin.id, documentId, allowNetwork, pluginAllowed, timestamp: Date.now() }); } catch (_) {}
+              const res = await maybe(documentId, allowNetwork && pluginAllowed);
+              if (res === undefined) {
+                try { telemetry.emit('plugin_summarize_denied', { pluginId: plugin.id, documentId, allowNetwork, pluginAllowed, timestamp: Date.now() }); } catch (_) {}
+              } else {
+                try { telemetry.emit('plugin_summarize_allowed', { pluginId: plugin.id, documentId, allowNetwork, timestamp: Date.now() }); } catch (_) {}
+              }
+              return res;
             }
           } catch (_) { /* swallow */ }
           return undefined;
         },
+
       };
 
       return Object.freeze(ctx);
     })();
 
     // Activate plugin inside try/catch to avoid leaving an inconsistent enabled state
+    try { telemetry.emit('plugin_enable_attempt', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
     try {
       plugin.activate(safeCtx);
     } catch (err) {
       try { console.error(`PluginHost: activation failed for plugin '${pluginId}'`, err); } catch (_) {}
+      try { telemetry.emit('plugin_enable_failed', { id: pluginId, error: String(err), timestamp: Date.now() }); } catch (_) {}
       return false;
     }
 
     this.enabled.add(pluginId);
+    try { telemetry.emit('plugin_enabled', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
     return true;
   }
 
-  disable(pluginId: string): boolean {
+    disable(pluginId: string): boolean {
+    try { telemetry.emit('plugin_disable_attempt', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
     const plugin = this.plugins.get(pluginId);
     if (!plugin || !this.enabled.has(pluginId)) return false;
-    plugin.deactivate();
+    try { plugin.deactivate(); } catch (_) {}
     this.enabled.delete(pluginId);
+    try { telemetry.emit('plugin_disabled', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
     return true;
   }
 
