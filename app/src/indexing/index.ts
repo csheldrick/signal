@@ -173,27 +173,35 @@ export class InvertedIndex {
     return ALL;
   }
 
-  stats(): IndexStats {
+  stats(maxDocs?: number): IndexStats {
     // Serve cached stats when available to avoid recomputation on hot paths.
     const now = Date.now();
     if (!this.statsDirty && this.cachedStats && (now - this.lastStatsTs) < InvertedIndex.STATS_TTL_MS) return { ...this.cachedStats };
 
     const docCount = this.docTerms.size;
     const termCount = this.posting.size;
-    // Calculate unique terms as the union of all posting lists
-    // Use a Set to track unique terms without mutating the posting map
-    const uniqueTerms = new Set<string>();
-    for (const terms of this.docTerms.values()) {
-      for (const term of terms) {
-        uniqueTerms.add(term);
-      }
-    }
-    const totalTerms = uniqueTerms.size;
+
+    // Heuristic: sample up to maxScan posting entries rather than scanning the
+    // entire posting map. This keeps the cost of stats bounded even when the
+    // index grows large. Callers may pass maxDocs to request cheaper stats.
     const TOP_N = 10;
-    const topTerms = [...this.posting.entries()]
-      .map(([term, set]) => ({ term, count: set.size }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, TOP_N);
+    const maxScan = typeof maxDocs === 'number' && maxDocs > 0 ? Math.max(1000, maxDocs * 20) : 10000;
+
+    const entries: Array<{ term: string; count: number }> = [];
+    let scanned = 0;
+    try {
+      for (const [term, set] of this.posting.entries()) {
+        if (scanned >= maxScan) break;
+        entries.push({ term, count: set.size });
+        scanned++;
+      }
+    } catch (_) {
+      // If iteration fails for any reason, fall back to empty list to preserve
+      // resiliency of the stats endpoint.
+    }
+
+    entries.sort((a, b) => b.count - a.count);
+    const topTerms = entries.slice(0, TOP_N);
 
     const computed: IndexStats = {
       docCount: docCount,
@@ -204,7 +212,6 @@ export class InvertedIndex {
     this.cachedStats = computed;
     this.lastStatsTs = Date.now();
     this.statsDirty = false;
-    // Return a shallow clone to avoid leaking internal references.
     return { ...computed };
   }
 

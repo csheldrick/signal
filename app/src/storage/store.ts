@@ -10,7 +10,7 @@ import type {
   SearchResult,
   DocumentChange,
 } from '../core/types.js';
-import { createDocumentSnapshot, validateDocumentChange, VALID_LINK_KINDS, normalizeSearchQuery } from '../core/types.js';
+import { createDocumentSnapshot, validateDocumentChange, VALID_LINK_KINDS, normalizeSearchQuery, normalizeDocumentChange } from '../core/types.js';
 import { StorageEventBus } from './events.js';
 export type { StorageEvent } from './events.js';
 import type { StorageEvent } from './events.js';
@@ -162,12 +162,19 @@ export class DocumentStore {
     if (!Array.isArray(tags) || tags.some(t => typeof t !== 'string')) {
       throw new Error('DocumentStore.create: invalid tags');
     }
+
+    // Clamp inputs to reasonable bounds to avoid passing pathological
+    // payloads into downstream subsystems (indexers, sync, graph builders).
+    const safeTitle = title.length > 5000 ? title.slice(0, 5000) : title;
+    const safeContent = content.length > 200_000 ? content.slice(0, 200_000) : content;
+    const safeTags = Array.isArray(tags) ? tags.slice(0, 100).map(t => (typeof t === 'string' ? (t.length > 100 ? t.slice(0, 100) : t) : String(t))) : [];
+
     const now = Date.now();
     const doc: Document = {
       id,
-      title,
-      content,
-      tags,
+      title: safeTitle,
+      content: safeContent,
+      tags: safeTags,
       links: [],
       createdAt: now,
       updatedAt: now,
@@ -185,18 +192,21 @@ export class DocumentStore {
   }
 
   update(id: string, changes: DocumentChange): Document | undefined {
-    // Validate change object to enforce the core input validation boundary.
-    if (!validateDocumentChange(changes)) {
-      try { console.warn('DocumentStore.update: rejected invalid changes'); } catch (_) {}
+    // Normalize and validate the change object to enforce the core input boundary
+    // and to clamp pathological updates which can overload downstream subsystems.
+    const normalized = normalizeDocumentChange(changes);
+    if (normalized === undefined) {
+      try { console.warn('DocumentStore.update: rejected invalid or oversized changes'); } catch (_) {}
       return undefined;
     }
+
     const existing = this.documents.get(id);
     if (!existing) return undefined;
 
     const now = Date.now();
     const updated: Document = {
       ...existing,
-      ...changes,
+      ...normalized,
       links: existing.links,
       updatedAt: now,
       version: (existing.version ?? 0) + 1,
@@ -504,6 +514,29 @@ export class DocumentStore {
     // id already appears in the log, return its existing seq.
     const existing = this.mutationLog.find(m => m.id === mutationId);
     if (existing) return existing.seq;
+
+    // Sanitize payload when it appears to contain DocumentChange shapes so
+    // we do not persist unbounded content into the durable mutation log.
+    try {
+      if (payload && typeof payload === 'object') {
+        // Common shapes: { change: DocumentChange } or { payload: { change: DocumentChange } }
+        let candidate: any = undefined;
+        if (payload.change !== undefined) candidate = payload.change;
+        else if (payload.payload && payload.payload.change !== undefined) candidate = payload.payload.change;
+
+        if (candidate !== undefined) {
+          const normalized = normalizeDocumentChange(candidate);
+          if (normalized !== undefined) {
+            if (payload.change !== undefined) payload.change = normalized;
+            else if (payload.payload && payload.payload.change !== undefined) payload.payload.change = normalized;
+          } else {
+            // Replace with a lightweight empty change to avoid persisting huge blobs
+            if (payload.change !== undefined) payload.change = {};
+            else if (payload.payload && payload.payload.change !== undefined) payload.payload.change = {};
+          }
+        }
+      }
+    } catch (_) { /* swallow normalization errors */ }
 
     this.seqCounter += 1;
     const entry = { seq: this.seqCounter, id: mutationId, op, payload };

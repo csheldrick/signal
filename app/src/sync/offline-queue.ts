@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync, unlinkSync, mk
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import type { DocumentChange } from '../core/types.js';
+import { normalizeDocumentChange } from '../core/types.js';
 
 export interface OfflineEntry {
   id: string; // stable id for the queued mutation
@@ -66,7 +67,8 @@ export class OfflineSyncQueue extends EventEmitter {
    */
   async enqueue(peerId: string, documentId: string, change: DocumentChange): Promise<void> {
     if (!peerId) throw new Error('peerId required');
-    const entry = this.makeEntry(peerId, documentId, change);
+    const safeChange = normalizeDocumentChange(change) ?? {};
+    const entry = this.makeEntry(peerId, documentId, safeChange);
 
     // append to in-memory queue immediately (fast, non-blocking)
     const q = this.memQueues.get(peerId) ?? [];

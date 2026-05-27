@@ -29,7 +29,7 @@ class InvertedIndexImpl implements InvertedIndex {
   private docTerms: Map<string, Set<string>> = new Map();
   private termCounts: Map<string, number> = new Map();
 
-  indexDocument(doc: DocumentSnapshot): void {
+  indexDocument(doc: DocumentSnapshot, maxDocs?: number): void {
     if (!doc || typeof doc.id !== 'string') return;
     if (this.docStore.has(doc.id)) {
       this.updateDocument(doc);
@@ -48,7 +48,7 @@ class InvertedIndexImpl implements InvertedIndex {
     }
   }
 
-  updateDocument(doc: DocumentSnapshot): void {
+  updateDocument(doc: DocumentSnapshot, maxDocs?: number): void {
     if (!doc || typeof doc.id !== 'string') return;
     const prev = this.docTerms.get(doc.id);
     if (prev) {
@@ -93,7 +93,7 @@ class InvertedIndexImpl implements InvertedIndex {
     this.docStore.delete(documentId);
   }
 
-  search(query: SearchQuery): SearchResult[] {
+  search(query: SearchQuery, maxDocs?: number): SearchResult[] {
     try {
       const q = normalizeSearchQuery(query);
       const text = (q && q.text) ? String(q.text).trim().toLowerCase() : '';
@@ -136,7 +136,7 @@ class InvertedIndexImpl implements InvertedIndex {
     }
   }
 
-  stats(): IndexStats {
+  stats(maxDocs?: number): IndexStats {
     const termCount = this.termMap.size;
     const docCount = this.docStore.size;
     const top: Array<{ term: string; count: number }> = [];
@@ -178,8 +178,8 @@ export class Indexer implements IndexerContract {
     this.workerPool = new WorkerPool({ numWorkers: 4, maxDocsPerWorker: 500 });
     if (!events || !this.index) return;
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); } catch (_) {} };
-      const updated = (ev: any) => { try { if (ev && ev.current) this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); } catch (_) {} };
+      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
+      const updated = (ev: any) => { try { if (ev && ev.current) { this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
 
       if (typeof events.onAsync === 'function') {
@@ -211,6 +211,17 @@ export class Indexer implements IndexerContract {
     } finally {
       this.processing = false;
     }
+  }
+
+  private scheduleProcessPending(): void {
+    try {
+      if (this.processing) return;
+      if (typeof (globalThis as any).setImmediate === 'function') {
+        (globalThis as any).setImmediate(() => void this.processPending());
+      } else {
+        setTimeout(() => { void this.processPending(); }, 0);
+      }
+    } catch (_) { /* swallow */ }
   }
 
   dispose(): void {
