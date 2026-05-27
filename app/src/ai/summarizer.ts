@@ -169,7 +169,7 @@ export class LocalSummarizer implements Summarizer {
 export class RemoteSummarizer implements Summarizer {
   readonly isRemote = true; readonly isPure = false;
   readonly allowsNetwork: boolean;
-  private readonly fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>;
+  private readonly _fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>;
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;
   private readonly authToken?: string;
@@ -263,7 +263,7 @@ export class RemoteSummarizer implements Summarizer {
     options?: { allowNetwork?: boolean; maxSentences?: number; authToken?: string },
   ) {
     // Store the raw fetcher reference so summarize() can call it with explicit opts
-    this.fetcher = fetcher;
+    this._fetcher = fetcher;
 
     // Require auth token if network is requested; otherwise disable network for safety.
     let effectiveAllow = options?.allowNetwork ?? false;
@@ -393,7 +393,7 @@ export class RemoteSummarizer implements Summarizer {
           try {
             // Race the fetcher against the configured timeout for this attempt
             const result: string = await Promise.race([
-              this.fetcher(document, { authToken: this.authToken }),
+              this._fetcher(document, { authToken: this.authToken }),
               new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
             ]);
 
