@@ -495,10 +495,11 @@ export class SignalApp {
     }
 
     // PresenceTracker uses the StorageEventBus validator (no direct store access)
-    this.presence = new PresenceTracker();
     try {
       // Wire the sandboxed PluginContext into PresenceTracker so it can validate
-      // documents without directly accessing the store.
+      // documents without directly accessing the store. Use the existing lazy
+      // presence wrapper that was created earlier to avoid creating duplicate
+      // trackers/listeners/timers.
       if (typeof (this.presence as any).setPluginContext === 'function') {
         (this.presence as any).setPluginContext(pluginContext);
       }
@@ -568,67 +569,20 @@ export class SignalApp {
     // Lazy-initialize subsystems that are safe to defer until app start
     // summarizer is initialized lazily when first needed (avoid runtime import and coupling)
     if (!this._sync) {
-      // Reuse the same engine instance that SyncManager uses when possible to
-      // avoid creating duplicate SyncEngine instances for the same
-      // DocumentStore. SyncManager caches the engine on the store under a
-      // private non-enumerable property named '__signal_sync_engine__'.
-      const ENGINE_KEY = '__signal_sync_engine__';
-      const cached = (this.store as any)[ENGINE_KEY] as SyncEngine | undefined;
-      if (cached) {
-        this._sync = cached;
-      } else {
-        // Create a new engine and publish it to the store for other callers
-        // to reuse. Be robust against races: if construction throws because
-        // another actor created an engine concurrently, prefer the installed
-        // engine. If no engine is installed, rethrow the error so callers can
-        // observe the misconfiguration.
+      // Use the canonical SyncEngine factory/registry to avoid duplicate
+      // engine instances and duplicate event subscriptions which can
+      // overload SyncEngine and downstream consumers.
+      try {
+        this._sync = SyncEngine.getOrCreate(this.store as any, this._peerId);
+      } catch (err) {
+        // As a defensive fallback, attempt direct construction but prefer any
+        // already-registered engine published via the registry.
         try {
-          let created: SyncEngine;
-          try {
-            // Attempt to create a new engine. If another actor created one
-            // concurrently, the SyncEngine constructor may throw to signal a
-            // duplicate binding; handle that deterministically below.
-            created = new SyncEngine(this.store, this._peerId);
-          } catch (err) {
-            // If construction failed, prefer an already-installed engine on the
-            // store (the preferred shared instance). If one exists, adopt it;
-            // otherwise rethrow to surface the configuration error to callers.
-            const installed = (this.store as any)[ENGINE_KEY] as SyncEngine | undefined;
-            if (installed) {
-              this._sync = installed;
-              created = installed;
-            } else {
-              throw err;
-            }
-          }
-
-          // If we don't yet have a cached engine reference, publish the one
-          // we created/adopted on the store so other callers can reuse it.
-          if (!this._sync) {
-            this._sync = created;
-            try {
-              Object.defineProperty(this.store, ENGINE_KEY, { value: created, configurable: true, enumerable: false, writable: true });
-            } catch (_) {
-              // Best-effort fallback for environments that disallow defineProperty
-              (this.store as any)[ENGINE_KEY] = created;
-            }
-          }
-          try {
-            Object.defineProperty(this.store, ENGINE_KEY, { value: created, enumerable: false, configurable: true });
-          } catch (_){
-            // Fallback for environments that restrict defineProperty.
-            (this.store as any)[ENGINE_KEY] = created;
-          }
-          this._sync = created;
-        } catch (err) {
-          // If another actor installed an engine in the interim, use it.
-          const installed = (this.store as any)[ENGINE_KEY] as SyncEngine | undefined;
-          if (installed) {
-            this._sync = installed;
-          } else {
-            // No installed engine found; rethrow so the caller sees the real error.
-            throw err;
-          }
+          this._sync = new SyncEngine(this.store as any, this._peerId);
+        } catch (e) {
+          const installed = getSyncEngineFromStore(this.store);
+          if (installed) this._sync = installed;
+          else throw err;
         }
       }
     }

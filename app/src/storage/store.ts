@@ -206,7 +206,7 @@ export class DocumentStore {
     const previousSnapshot = cloneDocument(existing);
     this.documents.set(id, updated);
     this.opCounts.update++;
-    this.events.emitAsync({
+    this.emitAsyncEvent({
       type: 'updated',
       documentId: id,
       previous: createDocumentSnapshot(previousSnapshot),
@@ -479,7 +479,7 @@ export class DocumentStore {
       try {
         setTimeout(() => {
           for (const ev of createdEvents) {
-            try { this.events.emitAsync(ev); } catch (_) { /* swallow individual emit errors */ }
+            try { this.emitAsyncEvent(ev); } catch (_) { /* swallow individual emit errors */ }
           }
         }, 0);
       } catch (_) {
@@ -487,7 +487,7 @@ export class DocumentStore {
         // using the existing emitAsync to preserve behavior while avoiding a
         // synchronous flood inside the load loop.
         for (const ev of createdEvents) {
-          try { this.events.emitAsync(ev); } catch (_) { /* swallow */ }
+          try { this.emitAsyncEvent(ev); } catch (_) { /* swallow */ }
         }
       }
     }
