@@ -387,7 +387,29 @@ export class SignalApp {
         // Job runner that performs the summary and drains the queue when done.
         // Use LocalSummarizer's concurrency control to prevent overload
         // when many timers fire concurrently.
-        LocalSummarizer.recordRequest();
+
+        // Attempt to acquire a LocalSummarizer slot; if we cannot, re-enqueue
+        // the job with a short backoff to avoid over-subscribing the local summarizer.
+        const acquired = LocalSummarizer.tryRecordRequest ? LocalSummarizer.tryRecordRequest() : (LocalSummarizer.recordRequest(), true);
+        if (!acquired) {
+          // Couldn't acquire: attempt to enqueue for later. If the queue is full
+          // set a short placeholder timer and drop the heavy work.
+          try {
+            const queue = (this as any)._bgSummarizeQueue as string[];
+            if (Array.isArray(queue) && queue.length < 1000) {
+              queue.push(id);
+              const placeholder = setTimeout(() => { try { timers.delete(id); } catch (_) {} }, 500);
+              timers.set(id, placeholder);
+              return;
+            }
+          } catch (_) {
+            // If anything goes wrong, fall back to a short placeholder timer.
+          }
+          const shortT = setTimeout(() => { try { timers.delete(id); } catch (_) {} }, 750);
+          timers.set(id, shortT);
+          return;
+        }
+
         const t = setTimeout(async () => {
           // Clear per-doc timer slot immediately (we're running it now)
           try { timers.delete(id); } catch (_) {}

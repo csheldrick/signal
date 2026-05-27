@@ -3,18 +3,7 @@
 // This is intentionally a high-centrality hub: every document that wants
 // fast search flows through here, making it a natural fan-in node for Loom.
 
-export interface IndexStats {
-  termCount: number;
-  documentCount: number;
-  avgTermsPerDoc: number;
-}
-
-export interface SearchHit {
-  documentId: string;
-  score: number;
-}
-
-export type InvertedIndexSearchHit = SearchHit;
+import type { IndexStats, SearchHit } from '../core/types.js';
 
 export class InvertedIndex {
   private posting: Map<string, Set<string>> = new Map();
@@ -97,8 +86,13 @@ export class InvertedIndex {
       };
 
       try {
+        // Prefer setImmediate where available to avoid starving microtasks.
         if (typeof (globalThis as any).setImmediate === 'function') {
           (globalThis as any).setImmediate(doRemaining);
+        } else if (typeof queueMicrotask === 'function') {
+          // When setImmediate is not available, queue a microtask followed by a macrotask
+          // to ensure we yield properly without blocking too long in tight loops.
+          queueMicrotask(() => setTimeout(doRemaining, 0));
         } else {
           setTimeout(doRemaining, 0);
         }
@@ -156,7 +150,7 @@ export class InvertedIndex {
     }
 
     const results = [...scores.entries()]
-      .map(([documentId, score]) => ({ documentId, score }))
+      .map(([documentId, score]) => ({ documentId, field: 'content' as const, snippet: undefined as string | undefined, score }))
       .sort((a, b) => b.score - a.score);
 
     // Cap results to keep downstream consumers focused and to reduce pressure
@@ -195,10 +189,16 @@ export class InvertedIndex {
       }
     }
     const totalTerms = uniqueTerms.size;
+    const TOP_N = 10;
+    const topTerms = [...this.posting.entries()]
+      .map(([term, set]) => ({ term, count: set.size }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, TOP_N);
+
     const computed: IndexStats = {
+      docCount: docCount,
       termCount: termCount,
-      documentCount: docCount,
-      avgTermsPerDoc: docCount === 0 ? 0 : totalTerms / docCount,
+      topTerms,
     };
 
     this.cachedStats = computed;
@@ -211,8 +211,8 @@ export class InvertedIndex {
   private tokenize(text: string): string[] {
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
+      .replace(/[^a-z0-9\\s]/g, ' ')
+      .split(/\\s+/)
       .filter(t => t.length > 2);
   }
 }

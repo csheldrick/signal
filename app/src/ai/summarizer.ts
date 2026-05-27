@@ -35,7 +35,18 @@ export class LocalSummarizer implements Summarizer {
   // when many callers activate it concurrently (background summarization,
   // plugin calls, remote fallbacks).
   private static globalActiveRequests: number = 0;
-  static readonly GLOBAL_MAX_CONCURRENT = 8;
+  static readonly GLOBAL_MAX_CONCURRENT = 4;
+
+  /**
+   * Attempt to acquire a global LocalSummarizer request slot.
+   * Returns true when the caller has successfully acquired a slot and must
+   * call releaseRequest() when finished.
+   */
+  static tryRecordRequest(): boolean {
+    if (LocalSummarizer.globalActiveRequests >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) return false;
+    LocalSummarizer.globalActiveRequests++;
+    return true;
+  }
 
   // Per-document pending tracking to coalesce concurrent requests
   // and avoid duplicate work for the same document.
@@ -159,6 +170,20 @@ export class RemoteSummarizer implements Summarizer {
   // overloading the remote service and downstream subsystems.
   private static globalActiveRequests: number = 0;
   private static readonly GLOBAL_MAX_CONCURRENT = 6;
+
+  static getGlobalActiveRequests(): number {
+    return RemoteSummarizer.globalActiveRequests;
+  }
+
+  static tryRecordRequest(): boolean {
+    if (RemoteSummarizer.globalActiveRequests >= RemoteSummarizer.GLOBAL_MAX_CONCURRENT) return false;
+    RemoteSummarizer.globalActiveRequests++;
+    return true;
+  }
+
+  static releaseRequest(): void {
+    RemoteSummarizer.globalActiveRequests = Math.max(0, RemoteSummarizer.globalActiveRequests - 1);
+  }
 
   private static getPending(id: string): Promise<string> | undefined {
     const entry = RemoteSummarizer.pending.get(id);
@@ -285,10 +310,9 @@ export class RemoteSummarizer implements Summarizer {
       return this.fallback.summarize(document);
     }
 
-    // Check global concurrency and cooldown — use LocalSummarizer static methods
-    // to avoid tight coupling while still respecting the same limits.
-    if (LocalSummarizer.isInCooldown()) {
-      // We're in global cooldown due to prior failures; return local summary quickly.
+    // Check remote instance cooldown due to prior failures; do not rely on LocalSummarizer cooldown.
+    if (Date.now() < this.cooldownUntil) {
+      // We're in a cooldown window due to recent remote failures; return local summary.
       return this.fallback.summarize(document);
     }
 
@@ -305,16 +329,12 @@ export class RemoteSummarizer implements Summarizer {
     const inFlight = RemoteSummarizer.getPending(id);
     if (inFlight) return inFlight;
 
-    // Check global concurrency before starting the remote request.
-    // Use LocalSummarizer's static methods to avoid tight coupling.
-    if (LocalSummarizer.getGlobalActiveRequests() >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) {
-      // Global concurrency cap is reached; defer to a later attempt.
-      // Return a local summary immediately to avoid blocking the caller.
+    // Check remote concurrency before starting the remote request.
+    // Use RemoteSummarizer's own global counter to avoid overloading the remote service.
+    if (!RemoteSummarizer.tryRecordRequest()) {
+      // Remote concurrency cap is reached; return a local summary immediately.
       return this.fallback.summarize(document);
     }
-
-    // Record the request and then execute.
-    LocalSummarizer.recordRequest();
 
     // Encapsulate the remote attempt so we can register it in the pending map
     const op = (async (): Promise<string> => {
@@ -326,8 +346,8 @@ export class RemoteSummarizer implements Summarizer {
             new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
           ]);
         } finally {
-          // Ensure the global active counter is decremented even on timeout/failure.
-          LocalSummarizer.releaseRequest();
+          // Ensure the remote global active counter is decremented even on timeout/failure.
+          RemoteSummarizer.releaseRequest();
         }
 
         if (typeof result !== 'string' || result.length === 0) {
