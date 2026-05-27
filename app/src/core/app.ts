@@ -14,8 +14,7 @@ import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
 import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 import { createLazyGraph, createLazyPluginHost, createLazyPresenceTracker } from './factories.js';
 
-import { LocalSummarizer, RemoteSummarizer } from '../ai/summarizer.js';
-import type { Summarizer } from '../ai/summarizer.js';
+import type { LocalSummarizer, RemoteSummarizer, Summarizer } from '../ai/summarizer.js';
 import type { Document, DocumentSnapshot } from '../core/types.js';
 
 export interface AppConfig {
@@ -43,7 +42,7 @@ export class SignalApp {
   private readonly _peerId: string;
   private _sync?: SyncEngine;
   private _summarizer?: Summarizer;
-  private readonly _localSummarizer: LocalSummarizer;
+  private _localSummarizer: any;
   private readonly _allowNetwork: boolean;
   private readonly _networkAuthToken?: string;
   private readonly _disableBgSummarize: boolean;
@@ -107,7 +106,10 @@ export class SignalApp {
     this._summarizer = undefined; // lazily created when first used
     // Shared LocalSummarizer used throughout the app to avoid creating many
     // ephemeral instances which increase subsystem fan-out and memory churn.
-    this._localSummarizer = new LocalSummarizer(3);
+    this._localSummarizer = undefined;
+    const getLocalSummarizerClass = () => {
+      try { const m = require('../ai/summarizer.js'); return m && (m.LocalSummarizer || (m.default && m.default.LocalSummarizer) || m.default); } catch (_) { return undefined; }
+    };
 
 
     // Provide safe, defensive clones to plugins so they cannot mutate internal store state.
@@ -164,7 +166,8 @@ export class SignalApp {
         const d = this.store.read(documentId);
         if (!d) return undefined;
         // Use the configured summarizer when present; otherwise use a local one.
-        const summarizer: Summarizer = this._summarizer ?? this._localSummarizer;
+        if (!this._summarizer && !this._localSummarizer) { const Lc = getLocalSummarizerClass(); if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } } }
+        const summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
 
         // Deny network summarization when caller does not explicitly request it.
         try {
@@ -390,7 +393,8 @@ export class SignalApp {
 
         // Attempt to acquire a LocalSummarizer slot; if we cannot, re-enqueue
         // the job with a short backoff to avoid over-subscribing the local summarizer.
-        const acquired = LocalSummarizer.tryRecordRequest ? LocalSummarizer.tryRecordRequest() : (LocalSummarizer.recordRequest(), true);
+        const Lclass = getLocalSummarizerClass();
+          const acquired = Lclass ? (typeof Lclass.tryRecordRequest === 'function' ? Lclass.tryRecordRequest() : (typeof Lclass.recordRequest === 'function' ? (Lclass.recordRequest(), true) : true)) : true;
         if (!acquired) {
           // Couldn't acquire: attempt to enqueue for later. If the queue is full
           // set a short placeholder timer and drop the heavy work.
@@ -419,8 +423,9 @@ export class SignalApp {
               try {
                 // Use the configured summarizer (may be remote) instead of always using local.
                 // This allows background work to benefit from remote summarization when available.
-                const summarizer: Summarizer = this._summarizer ?? this._localSummarizer;
-                await summarizer.summarize(doc);
+                if (!this._summarizer && !this._localSummarizer) { const Lc = getLocalSummarizerClass(); if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } } }
+                const summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
+                if (summarizer && typeof summarizer.summarize === 'function') await summarizer.summarize(doc);
                 try { lastMap.set(id, Date.now()); } catch (_) {}
                 try { console.debug && console.debug(`background summarization completed for ${id}`); } catch (_) {}
               } catch (_) {
@@ -430,7 +435,7 @@ export class SignalApp {
           } catch (_) { /* swallow background errors */ }
           // Mark job finished and try to drain a queued job.
           try {
-            LocalSummarizer.releaseRequest();
+            try { const Lr = getLocalSummarizerClass(); if (Lr && typeof Lr.releaseRequest === 'function') Lr.releaseRequest(); } catch (_) {}
             const next = (this as any)._bgSummarizeQueue.shift();
             if (next) {
               // Use a short defer to avoid deep synchronous recursion and to
@@ -552,8 +557,14 @@ export class SignalApp {
       }
       : fetcher;
 
-    this._summarizer = new RemoteSummarizer(effectiveFetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences, authToken: this._networkAuthToken });
-    return true;
+    try {
+      const m = require('../ai/summarizer.js');
+      const Remote = m && (m.RemoteSummarizer || m.default || m);
+      if (typeof Remote === 'function') {
+        try { this._summarizer = new Remote(effectiveFetcher, { allowNetwork: options?.allowNetwork ?? true, maxSentences: options?.maxSentences, authToken: this._networkAuthToken }); return true; } catch (_) { /* swallow */ }
+      }
+    } catch (_) {}
+    return false;
   }
 
   disableRemoteSummarizer(): void {
