@@ -98,12 +98,17 @@ export class DocumentSnapshotService {
     const store = this.store;
     if (!store) return;
 
+    // Prevent overlapping compaction runs which can cause bursts of IO and
+    // unexpectedly high load if a previous pass is still running.
+    if ((this as any)._running) return;
+    (this as any)._running = true;
+
     try {
       const ids = await Promise.resolve(store.listDocumentIds()).catch(() => []);
       if (!Array.isArray(ids) || ids.length === 0) return;
 
       // Bound the number of ids processed per pass to avoid long blocking
-      const MAX_PER_PASS = 200;
+      const MAX_PER_PASS = 50; // reduced from 200 to lower per-pass pressure
       let count = 0;
       for (const id of ids) {
         if (this.stopped) break;
@@ -111,14 +116,15 @@ export class DocumentSnapshotService {
         try {
           const snap = await Promise.resolve(store.getLatestSnapshot(id)).catch(() => undefined);
           if (!snap) continue;
-          // For now the compaction is conservative: re-store the snapshot
-          // after trimming any excessively large fields (defensive). This
-          // allows downstream consumers to rely on snapshots existing.
           const compacted = this.compactSnapshot(snap);
-          await Promise.resolve(store.putSnapshot(id, compacted)).catch(() => { /* swallow */ });
+          // Fire-and-forget put to avoid blocking the compaction loop on slow IO;
+          // errors are swallowed to preserve best-effort semantics.
+          void Promise.resolve(store.putSnapshot(id, compacted)).catch(() => { /* swallow */ });
         } catch (_) { /* continue on error */ }
       }
-    } catch (_) { /* swallow */ }
+    } finally {
+      try { delete (this as any)._running; } catch (_) { (this as any)._running = false; }
+    }
   }
 
   /**

@@ -308,37 +308,26 @@ export class SyncManager {
     // so outbound generation is coalesced and controlled by the manager's flush
     // cadence instead of being enqueued directly by every storage event.
     try {
-      const outbound = this.engine.drainOutbound();
-      {
-      // Batch enqueue outbound messages concurrently to avoid serializing the flush
-      // on each individual enqueue while still honoring the queue's retry semantics.
+      const outbound = this.engine.drainOutbound() || [];
+      // Batch enqueue outbound messages to avoid long synchronous bursts. Yield
+      // to the event loop every BATCH_SIZE messages so the flush loop doesn't
+      // monopolize the host when many outbound messages are present.
+      const BATCH_SIZE = 50;
       const enqPromises: Promise<void>[] = [];
-      for (const msg of outbound) {
-        // Ensure every outbound message carries a stable, explicit messageId so
-        // downstream queue operations (findIndex / ack / fail) can rely on a
-        // deterministic identity instead of fragile object reference equality.
-        // The messageId combines the manager peerId, documentId and timestamp
-        // and a small random suffix to avoid accidental collisions.
-        // Preserve any upstream-provided messageId (e.g. from SyncEngine). Only
-        // generate and attach a messageId when one is not already present. This
-        // prevents churn and inconsistent identities between engine -> manager -> queue
-        // which otherwise cause ack/fail/findIndex to miss entries.
+
+      for (let i = 0; i < outbound.length; i++) {
+        const msg = outbound[i];
         const prepared = ((msg as any).messageId ? (msg as any) : (() => {
           const suffix = Math.floor(Math.random() * 1e9).toString(36);
           const msgId = `${this.peerId}:${msg.documentId}:${msg.timestamp}:${suffix}`;
           return { ...(msg as any), messageId: msgId } as unknown as SyncMessage;
         })());
+
         try { this.emitTelemetry('outbound_prepared', { message: prepared }); } catch (_) { /* swallow */ }
 
         enqPromises.push(
           this.queue.enqueue(prepared).catch(err => {
-            // Convert rejection to a handled telemetry emission so a single failure
-            // does not throw from flush; queue.enqueue already enforces semantics.
             try { this.emitTelemetry('queue_enqueue_failed', { message: prepared, error: err }); } catch (_) {}
-
-            // Persist the prepared message to a per-peer offline file so it can be
-            // recovered across restarts. This conservative fallback reduces the
-            // immediate data-loss surface when enqueues fail (e.g. transient disk/queue errors).
             try {
               const path = `.signal_offline_${this.peerId}.json`;
               let arr: any[] = [];
@@ -350,11 +339,17 @@ export class SyncManager {
             } catch (_) {}
           }),
         );
+
+        // Yield periodically to keep the event loop responsive for large batches
+        if ((i + 1) % BATCH_SIZE === 0) {
+          await Promise.resolve();
+        }
       }
-      // Wait for all enqueues to be enqueued (not for delivery/acks) so we keep
-      // the flush loop semantics predictable.
-      void Promise.all(enqPromises);
-    }
+
+      // Allow outstanding enqueues to settle without throwing into the flush
+      // loop. allSettled ensures we tolerate failures while keeping semantics
+      // predictable for the remainder of the flush.
+      try { await Promise.allSettled(enqPromises); } catch (_) { /* swallow */ }
     } catch (err) {
       // Ensure unexpected engine errors don't crash the flush loop.
       this.emitTelemetry('engine_drain_error', { error: err });

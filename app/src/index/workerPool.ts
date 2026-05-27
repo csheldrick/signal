@@ -49,61 +49,66 @@ export class WorkerPool {
   }
 
   process(documents: Array<{ id: string; text: string }>): Promise<void> {
-    // Asynchronously dispatch chunks and resolve only when all complete.
     // Copy the documents array to avoid mutating the caller's array.
     const docsCopy = documents.slice();
 
     const chunks: Array<{ workerIndex: number; docs: Array<{ id: string; text: string }> }> = [];
     let chunkIndex = 0;
 
-    // Build chunks from the copy
+    // Build chunks from the copy (same chunking semantics as before)
     while (docsCopy.length > 0) {
       const chunk: Array<{ id: string; text: string }> = [];
       while (docsCopy.length > 0 && chunk.length < this.maxDocsPerWorker) {
-        // pop keeps chunks similar to previous behavior but does not mutate caller input
         chunk.push(docsCopy.pop()!);
       }
       chunks.push({ workerIndex: chunkIndex % this.numWorkers, docs: chunk });
       chunkIndex++;
     }
 
+    if (chunks.length === 0) return Promise.resolve();
+
+    // Process chunks with a concurrency limit equal to numWorkers. This avoids
+    // dispatching an unbounded number of macrotasks at once and reduces
+    // instantaneous pressure on downstream subsystems.
     return new Promise<void>((resolve) => {
-      if (chunks.length === 0) {
-        // Nothing to do
-        resolve();
-        return;
-      }
+      let idx = 0;
+      let active = 0;
 
-      let remaining = chunks.length;
+      const scheduleNext = () => {
+        // If no remaining work and no active workers, we're done.
+        if (idx >= chunks.length && active === 0) {
+          resolve();
+          return;
+        }
 
-      for (const { workerIndex, docs } of chunks) {
-        // Schedule each chunk asynchronously so we don't block the event loop.
-        setTimeout(() => {
-          try {
-            // Here we'd normally dispatch to a real worker implementation.
-            // For now, perform the same local processing logic but asynchronously.
-            for (const doc of docs) {
-              const normalized = doc.text ? doc.text.toLowerCase() : '';
-              const words = normalized.split(/\s+/).filter(w => w.length > 0);
-              // No-op with words; actual worker would use these tokens.
-            }
-          } catch (err) {
-            // Swallow per-chunk errors to avoid leaving the pool unresolved.
-          } finally {
-            remaining--;
-            if (this.onWorkerFinish) {
-              try {
-                this.onWorkerFinish(workerIndex);
-              } catch (_) {
-                // ignore handler errors
+        // While we have capacity, start new chunk tasks.
+        while (active < this.numWorkers && idx < chunks.length) {
+          const { workerIndex, docs } = chunks[idx++];
+          active++;
+
+          // Run chunk asynchronously so we yield to the event loop between chunks.
+          setTimeout(() => {
+            try {
+              for (const doc of docs) {
+                const normalized = doc.text ? doc.text.toLowerCase() : '';
+                const words = normalized.split(/\s+/).filter(w => w.length > 0);
+                // No-op with words; worker would use tokens for indexing.
               }
+            } catch (_) {
+              // Swallow per-chunk errors to avoid leaving the pool unresolved.
+            } finally {
+              active--;
+              if (this.onWorkerFinish) {
+                try { this.onWorkerFinish(workerIndex); } catch (_) { /* ignore */ }
+              }
+              // Schedule next work after allowing other macrotasks to run.
+              try { setTimeout(scheduleNext, 0); } catch (_) { scheduleNext(); }
             }
-            if (remaining === 0) {
-              resolve();
-            }
-          }
-        }, 0);
-      }
+          }, 0);
+        }
+      };
+
+      scheduleNext();
     });
   }
 
