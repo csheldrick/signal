@@ -105,9 +105,20 @@ export class PluginHost {
   // reduces StorageEventBus fan-out under load.
   private pluginEventManagers: Map<StorageEventType | '*', { upstreamDispose?: () => void; listeners: Set<(event: Readonly<StorageEvent>) => void> }> = new Map();
   private context: PluginContext;
+  // Security policy: by default plugins are not allowed to trigger
+  // network-backed summarization. Hosts may opt-in globally or per-plugin
+  // using the options parameter to the constructor.
+  private allowNetworkSummaries: boolean = false;
+  private allowedNetworkPluginIds?: Set<string> | undefined;
 
-  constructor(context: PluginContext) {
+  constructor(context: PluginContext, options?: { allowNetworkSummaries?: boolean; allowedNetworkPlugins?: string[] }) {
     this.context = context;
+    if (options) {
+      this.allowNetworkSummaries = !!options.allowNetworkSummaries;
+      if (Array.isArray(options.allowedNetworkPlugins) && options.allowedNetworkPlugins.length > 0) {
+        this.allowedNetworkPluginIds = new Set(options.allowedNetworkPlugins);
+      }
+    }
   }
 
   register(plugin: Plugin): void {
@@ -380,9 +391,20 @@ export class PluginHost {
           try {
             const maybe = (this.context as any)?.summarizeDocument;
             if (typeof maybe === 'function') {
-              // Forward the allowNetwork flag so plugins can explicitly opt-in
-              // to remote summarization and the host can enforce network policy.
-              return await maybe(documentId, allowNetwork);
+              // Enforce host-level network policy. Plugins must both request
+              // allowNetwork=true and be permitted by the host policy. This
+              // prevents unvetted plugins from performing network calls.
+              const pluginAllowed = (() => {
+                try {
+                  // If host has no per-plugin allowlist and allowNetworkSummaries
+                  // is true, permit all plugins; otherwise require plugin id in the allowlist.
+                  if (!this.allowNetworkSummaries) return false;
+                  if (!this.allowedNetworkPluginIds) return true;
+                  return this.allowedNetworkPluginIds.has(plugin.id);
+                } catch (_) { return false; }
+              })();
+
+              return await maybe(documentId, allowNetwork && pluginAllowed);
             }
           } catch (_) { /* swallow */ }
           return undefined;

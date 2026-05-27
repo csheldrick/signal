@@ -4,7 +4,7 @@
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 34 source file(s).
+Module boundary at app containing 35 source file(s).
 _Path: `app`_
 Confidence: 95%
 
@@ -59,9 +59,6 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: DocumentChange
-Confidence: 85%
-
-### Contract: DeprecatedDocumentChange
 Confidence: 85%
 
 ### Contract: SearchHit
@@ -214,6 +211,9 @@ Confidence: 85%
 ### Contract: PeerSession
 Confidence: 85%
 
+### Contract: TelemetryEvent
+Confidence: 85%
+
 ### Contract: DocumentVersion
 Confidence: 85%
 
@@ -240,7 +240,7 @@ Exported function `RemoteSummarizer.summarize(document: Document): Promise<strin
 Confidence: 95%
 
 ### createValidatorFromStore
-Exported function `createValidatorFromStore(_store: DocumentStore): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: io.
+Exported function `createValidatorFromStore(_store: any): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: io.
 Confidence: 95%
 
 ### createValidatorFromPluginContext
@@ -318,8 +318,8 @@ Confidence: 95%
 
 ## Detected Invariants
 
-- **guard: Guard clause (null/undefined check)**: Detected 24 occurrence(s) of guard pattern across 13 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
-- **error-boundary: Error boundary (try/catch)**: Detected 169 occurrence(s) of error-boundary pattern across 22 file(s) in module 'signal-app'. Example: "try { console.warn('RemoteSummarizer: allowNetwork requested but authToken missing; network disabled for safety'); } cat" _(88%)_
+- **error-boundary: Error boundary (try/catch)**: Detected 183 occurrence(s) of error-boundary pattern across 22 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Guard clause (null/undefined check)**: Detected 26 occurrence(s) of guard pattern across 14 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 13 occurrence(s) of validation pattern across 5 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
 - **sanitization: Input sanitization**: Detected 4 occurrence(s) of sanitization pattern across 3 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
 
@@ -357,7 +357,6 @@ Confidence: 95%
 - **SearchResult**: interface in app/src/core/types.ts
 - **SearchResultSnapshot**: interface in app/src/core/types.ts
 - **DocumentChange**: interface in app/src/core/types.ts
-- **DeprecatedDocumentChange**: type in app/src/core/types.ts
 - **SearchHit**: interface in app/src/core/types.ts
 - **InvertedIndexSearchHit**: interface in app/src/core/types.ts
 - **IndexStats**: interface in app/src/core/types.ts
@@ -392,7 +391,7 @@ Confidence: 95%
 - **SyncManagerOptions**: interface in app/src/sync/manager.ts
 - **OfflineEntry**: interface in app/src/sync/offline-queue.ts
 - **OfflineSyncQueueOptions**: interface in app/src/sync/offline-queue.ts
-- **OfflineSyncQueue**: OfflineSyncQueue Durable, per-peer queue that persists DocumentChange mutations to disk when network transport is unavailable. Ensures causal (timestamp/seq) ordering when draining and provides robust rewrite behaviour so partially applied drains do not lose remaining entries.
+- **OfflineSyncQueue**: OfflineSyncQueue Durable, per-peer queue that persists opaque payloads to disk when network transport is unavailable. Ensures causal (timestamp/seq) ordering when draining and provides robust rewrite behaviour so partially applied drains do not lose remaining entries.
 - **SyncState**: type in app/src/sync/protocol.ts
 - **ConflictStrategy**: type in app/src/sync/protocol.ts
 - **PeerInfo**: interface in app/src/sync/protocol.ts
@@ -408,25 +407,24 @@ Confidence: 95%
 - **SyncSessionTrackerOptions**: interface in app/src/sync/session-tracker.ts
 - **SyncSessionTracker**: SyncSessionTracker Manages per-peer sync session lifecycle. Emits events on an internal bus so multiple subsystems (SyncManager, PresenceTracker) can observe a single authoritative session view.
 - **PeerSession**: class in app/src/sync/session.ts
+- **TelemetryEvent**: type in app/src/sync/telemetry.ts
 - **DocumentVersion**: interface in app/src/versioning/history.ts
 - **VersionDiff**: interface in app/src/versioning/history.ts
 - **VersionHistory**: class in app/src/versioning/history.ts
 
 ## Services
 
-- **DocumentStore**: type in app/src/collaboration/presence.ts
 - **SyncEngine**: type in app/src/collaboration/presence.ts
-- **DeprecatedDocumentStore**: type in app/src/collaboration/presence.ts
 - **ClockProvider**: interface in app/src/collaboration/presence.ts
 - **SnapshotStore**: interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
+- **DocumentStore**: class in app/src/storage/store.ts
 - **SyncManager**: class in app/src/sync/manager.ts
-- **DocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
 - **SyncEngine**: Service inferred from type in app/src/collaboration/presence.ts
-- **DeprecatedDocumentStore**: Service inferred from type in app/src/collaboration/presence.ts
 - **ClockProvider**: Service inferred from interface in app/src/collaboration/presence.ts
 - **SnapshotStore**: Service inferred from interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts
+- **DocumentStore**: Service inferred from class in app/src/storage/store.ts
 - **SyncManager**: Service inferred from class in app/src/sync/manager.ts
 - **app**: Module: app
 

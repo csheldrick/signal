@@ -35,7 +35,7 @@ export function createLazyGraph(storeGetter: () => any[]): GraphBuilder {
 export function createLazyPluginHost(pluginContext: PluginContext): PluginHost {
   let real: PluginHost | undefined;
   const ensure = () => {
-    if (!real) real = new PluginHost(pluginContext);
+    if (!real) real = new PluginHost(pluginContext); // TODO: consider passing policy options from app configuration to PluginHost
     return real!;
   };
   return {

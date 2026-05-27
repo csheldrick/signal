@@ -29,6 +29,11 @@ export interface OfflineSyncQueueOptions {
  * applied drains do not lose remaining entries.
  */
 export class OfflineSyncQueue extends EventEmitter {
+  // Per-peer monotonic sequence counters to ensure durable on-disk ordering
+  // that is stable across process restarts while avoiding relying on
+  // platform-specific high-resolution timers. This map is used by makeEntry
+  // to assign a monotonic seq number per peer.
+  private seqCounters: Map<string, number> = new Map();
   private readonly dataDir: string;
   private readonly filePrefix: string;
   private readonly memQueues: Map<string, OfflineEntry[]> = new Map();
@@ -51,14 +56,39 @@ export class OfflineSyncQueue extends EventEmitter {
   }
 
   private makeEntry(peerId: string, documentId: string, payload: any): OfflineEntry {
-    return {
-      id: `${peerId}:${documentId}:${Date.now()}:${Math.floor(Math.random() * 1e9).toString(36)}`,
-      peerId,
-      documentId,
-      payload,
-      timestamp: Date.now(),
-      seq: Number(process.hrtime.bigint() % BigInt(Number.MAX_SAFE_INTEGER)),
-    };
+    // Use a per-peer monotonic sequence counter to ensure stable ordering
+    // even across restarts. Seed with a coarse timestamp-based value if we
+    // have no prior information for the peer.
+    try {
+      let seq = this.seqCounters.get(peerId);
+      if (typeof seq !== 'number') {
+        // Seed with current epoch seconds to reduce collision likelihood and
+        // provide an increasing baseline.
+        seq = Math.floor(Date.now() / 1000);
+      }
+      seq = seq + 1;
+      this.seqCounters.set(peerId, seq);
+
+      return {
+        id: `${peerId}:${documentId}:${seq}`,
+        peerId,
+        documentId,
+        payload,
+        timestamp: Date.now(),
+        seq,
+      };
+    } catch (_) {
+      // Fallback to less-precise but safe seq on environments without
+      // process.hrtime or BigInt.
+      return {
+        id: `${peerId}:${documentId}:${Date.now()}:${Math.floor(Math.random() * 1e9).toString(36)}`,
+        peerId,
+        documentId,
+        payload,
+        timestamp: Date.now(),
+        seq: Date.now(),
+      };
+    }
   }
 
   /**
@@ -139,9 +169,21 @@ export class OfflineSyncQueue extends EventEmitter {
       if (!raw) return [];
       const lines = raw.split('\n').filter(l => l.trim().length > 0);
       const out: OfflineEntry[] = [];
+      let maxSeq = -Infinity;
       for (const line of lines) {
-        try { out.push(JSON.parse(line) as OfflineEntry); } catch (_) { /* skip corrupt line */ }
+        try {
+          const parsed = JSON.parse(line) as OfflineEntry;
+          out.push(parsed);
+          if (typeof parsed.seq === 'number' && Number.isFinite(parsed.seq)) {
+            if (parsed.seq > maxSeq) maxSeq = parsed.seq;
+          }
+        } catch (_) { /* skip corrupt line */ }
       }
+      // Seed the per-peer seq counter to one past the max observed on-disk so
+      // subsequent makeEntry calls continue monotonicity across restarts.
+      try {
+        if (maxSeq !== -Infinity) this.seqCounters.set(peerId, maxSeq);
+      } catch (_) { /* swallow */ }
       return out;
     } catch (_) { return []; }
   }
