@@ -186,9 +186,12 @@ export class Indexer implements IndexerContract {
         events.onAsync('created', created);
         events.onAsync('updated', updated);
         events.onAsync('deleted', deleted);
-        this.disposers.push(() => { try { events.off('created', created); } catch (_) {} });
-        this.disposers.push(() => { try { events.off('updated', updated); } catch (_) {} });
-        this.disposers.push(() => { try { events.off('deleted', deleted); } catch (_) {} });
+        // When registering with onAsync we must remove with offAsync to avoid
+        // leaving entries in the asyncListeners map and causing listener leaks
+        // / unbounded fan-out on the StorageEventBus.
+        this.disposers.push(() => { try { events.offAsync('created', created); } catch (_) {} });
+        this.disposers.push(() => { try { events.offAsync('updated', updated); } catch (_) {} });
+        this.disposers.push(() => { try { events.offAsync('deleted', deleted); } catch (_) {} });
       } else {
         events.on('created', created);
         events.on('updated', updated);

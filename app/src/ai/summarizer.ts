@@ -71,24 +71,6 @@ export class LocalSummarizer implements Summarizer {
     const id = document?.id ?? '';
     const updatedAt = (document as any)?.updatedAt ?? 0;
 
-    // Check for failed remote summarization cache to avoid repeated work.
-    // This helps reduce load when remote summarization is flaky or disabled.
-    if (id && LocalSummarizer.FAILED_CACHE.has(id)) {
-      const failedAt = LocalSummarizer.FAILED_CACHE.get(id) ?? 0;
-      if (Date.now() - failedAt < 300_000) {
-        // Recent failure; cache the local summary to avoid repeated work.
-        const sentences = (document.content || '')
-          .split(/[.!?]+/)
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-        const selected = sentences.slice(0, this.maxSentences);
-        const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
-        LocalSummarizer.cache.set(id, { updatedAt, summary });
-        LocalSummarizer.FAILED_CACHE.set(id, Date.now());
-        return summary;
-      }
-    }
-
     // Fast-path: return cached summary when document hasn't changed.
     if (id) {
       const cached = LocalSummarizer.cache.get(id);
@@ -97,27 +79,36 @@ export class LocalSummarizer implements Summarizer {
       }
     }
 
-    const sentences = (document.content || '')
-      .split(/[.!?]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+    // Attempt to acquire a global LocalSummarizer request slot. If the slot
+    // cannot be acquired we still compute and return a local summary, but we
+    // do not modify the global counters.
+    const acquired = LocalSummarizer.tryRecordRequest();
+    try {
+      const sentences = (document.content || '')
+        .split(/[.!?]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
 
-    const selected = sentences.slice(0, this.maxSentences);
-    const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
+      const selected = sentences.slice(0, this.maxSentences);
+      const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
 
-    if (id) {
-      LocalSummarizer.cache.set(id, { updatedAt, summary });
-      // Simple bounded eviction to avoid unbounded memory growth.
-      if (LocalSummarizer.cache.size > 200) {
-        const it = LocalSummarizer.cache.keys();
-        const first = it.next().value as string | undefined;
-        if (first) LocalSummarizer.cache.delete(first);
+      if (id) {
+        LocalSummarizer.cache.set(id, { updatedAt, summary });
+        // Simple bounded eviction to avoid unbounded memory growth.
+        if (LocalSummarizer.cache.size > LocalSummarizer.CACHE_MAX_SIZE) {
+          const it = LocalSummarizer.cache.keys();
+          const first = it.next().value as string | undefined;
+          if (first) LocalSummarizer.cache.delete(first);
+        }
       }
-      // Cache failed attempts to avoid repeated work.
-      LocalSummarizer.FAILED_CACHE.set(id, Date.now());
-    }
 
-    return summary;
+      return summary;
+    } finally {
+      // Only release the global slot if we successfully acquired it.
+      if (acquired) {
+        try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }
+      }
+    }
   }
 
   /**
