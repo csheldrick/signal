@@ -7,6 +7,7 @@
 import type { Plugin, PluginContext } from '../plugins/host.js';
 import type { DocumentSnapshot } from '../core/types.js';
 import { getSignalStorageEventBus } from '../core/globals.js';
+import { telemetry } from '../sync/telemetry.js';
 
 // Types exposed for backwards compatibility — deprecated direct imports.
 // Use PluginContext.listDocuments().map(...) instead.
@@ -161,6 +162,7 @@ export class PresenceTracker {
           // Drop references to any pending validation promises so they can be GC'd.
           this.pendingValidations.clear();
         } catch (_) { /* swallow */ }
+        try { telemetry.emit('plugin_context_cleared', { timestamp: Date.now() }); } catch (_) { /* swallow */ }
         return;
       }
 

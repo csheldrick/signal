@@ -7,6 +7,7 @@
 // callers that do not opt in to network side effects.
 
 import type { Document } from '../core/types.js';
+import { telemetry } from '../sync/telemetry.js';
 
 export interface Summarizer {
   readonly isRemote: boolean;
@@ -328,32 +329,61 @@ export class RemoteSummarizer implements Summarizer {
     }
 
     // Encapsulate the remote attempt so we can register it in the pending map
+    // Encapsulate the remote attempt with a bounded retry/backoff strategy
+    // and emit telemetry for attempts, success, failure and fallback. We keep
+    // the global concurrency accounting correct by releasing the active slot
+    // once the remote work has completed (successful or not).
     const op = (async (): Promise<string> => {
+      const maxAttempts = 3; // initial try + up to 2 retries
+      const baseBackoffMs = 100;
+      let attempt = 0;
+      let lastError: any = null;
+
       try {
-        let result: string;
-        try {
-          result = await Promise.race([
-            this.fetcher(document, { authToken: this.authToken }),
-            new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
-          ]);
-        } finally {
-          // Ensure the remote global active counter is decremented even on timeout/failure.
-          RemoteSummarizer.releaseRequest();
+        while (attempt < maxAttempts) {
+          attempt++;
+          telemetry.emit('remote_summarizer_attempt', { documentId: id, attempt, timestamp: Date.now() });
+
+          try {
+            // Race the fetcher against the configured timeout for this attempt
+            const result: string = await Promise.race([
+              this.fetcher(document, { authToken: this.authToken }),
+              new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
+            ]);
+
+            if (typeof result !== 'string' || result.length === 0) {
+              // Treat invalid/empty responses as failures
+              this.recordFailure();
+              lastError = new Error('invalid_or_empty_response');
+              telemetry.emit('remote_summarizer_invalid_response', { documentId: id, attempt, timestamp: Date.now() });
+            } else {
+              // Success path
+              this.recordSuccess();
+              telemetry.emit('remote_summarizer_success', { documentId: id, attempt, timestamp: Date.now() });
+              return result;
+            }
+          } catch (err) {
+            lastError = err;
+            telemetry.emit('remote_summarizer_error', { documentId: id, attempt, error: String(err), timestamp: Date.now() });
+            // recordFailure only on a real network/remote failure; recordFailure
+            // will also set cooldowns when repeated failures occur.
+            this.recordFailure();
+          }
+
+          // If we'll retry, wait with jittered backoff before the next attempt
+          if (attempt < maxAttempts) {
+            const backoff = baseBackoffMs * Math.pow(2, attempt - 1);
+            const jitter = Math.floor(Math.random() * Math.min(50, backoff));
+            await new Promise<void>(res => setTimeout(res, backoff + jitter));
+          }
         }
 
-        if (typeof result !== 'string' || result.length === 0) {
-          // Treat invalid/empty responses as failures
-          this.recordFailure();
-          return this.fallback.summarize(document);
-        }
-
-        // Successful remote summary — reset failure tracking
-        this.recordSuccess();
-        return result;
-      } catch (err) {
-        // On any remote failure, record it and return a safe local summary.
-        this.recordFailure();
+        // All attempts exhausted: fall back to local summary
+        telemetry.emit('remote_summarizer_fallback', { documentId: id, attempts: attempt, lastError: String(lastError), timestamp: Date.now() });
         return this.fallback.summarize(document);
+      } finally {
+        // Ensure the remote global active counter is decremented even on timeout/failure.
+        try { RemoteSummarizer.releaseRequest(); } catch (_) { /* swallow */ }
       }
     })();
 

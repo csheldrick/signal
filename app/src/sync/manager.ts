@@ -59,6 +59,9 @@ export class SyncManager {
   private readonly peerId: string;
   private flushTimer: ReturnType<typeof setInterval> | undefined;
   private transport: TransportSend | undefined;
+  // Deterministic per-manager counter used to generate stable message suffixes
+  // for tests and to avoid relying on Math.random() at runtime.
+  private msgCounter: number = 0;
   private authValidator?: (peerId: string, message?: SyncMessage) => boolean;
   private static readonly MAX_TELEMETRY_LISTENERS = 32;
   private telemetryListeners: Set<(event: { type: string; payload: any }) => void> = new Set();
@@ -326,7 +329,7 @@ export class SyncManager {
       for (let i = 0; i < outbound.length; i++) {
         const msg = outbound[i];
         const prepared = ((msg as any).messageId ? (msg as any) : (() => {
-          const suffix = Math.floor(Math.random() * 1e9).toString(36);
+          const suffix = (this.msgCounter++).toString(36);
           const msgId = `${this.peerId}:${msg.documentId}:${msg.timestamp}:${suffix}`;
           return { ...(msg as any), messageId: msgId } as unknown as SyncMessage;
         })());

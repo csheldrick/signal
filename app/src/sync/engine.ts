@@ -23,6 +23,9 @@ export class SyncEngine {
   private clock: VectorClock = {};
   private readonly peerId: string;
   private outbound: SyncMessage[] = [];
+  // Incrementing counter for message id uniqueness without relying on Math.random();
+  // keeps the engine stateless from a persistence PoV but improves determinism.
+  private messageCounter: number = 0;
   // Registry of SyncEngine instances keyed by the concrete store object to detect accidental duplicates.
   private static _instancesByStore: WeakMap<object, SyncEngine> = new WeakMap<object, SyncEngine>();
 
@@ -241,7 +244,7 @@ export class SyncEngine {
     // Helper to produce a compact, stable-ish id when the engine must generate one.
     // The id includes the peer, document grouping and a timestamp+random suffix to
     // avoid accidental collisions while remaining stable for the immediate pipeline.
-    const makeMessageId = (docId: string) => `${this.peerId}:${docId}:${Date.now()}:${Math.floor(Math.random() * 1e9).toString(36)}`;
+    const makeMessageId = (docId: string) => `${this.peerId}:${docId}:${Date.now()}:${(this.messageCounter++).toString(36)}`;
 
     switch (event.type) {
       case 'created': {

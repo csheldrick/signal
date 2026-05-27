@@ -12,6 +12,9 @@ export interface WorkerPoolOptions {
   maxDocsPerWorker: number;
 }
 
+import os from 'node:os';
+import { telemetry } from '../sync/telemetry.js';
+
 export class WorkerPool {
   private workers: IndexWorker[] = [];
   private activeWorkers: number = 0;
@@ -20,7 +23,11 @@ export class WorkerPool {
   private readonly onWorkerFinish: ((workerIndex: number) => void) | null = null;
 
   constructor(options: WorkerPoolOptions, onWorkerFinish?: (workerIndex: number) => void) {
-    this.numWorkers = Math.max(1, options.numWorkers);
+    const provided = options && typeof options.numWorkers === 'number' ? Math.max(1, options.numWorkers) : undefined;
+    const cpus = (() => { try { return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
+    // Default to (cpus - 1) but at least 2 workers; cap to avoid extreme parallelism
+    const defaultWorkers = Math.max(2, Math.min(16, Math.max(1, cpus - 1)));
+    this.numWorkers = Math.min(64, provided ?? defaultWorkers);
     this.maxDocsPerWorker = options.maxDocsPerWorker;
     this.onWorkerFinish = onWorkerFinish || null;
     this.initWorkers();
@@ -67,6 +74,10 @@ export class WorkerPool {
     }
 
     if (chunks.length === 0) return Promise.resolve();
+
+    // Emit telemetry when the chunk queue length exceeds the number of workers
+    // as a signal that indexing tasks may be lagging behind writes.
+    try { if (chunks.length > this.numWorkers) telemetry.emit('indexing_queue_depth', { chunks: chunks.length, numWorkers: this.numWorkers, timestamp: Date.now() }); } catch (_) { /* swallow */ }
 
     // Process chunks with a concurrency limit equal to numWorkers. This avoids
     // dispatching an unbounded number of macrotasks at once and reduces
