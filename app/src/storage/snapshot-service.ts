@@ -133,3 +133,9 @@ export class DocumentSnapshotService {
 
 
 export default DocumentSnapshotService;
+
+// Re-export concrete disk-backed snapshot store from sibling implementation
+// to provide a single canonical import surface for consumers. This keeps a
+// consistent public API while the concrete implementation remains in a
+// separate module.
+export { default as DiskDocumentSnapshotStore } from './snapshotService.js';
