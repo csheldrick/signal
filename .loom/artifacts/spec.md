@@ -4,25 +4,13 @@
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 35 source file(s).
+Module boundary at app containing 36 source file(s).
 _Path: `app`_
 Confidence: 95%
 
 ## Inferred Contracts
 
-### Contract: Summarizer
-Confidence: 85%
-
 ### Contract: LocalSummarizer
-Confidence: 85%
-
-### Contract: RemoteSummarizer
-Confidence: 85%
-
-### Contract: DocumentReader
-Confidence: 85%
-
-### Contract: PresenceStatus
 Confidence: 85%
 
 ### Contract: PeerPresence
@@ -38,6 +26,9 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: Document
+Confidence: 85%
+
+### Contract: DeprecatedDocumentChange
 Confidence: 85%
 
 ### Contract: DocumentSnapshot
@@ -70,7 +61,7 @@ Confidence: 85%
 ### Contract: IndexStats
 Confidence: 85%
 
-### Contract: InvertedIndex
+### Contract: Summarizer
 Confidence: 85%
 
 ### Contract: GraphNode
@@ -85,19 +76,13 @@ Confidence: 85%
 ### Contract: GraphBuilder
 Confidence: 85%
 
-### Contract: IndexerContract
-Confidence: 85%
-
 ### Contract: Indexer
 Confidence: 85%
 
-### Contract: IndexWorker
-Confidence: 85%
-
-### Contract: WorkerPoolOptions
-Confidence: 85%
-
 ### Contract: WorkerPool
+Confidence: 85%
+
+### Contract: InvertedIndex
 Confidence: 85%
 
 ### Contract: ExportPlugin
@@ -133,6 +118,12 @@ Confidence: 85%
 ### Contract: StorageEvent
 Confidence: 85%
 
+### Contract: DocumentValidatorAsync
+Confidence: 85%
+
+### Contract: DocumentValidatorSync
+Confidence: 85%
+
 ### Contract: StorageEventBusContract
 Confidence: 85%
 
@@ -143,9 +134,6 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: ConflictCandidate
-Confidence: 85%
-
-### Contract: ConflictResolution
 Confidence: 85%
 
 ### Contract: ConflictCandidateRecord
@@ -228,7 +216,7 @@ Exported function `LocalSummarizer` in app/src/ai/summarizer.ts. Pure function (
 Confidence: 88%
 
 ### LocalSummarizer.summarize
-Exported function `LocalSummarizer.summarize(document: Document): Promise<string>` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Exported function `LocalSummarizer.summarize(document: Document | DocumentSnapshot): Promise<string>` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
 Confidence: 95%
 
 ### RemoteSummarizer
@@ -236,11 +224,11 @@ Exported function `RemoteSummarizer` in app/src/ai/summarizer.ts. Side effects: 
 Confidence: 88%
 
 ### RemoteSummarizer.summarize
-Exported function `RemoteSummarizer.summarize(document: Document): Promise<string>` in app/src/ai/summarizer.ts. Side effects: async.
+Exported function `RemoteSummarizer.summarize(document: Document | DocumentSnapshot): Promise<string>` in app/src/ai/summarizer.ts. Side effects: async.
 Confidence: 95%
 
 ### createValidatorFromStore
-Exported function `createValidatorFromStore(_store: any): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: io.
+Exported function `createValidatorFromStore(_store: any): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
 Confidence: 95%
 
 ### createValidatorFromPluginContext
@@ -318,10 +306,11 @@ Confidence: 95%
 
 ## Detected Invariants
 
-- **error-boundary: Error boundary (try/catch)**: Detected 199 occurrence(s) of error-boundary pattern across 22 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
-- **guard: Guard clause (null/undefined check)**: Detected 26 occurrence(s) of guard pattern across 14 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
-- **validation: Input validation boundary**: Detected 13 occurrence(s) of validation pattern across 5 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
-- **sanitization: Input sanitization**: Detected 4 occurrence(s) of sanitization pattern across 3 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
+- **error-boundary: Error boundary (try/catch)**: Detected 228 occurrence(s) of error-boundary pattern across 24 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Guard clause (null/undefined check)**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **validation: Input validation boundary**: Detected 15 occurrence(s) of validation pattern across 6 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
+- **sanitization: Input sanitization**: Detected 5 occurrence(s) of sanitization pattern across 4 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
+- **rate-limit: Rate limiting enforcement**: Detected 2 occurrence(s) of rate-limit pattern across 2 file(s) in module 'signal-app'. Example: "const debounceMs = 50; // short debounce to group bursts" _(78%)_
 
 ## Architectural Decisions (Lineage)
 
@@ -329,27 +318,16 @@ Confidence: 95%
   refactor: replace Document type with DocumentSnapshot for improved readonly contract
 
 - Updated presence.ts to use Docum
-- **[REFACTOR] fix(presence): refactor to use PluginContext for document access and remove dire** `2b3326d` 2026-05-25
-  fix(presence): refactor to use PluginContext for document access and remove direct imports
-
- 
-- **[REFACTOR] Refactor code structure for improved readability and maintainability** `7542e4c` 2026-05-25
-  Refactor code structure for improved readability and maintainability
-
- 
 
 ## Entities
 
-- **Summarizer**: interface in app/src/ai/summarizer.ts
 - **LocalSummarizer**: class in app/src/ai/summarizer.ts
-- **RemoteSummarizer**: class in app/src/ai/summarizer.ts
-- **DocumentReader**: interface in app/src/collaboration/presence.ts
-- **PresenceStatus**: type in app/src/collaboration/presence.ts
-- **PeerPresence**: interface in app/src/collaboration/presence.ts
+- **PeerPresence**: type in app/src/collaboration/presence.ts
 - **PresenceTracker**: class in app/src/collaboration/presence.ts
 - **AppConfig**: interface in app/src/core/app.ts
 - **SignalApp**: class in app/src/core/app.ts
 - **Document**: interface in app/src/core/types.ts
+- **DeprecatedDocumentChange**: Deprecated alias: use DocumentChange instead.
 - **DocumentSnapshot**: interface in app/src/core/types.ts
 - **DocumentLink**: interface in app/src/core/types.ts
 - **LinkKind**: type in app/src/core/types.ts
@@ -360,16 +338,14 @@ Confidence: 95%
 - **SearchHit**: interface in app/src/core/types.ts
 - **InvertedIndexSearchHit**: interface in app/src/core/types.ts
 - **IndexStats**: interface in app/src/core/types.ts
-- **InvertedIndex**: interface in app/src/core/types.ts
+- **Summarizer**: interface in app/src/core/types.ts
 - **GraphNode**: interface in app/src/graph/builder.ts
 - **AdjacencyList**: interface in app/src/graph/builder.ts
 - **GraphAdjacencyList**: type in app/src/graph/builder.ts
 - **GraphBuilder**: class in app/src/graph/builder.ts
-- **IndexerContract**: interface in app/src/index/inverted.ts
 - **Indexer**: class in app/src/index/inverted.ts
-- **IndexWorker**: interface in app/src/index/workerPool.ts
-- **WorkerPoolOptions**: interface in app/src/index/workerPool.ts
 - **WorkerPool**: class in app/src/index/workerPool.ts
+- **InvertedIndex**: class in app/src/indexing/index.ts
 - **ExportPlugin**: class in app/src/plugins/export.ts
 - **Plugin**: interface in app/src/plugins/host.ts
 - **PluginContext**: interface in app/src/plugins/host.ts
@@ -381,11 +357,12 @@ Confidence: 95%
 - **StorageEventDeleted**: interface in app/src/storage/events.ts
 - **StorageEventLinked**: interface in app/src/storage/events.ts
 - **StorageEvent**: type in app/src/storage/events.ts
+- **DocumentValidatorAsync**: type in app/src/storage/events.ts
+- **DocumentValidatorSync**: type in app/src/storage/events.ts
 - **StorageEventBusContract**: interface in app/src/storage/events.ts
 - **StorageEventBus**: class in app/src/storage/events.ts
 - **DocumentSnapshotServiceOptions**: interface in app/src/storage/snapshot-service.ts
 - **ConflictCandidate**: interface in app/src/sync/conflict.ts
-- **ConflictResolution**: interface in app/src/sync/conflict.ts
 - **ConflictCandidateRecord**: Detect whether a remote document write genuinely conflicts with the local version (concurrent vector clocks) or is simply a causally-later update.
 - **TransportSend**: Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc.
 - **SyncManagerOptions**: interface in app/src/sync/manager.ts
@@ -414,17 +391,21 @@ Confidence: 95%
 
 ## Services
 
-- **SyncEngine**: type in app/src/collaboration/presence.ts
-- **ClockProvider**: interface in app/src/collaboration/presence.ts
+- **DeprecatedDocumentStore**: DeprecatedDocumentStore: legacy alias used by older code that imported a concrete store type from core. Kept as `any` to avoid introducing a hard dependency on the storage module in core types and to ease gradual migration. New code should import the concrete DocumentStore from storage/store.ts instead of relying on this alias.
+- **FileSnapshotStore**: Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
 - **SnapshotStore**: interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
+- **DiskDocumentSnapshotStore**: DocumentSnapshotService - Writes snapshots atomically using write-then-rename (tmp -> final) - Retains at least two most-recent snapshots per document (prunes older) - Performs all work asynchronously so live document writes are not blocked
 - **DocumentStore**: class in app/src/storage/store.ts
+- **SyncEngine**: class in app/src/sync/engine.ts
 - **SyncManager**: class in app/src/sync/manager.ts
-- **SyncEngine**: Service inferred from type in app/src/collaboration/presence.ts
-- **ClockProvider**: Service inferred from interface in app/src/collaboration/presence.ts
+- **DeprecatedDocumentStore**: Service inferred from DeprecatedDocumentStore: legacy alias used by older code that imported a concrete store type from core. Kept as `any` to avoid introducing a hard dependency on the storage module in core types and to ease gradual migration. New code should import the concrete DocumentStore from storage/store.ts instead of relying on this alias.
+- **FileSnapshotStore**: Service inferred from Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
 - **SnapshotStore**: Service inferred from interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts
+- **DiskDocumentSnapshotStore**: Service inferred from DocumentSnapshotService - Writes snapshots atomically using write-then-rename (tmp -> final) - Retains at least two most-recent snapshots per document (prunes older) - Performs all work asynchronously so live document writes are not blocked
 - **DocumentStore**: Service inferred from class in app/src/storage/store.ts
+- **SyncEngine**: Service inferred from class in app/src/sync/engine.ts
 - **SyncManager**: Service inferred from class in app/src/sync/manager.ts
 - **app**: Module: app
 

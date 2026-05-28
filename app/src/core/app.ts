@@ -333,9 +333,15 @@ export class SignalApp {
     // Lazy PluginHost instantiation to reduce startup fan-out and avoid
     // constructing the full plugin subsystem until it's actually used.
     // Provide host-level policy options to the PluginHost (e.g. allowNetworkSummaries)
-    this.plugins = createLazyPluginHost(pluginContext, { allowNetworkSummaries: this._allowNetwork, // stricter defaults: require explicit per-plugin allowlist for network summaries and require audit metadata
-      allowedNetworkPlugins: Array.isArray(process && (process as any).env && (process as any).env.SIGNAL_ALLOWED_NETWORK_PLUGINS ? (process as any).env.SIGNAL_ALLOWED_NETWORK_PLUGINS.split(',').filter(Boolean) : [] ) ? [] : [],
-      requireAudit: true });
+    // Compute allowed network plugins from env var SIGNAL_ALLOWED_NETWORK_PLUGINS (comma-separated).
+    const envAllowedNetworkPlugins = (typeof process !== 'undefined' && process.env && process.env.SIGNAL_ALLOWED_NETWORK_PLUGINS)
+      ? (process.env.SIGNAL_ALLOWED_NETWORK_PLUGINS.split(',').map(s => s.trim()).filter(Boolean))
+      : [];
+    this.plugins = createLazyPluginHost(pluginContext, {
+      allowNetworkSummaries: this._allowNetwork,
+      allowedNetworkPlugins: envAllowedNetworkPlugins.length ? envAllowedNetworkPlugins : undefined,
+      requireAudit: true
+    });
     // Lazy PresenceTracker to avoid starting background timers and IO until needed.
     this.presence = createLazyPresenceTracker(() => pluginContext);
 
