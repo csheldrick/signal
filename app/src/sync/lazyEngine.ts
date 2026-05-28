@@ -8,7 +8,7 @@ import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
  * and buffering performed by SyncEngine at construction time, reducing
  * startup fan-out and background work.
  */
-export function createLazySyncEngine(store: any, peerId: string, provided?: SyncEngine) {
+export function createLazySyncEngine(store: any, peerId: string, provided?: SyncEngine): SyncEngine {
   let real: SyncEngine | undefined = provided;
 
     const ensure = (): SyncEngine => {
