@@ -15,6 +15,13 @@ export interface Plugin {
   id: string;
   name: string;
   /**
+   * Optional audit identifier (e.g. a signed vendor audit or review id).
+   * When the host is configured to enforce audits this field must be present
+   * to allow enabling the plugin. This lightweight field avoids introducing
+   * a full audit system while making audits explicit at registration time.
+   */
+  readonly auditId?: string;
+  /**
    * Explicit opt-in flag indicating the plugin uses only the PluginContext
    * sandbox. Plugins that access other subsystems MUST NOT set this flag.
    */
@@ -116,13 +123,15 @@ export class PluginHost {
   // to avoid memory growth; hosts may choose to export or persist entries.
   private auditLog: Array<{ event: string; pluginId?: string; detail?: any; timestamp: number }> = [];
 
-  constructor(context: PluginContext, options?: { allowNetworkSummaries?: boolean; allowedNetworkPlugins?: string[] }) {
+  private requireAudit: boolean = false;
+  constructor(context: PluginContext, options?: { allowNetworkSummaries?: boolean; allowedNetworkPlugins?: string[]; requireAudit?: boolean }) {
     this.context = context;
     if (options) {
       this.allowNetworkSummaries = !!options.allowNetworkSummaries;
       if (Array.isArray(options.allowedNetworkPlugins) && options.allowedNetworkPlugins.length > 0) {
         this.allowedNetworkPluginIds = new Set(options.allowedNetworkPlugins);
       }
+      this.requireAudit = !!options.requireAudit;
     }
   }
 
@@ -137,6 +146,13 @@ export class PluginHost {
       // legacy plugins to the sandboxed contract. Throw so callers notice
       // misconfiguration immediately instead of silently continuing.
       throw new Error(`PluginHost: plugin '${plugin.id}' must set usesPluginContext = true to register`);
+    }
+
+    // Enforce audit requirement when configured: plugin must provide an auditId
+    // to be eligible for enablement when the host is configured to require audits.
+    if (this.requireAudit && !plugin.auditId) {
+      try { telemetry.emit('plugin_register_failed_audit_missing', { id: plugin.id, timestamp: Date.now() }); } catch (_) {}
+      throw new Error(`PluginHost: plugin '${plugin.id}' registration denied: auditId required by host policy`);
     }
 
     if (this.plugins.size >= PluginHost.MAX_REGISTERED_PLUGINS) {

@@ -40,6 +40,8 @@ export interface SyncManagerOptions {
   snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
   /** Optional durable offline queue to persist outbound messages when enqueue fails */
   offlineQueue?: OfflineSyncQueueContract;
+  /** When true, enforce offline-first replay ordering: drain offlineQueue before attaching live store listeners. Defaults to false (favor realtime). */
+  offlineFirstMode?: boolean;
 }
 
 export class SyncManager {
@@ -48,6 +50,8 @@ export class SyncManager {
   private readonly sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
   private readonly snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
   private readonly offlineQueue?: OfflineSyncQueueContract;
+  // When true, manager prioritizes offline-first replay ordering by waiting for drains before attaching live listeners.
+  private readonly offlineFirstMode: boolean = false;
   // Promise that resolves when an in-progress offline replay drain completes.
   private offlineDrainPromise?: Promise<void>;
   // Observability for sessions: track last-seen and stale state and emit
@@ -159,6 +163,7 @@ export class SyncManager {
     this.sessionTracker = opts.sessionTracker;
     this.snapshotService = opts.snapshotService;
     this.offlineQueue = opts.offlineQueue;
+    this.offlineFirstMode = !!opts.offlineFirstMode;
 
     // If an offlineQueue is provided, attempt a best-effort drain when the
     // manager starts or when a transport is attached so that offline-first
@@ -170,16 +175,21 @@ export class SyncManager {
     // Subscribe to the store's StorageEventBus and forward events to the
     // SyncEngine.generateOutbound. SyncEngine no longer manages subscriptions
     // itself to avoid duplicate listeners and to centralize event handling.
-    // When an OfflineSyncQueue is attached we defer installing live store
-    // subscriptions until after a best-effort drain completes to avoid
+    // When an OfflineSyncQueue is attached we may defer installing live store
+    // subscriptions depending on the offlineFirstMode option to avoid
     // interleaving persisted replayed messages with live-generated messages
-    // (which can cause duplicate outbound deliveries or ordering anomalies).
+    // which can cause duplicate outbound deliveries or ordering anomalies.
     try {
       if (!this.offlineQueue) {
         this.attachStoreSubscriptions();
-      } else {
+      } else if (this.offlineFirstMode) {
         // Defer attachment until after offline drain completes. attachStoreSubscriptions
         // will be called by start()/setTransport() once the offline replay finishes.
+      } else {
+        // Favor realtime: attach immediately and perform an asynchronous
+        // best-effort drain in the background. Callers can enable offlineFirstMode
+        // when strict replay ordering is required.
+        this.attachStoreSubscriptions();
       }
     } catch (_) {}
 
@@ -294,38 +304,50 @@ export class SyncManager {
       try {
         // Record the offline drain as a managed promise so flush() can await
         // replay completion and preserve offline-first ordering guarantees.
-        this.offlineDrainPromise = (async () => {
-          try {
-            await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
-              try {
-                // Re-enqueue the payload into the in-memory SyncQueue so it
-                // participates in normal flush/ack semantics. If enqueue fails
-                // we propagate the error to cause the remaining entries to be
-                // preserved on disk by OfflineSyncQueue.drain rewrite logic.
-                const msg = entry.payload as SyncMessage;
-                await this.queue.enqueue(msg);
-              } catch (err) {
-                throw err;
-              }
-            });
-            try { telemetry.emit('offline_queue_drained', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
-          } catch (err) {
-            try { telemetry.emit('offline_queue_drain_failed', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
-          } finally {
-            // Clear the promise reference so subsequent flush() calls do not
-            // await a completed/cleared drain. flush() also clears this in its
-            // finally block but defensive cleanup here keeps state consistent.
-            this.offlineDrainPromise = undefined;
-          }
-        })();
+        // When offlineFirstMode is disabled we still attempt a background drain
+        // but do not set offlineDrainPromise so attachStoreSubscriptions isn't blocked.
+        if (this.offlineFirstMode) {
+          this.offlineDrainPromise = (async () => {
+            try {
+              await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
+                try {
+                  const msg = entry.payload as SyncMessage;
+                  await this.queue.enqueue(msg);
+                } catch (err) {
+                  throw err;
+                }
+              });
+              try { telemetry.emit('offline_queue_drained', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
+            } catch (err) {
+              try { telemetry.emit('offline_queue_drain_failed', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+            } finally {
+              this.offlineDrainPromise = undefined;
+            }
+          })();
+        } else {
+          (async () => {
+            try {
+              await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
+                try { const msg = entry.payload as SyncMessage; await this.queue.enqueue(msg); } catch (err) { throw err; }
+              });
+              try { telemetry.emit('offline_queue_drained', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
+            } catch (err) {
+              try { telemetry.emit('offline_queue_drain_failed', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+            }
+          })();
+        }
 
         // When the offline drain completes (success or failure) ensure store
         // subscriptions are attached so live-generated outbound messages are
         // processed. We attach after drain to avoid interleaving replayed
         // persisted entries with freshly-generated ones which could cause
-        // ordering anomalies or duplicate delivery.
+        // ordering anomalies or duplicate delivery. Only await/attach when
+        // offlineFirstMode is enabled; in realtime-favoring mode we already
+        // attached subscriptions above.
         try {
-          this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
+          if (this.offlineFirstMode && this.offlineDrainPromise) {
+            this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
+          }
         } catch (_) {}
       } catch (_) {}
     }
@@ -597,24 +619,36 @@ export class SyncManager {
     // will await this drain once (see flush()) to ensure persisted entries are
     // re-enqueued before live messages are sent, reconciling offline-first
     // ordering with realtime delivery without blocking startup.
-    if (this.offlineQueue && !this.offlineDrainPromise) {
-      this.offlineDrainPromise = (async () => {
-        try {
-          await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
-            try { await this.queue.enqueue(entry.payload as SyncMessage); } catch (err) { throw err; }
-          });
-          try { telemetry.emit('offline_queue_drained_on_start', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
-        } catch (err) {
-          try { telemetry.emit('offline_queue_drain_failed_on_start', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
-        }
-      })();
+    if (this.offlineQueue) {
+      // In offlineFirstMode we start a drain and record the promise so that
+      // the flush loop and attach logic can await it; otherwise we kick off
+      // a background drain to preserve realtime responsiveness.
+      if (this.offlineFirstMode && !this.offlineDrainPromise) {
+        this.offlineDrainPromise = (async () => {
+          try {
+            await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => { try { await this.queue.enqueue(entry.payload as SyncMessage); } catch (err) { throw err; } });
+            try { telemetry.emit('offline_queue_drained_on_start', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
+          } catch (err) {
+            try { telemetry.emit('offline_queue_drain_failed_on_start', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+          } finally {
+            this.offlineDrainPromise = undefined;
+          }
+        })();
 
-      // Ensure store subscriptions are attached after the start-time offline
-      // drain completes to avoid interleaving replayed persisted entries with
-      // live store-generated outbound messages which can cause duplicates.
-      try {
-        this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
-      } catch (_) {}
+        try {
+          this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
+        } catch (_) {}
+      } else {
+        // Background drain only; do not block start() or attachment of store listeners
+        (async () => {
+          try {
+            await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => { try { await this.queue.enqueue(entry.payload as SyncMessage); } catch (err) { throw err; } });
+            try { telemetry.emit('offline_queue_drained_on_start', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
+          } catch (err) {
+            try { telemetry.emit('offline_queue_drain_failed_on_start', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+          }
+        })();
+      }
     }
 
     this.flushTimer = setInterval(() => void this.flush(), flushIntervalMs);
