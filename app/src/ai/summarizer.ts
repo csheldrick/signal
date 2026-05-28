@@ -10,6 +10,7 @@ import type { Document, DocumentSnapshot } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 
 import type { Summarizer } from '../core/types.js';
+
 // LocalSummarizer and RemoteSummarizer implement the Summarizer contract declared in core/types.ts.
 
 export class LocalSummarizer implements Summarizer {
