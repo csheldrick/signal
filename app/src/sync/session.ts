@@ -16,7 +16,7 @@ export class PeerSession {
   // Prevent unbounded growth under heavy inbound traffic; drop oldest when full.
   private maxInboundBufferSize: number;
 
-  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 50) {
+  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 20) {
     this.peerId = peerId;
     this._clock = { ...initialClock };
     this._state = 'idle';
@@ -66,7 +66,7 @@ export class PeerSession {
    */
   updateClock(incoming: VectorClock): boolean {
     const merged = mergeClocks(this._clock, incoming);
-    const advanced = !this.clocksEqual(merged, this._clock);
+    const advanced = !this.clocksEqualLocal(merged, this._clock);
     this._clock = merged;
     this._lastSeen = Date.now();
     return advanced;
@@ -83,8 +83,8 @@ export class PeerSession {
     // Leave state as 'resolved' so callers can observe and transition when appropriate.
   }
 
-  private clocksEqual(a: VectorClock | undefined, b: VectorClock | undefined): boolean {
-  return clocksEqual(a, b);
+  private clocksEqualLocal(a: VectorClock | undefined, b: VectorClock | undefined): boolean {
+    return clocksEqual(a, b);
   }
 
   // ── Inbound buffer ─────────────────────────────────────────

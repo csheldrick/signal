@@ -29,7 +29,7 @@ export class LocalSummarizer implements Summarizer {
   private static globalActiveRequests: number = 0;
   // Timestamp of the last recorded acquisition; used to recover from leaked slots.
   private static lastAcquireAt: number = 0;
-  static readonly GLOBAL_MAX_CONCURRENT = 2;
+  static readonly GLOBAL_MAX_CONCURRENT = 1;
 
   /**
    * Attempt to acquire a global LocalSummarizer request slot.
@@ -201,21 +201,21 @@ export class RemoteSummarizer implements Summarizer {
 
   // Coalesce concurrent summaries per-document to avoid duplicated remote work
   private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
-  private static readonly MAX_PENDING_ENTRIES = 50;
+  private static readonly MAX_PENDING_ENTRIES = 20;
 
   // Global concurrency control: limit the number of simultaneous remote
   // summarization requests across all RemoteSummarizer instances. When the
   // global cap is reached we immediately return a local summary to avoid
   // overloading the remote service and downstream subsystems.
   private static globalActiveRequests: number = 0;
-  private static readonly GLOBAL_MAX_CONCURRENT = 2; // reduced to avoid overloading remote service under bursty traffic
+  private static readonly GLOBAL_MAX_CONCURRENT = 1; // reduced to avoid overloading remote service under bursty traffic
   // Rate limit the total number of remote summarization attempts to avoid
   // overwhelming the remote service. This is separate from concurrency
   // control and provides protection against burst traffic.
   private static totalAttemptsInWindow: number = 0;
   private static lastAttemptWindowAt: number = 0;
   private static readonly RATE_LIMIT_WINDOW_MS = 5000;
-  private static readonly RATE_LIMIT_MAX_ATTEMPTS = 30;
+  private static readonly RATE_LIMIT_MAX_ATTEMPTS = 10;
 
   static getGlobalActiveRequests(): number {
     return RemoteSummarizer.globalActiveRequests;
@@ -405,7 +405,7 @@ export class RemoteSummarizer implements Summarizer {
     // the global concurrency accounting correct by releasing the active slot
     // once the remote work has completed (successful or not).
     const op = (async (): Promise<string> => {
-      const maxAttempts = 3; // initial try + up to 2 retries
+      const maxAttempts = 2; // initial try + up to 1 retry (reduced to limit remote pressure)
       const baseBackoffMs = 100;
       let attempt = 0;
       let lastError: any = null;

@@ -97,7 +97,7 @@ export const dire: any = ((): any => {
 })();
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 2; // tightened to reduce plugin subsystem fan-out and resource pressure
+  private static readonly MAX_REGISTERED_PLUGINS = 1; // tightened to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
   private static readonly MAX_ENABLED_PLUGINS = 1;
   private enabled: Set<string> = new Set();
