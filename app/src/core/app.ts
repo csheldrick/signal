@@ -613,9 +613,10 @@ export class SignalApp {
     // local-only behavior for this instance.
     // Support backward-compatible single-arg fetchers by wrapping them in a function that enforces an authToken
     // is supplied via the options bag. This makes the network-auth contract explicit.
-    const effectiveFetcher = (fetcher as any).length === 1
+    const effectiveFetcher = (fetcher as any) && (typeof (fetcher as any).length === 'number' && (fetcher as any).length === 1)
       ? (doc: Document, opts?: { authToken?: string }) => {
         if (!opts || !opts.authToken) return Promise.reject(new Error('auth token required'));
+        if (typeof (fetcher as any) !== 'function') return Promise.reject(new Error('fetcher not a function'));
         return (fetcher as any)(doc);
       }
       : fetcher;
@@ -647,7 +648,20 @@ export class SignalApp {
       // engine instances and duplicate event subscriptions which can
       // overload SyncEngine and downstream consumers.
       try {
-        this._sync = SyncEngine.getOrCreate(this.store as any, this._peerId);
+        // Defensive runtime resolver: in some build/require scenarios the imported
+        // SyncEngine symbol may not be the runtime constructor. Prefer the
+        // imported symbol when present, otherwise attempt a runtime require
+        // to obtain the constructor. This avoids missing-runtime-symbol TS
+        // errors in environments that elide imports.
+        const SE: any = (typeof SyncEngine !== 'undefined' && (SyncEngine as any).getOrCreate)
+          ? SyncEngine
+          : (() => { try { const m = require('../sync/engine.js'); return m && (m.SyncEngine || m.default || m); } catch (_) { return undefined; } })();
+        if (SE && typeof SE.getOrCreate === 'function') {
+          this._sync = SE.getOrCreate(this.store as any, this._peerId);
+        } else {
+          // Fall through to registry lookup below via thrown error.
+          throw new Error('SyncEngine.getOrCreate unavailable');
+        }
       } catch (err) {
         // Avoid directly constructing a new SyncEngine here — prefer any
         // already-registered engine on the store to prevent duplicate
