@@ -27,6 +27,8 @@ export interface DocumentSnapshot {
   readonly links: readonly DocumentLink[];
   readonly createdAt: number;
   readonly updatedAt: number;
+  /** Optional version to support lightweight snapshot versioning for sync/merge logic. */
+  readonly version?: number;
 }
 
 export interface DocumentLink {
@@ -89,6 +91,7 @@ export function isValidDocumentSnapshot(obj: any): obj is DocumentSnapshot {
     }
 
     if (!Number.isFinite(obj.createdAt) || !Number.isFinite(obj.updatedAt)) return false;
+    if (obj.version !== undefined && !Number.isFinite(obj.version)) return false;
 
     return true;
   } catch (_) {
@@ -156,6 +159,7 @@ export function createDocumentSnapshot(doc: Document): DocumentSnapshot {
     links: Array.isArray(doc.links) ? doc.links.map(l => ({ ...l })) : [],
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
+    version: typeof doc.version === 'number' ? doc.version : undefined,
   };
 }
 

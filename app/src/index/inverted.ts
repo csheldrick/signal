@@ -196,7 +196,11 @@ export class Indexer implements IndexerContract {
   private processing: boolean = false;
 
   constructor(events: any, private readonly index: InvertedIndex) {
-    this.workerPool = new WorkerPool({ numWorkers: Math.min(4, Math.max(1, Math.floor((typeof process !== 'undefined' && process.env && process.env.INDEX_WORKERS) ? Number(process.env.INDEX_WORKERS) : 4))), maxDocsPerWorker: 500 });
+    // Determine worker count from env or CPU, allowing more headroom (up to 8)
+    const envWorkers = (typeof process !== 'undefined' && process.env && process.env.INDEX_WORKERS) ? Number(process.env.INDEX_WORKERS) : undefined;
+    const cpus = (() => { try { const os = require('node:os'); return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
+    const desired = typeof envWorkers === 'number' && !Number.isNaN(envWorkers) ? Math.max(1, Math.floor(envWorkers)) : Math.max(1, Math.floor(Math.max(1, cpus - 1)));
+    this.workerPool = new WorkerPool({ numWorkers: Math.min(8, desired), maxDocsPerWorker: 100 });
     if (!events || !this.index) return;
     try {
       const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 1000) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };

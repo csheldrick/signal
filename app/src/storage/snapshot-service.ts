@@ -148,6 +148,7 @@ export class DocumentSnapshotService {
         links: Array.isArray(s.links) ? s.links.map(l => ({ sourceId: String(l.sourceId), targetId: String(l.targetId), kind: (l.kind as any) })) : [],
         createdAt: Number.isFinite(s.createdAt) ? s.createdAt : Date.now(),
         updatedAt: Number.isFinite(s.updatedAt) ? s.updatedAt : Date.now(),
+        version: Number.isFinite((s as any).version) ? (s as any).version : undefined,
       };
       return trimmed;
     } catch (_) {
