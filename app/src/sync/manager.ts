@@ -515,7 +515,12 @@ export class SyncManager {
     // If an offline replay is in progress, wait for it to complete so that
     // persisted outbound entries are re-enqueued before we send live messages.
     if (this.offlineDrainPromise) {
-      try { await this.offlineDrainPromise; } catch (_) { /* swallow */ } finally { this.offlineDrainPromise = undefined; }
+      try {
+        await this.offlineDrainPromise;
+      } catch (_) {
+        /* swallow */
+      }
+      this.offlineDrainPromise = undefined;
     }
 
     // First, drain any outbound messages produced by the SyncEngine into the queue
