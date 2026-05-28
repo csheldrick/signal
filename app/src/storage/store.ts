@@ -31,6 +31,22 @@ function cloneDocument(d: import('../core/types.js').Document): import('../core/
 
 export const SYM_SYNC_ENGINE = Symbol('signal:sync-engine');
 
+// Singleton helper to reduce accidental multiple DocumentStore instances
+// which can lead to divergent state and make tests/observability brittle.
+let __singletonDocumentStore: DocumentStore | undefined;
+
+/**
+ * Obtain a shared DocumentStore instance. Prefer this in application code
+ * to avoid creating multiple independent stores which complicate testing
+ * and instrumentation. Calling code may still construct a private store
+ * using `new DocumentStore(...)` for advanced scenarios.
+ */
+export function getOrCreateDocumentStore(events?: StorageEventBus): DocumentStore {
+  if (__singletonDocumentStore) return __singletonDocumentStore;
+  __singletonDocumentStore = new DocumentStore(events);
+  return __singletonDocumentStore;
+}
+
 export class DocumentStore {
   // Event batching queue to smooth spikes of StorageEventBus emissions.
   // Many parts of the system (indexer, graph builder, plugins) attach
@@ -165,6 +181,23 @@ export class DocumentStore {
       // Best-effort fallback for constrained environments
       try { (this as any)[String(SYM_SYNC_ENGINE)] = engine; } catch (_) { /* swallow */ }
     }
+  }
+
+  /**
+   * Return a snapshot of operation counters for observability and tests.
+   */
+  getOpCounts(): { create: number; update: number; delete: number; link: number } {
+    try { return { ...this.opCounts }; } catch (_) { return { create: 0, update: 0, delete: 0, link: 0 }; }
+  }
+
+  /** Reset operation counters to zero. Useful for deterministic tests. */
+  resetOpCounts(): void {
+    try { this.opCounts = { create: 0, update: 0, delete: 0, link: 0 }; } catch (_) { /* swallow */ }
+  }
+
+  /** Return the number of DocumentStore instances created in this process. Useful for diagnostics. */
+  static getInstanceCount(): number {
+    try { return DocumentStore._instances; } catch (_) { return 0; }
   }
 
   create(id: string, title: string, content: string, tags: string[] = []): Document {

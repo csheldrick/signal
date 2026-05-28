@@ -66,6 +66,12 @@ export interface StorageEventBusContract {
   attachDocumentValidatorSnapshot(initial?: Iterable<string>): ((id: string) => boolean) & { dispose?: () => void };
   /** Return a snapshot of recently emitted storage events for diagnostics */
   getTrace(): ReadonlyArray<StorageEvent>;
+  /** Return counts of registered listeners for diagnostics */
+  getListenerCounts(): { total: number; perType: Record<string, number>; asyncTotal: number };
+  /** Clear the internal trace used for diagnostics */
+  clearTrace(): void;
+  /** Remove all registered listeners (useful in tests to avoid leaks) */
+  removeAllListeners(): void;
 }
 
 // deprecated alias removed to reduce legacy surface area
@@ -76,6 +82,22 @@ export class StorageEventBus implements StorageEventBusContract {
   private asyncScheduled: boolean = false;
   private trace: StorageEvent[] = [];
   getTrace(): ReadonlyArray<StorageEvent> { try { return this.trace.slice(); } catch (_) { return []; } }
+  getListenerCounts(): { total: number; perType: Record<string, number>; asyncTotal: number } {
+    try {
+      const perType: Record<string, number> = {};
+      let total = 0;
+      for (const [k, s] of this.listeners) { perType[String(k)] = s.size; total += s.size; }
+      let asyncTotal = 0;
+      for (const [k, s] of this.asyncListeners) { asyncTotal += s.size; }
+      return { total, perType, asyncTotal };
+    } catch (_) { return { total: 0, perType: {}, asyncTotal: 0 }; }
+  }
+
+  clearTrace(): void { try { this.trace = []; } catch (_) { /* swallow */ } }
+
+  removeAllListeners(): void {
+    try { this.listeners.clear(); this.asyncListeners.clear(); } catch (_) { /* swallow */ }
+  }
   // Async listeners are intended for consumers that must not run synchronously
   // on the emitter's call path (e.g. plugins, background summarizers, session
   // lifecycle observers). They are invoked in microtasks/macrotasks depending

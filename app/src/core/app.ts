@@ -69,7 +69,14 @@ export class SignalApp {
     if (typeof setSignalStorageEventBus === 'function' && (typeof process !== 'undefined' && process.env && process.env.SIGNAL_ALLOW_GLOBALS === 'true')) {
       try { setSignalStorageEventBus(this.events); } catch (_) {}
     }
-    this.store = new DocumentStore(this.events);
+    // Prefer shared singleton to avoid accidental multiple stores in normal app usage.
+    try {
+      // Use singleton factory when available; fall back to direct construction.
+      const { getOrCreateDocumentStore } = require('../storage/store.js');
+      this.store = getOrCreateDocumentStore(this.events);
+    } catch (_) {
+      this.store = new DocumentStore(this.events);
+    }
     this.graph = createLazyGraph(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
     // Create a lightweight inverted index and an Indexer that listens to
     // the StorageEventBus. Historically we created these eagerly which
