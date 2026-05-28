@@ -639,14 +639,19 @@ export class SignalApp {
       try {
         this._sync = SyncEngine.getOrCreate(this.store as any, this._peerId);
       } catch (err) {
-        // As a defensive fallback, attempt direct construction but prefer any
-        // already-registered engine published via the registry.
+        // Avoid directly constructing a new SyncEngine here — prefer any
+        // already-registered engine on the store to prevent duplicate
+        // subscriptions or conflicting clocks. If no engine is available,
+        // rethrow the original error so callers can handle it explicitly.
         try {
-          this._sync = new SyncEngine(this.store as any, this._peerId);
-        } catch (e) {
           const installed = getSyncEngineFromStore(this.store);
-          if (installed) this._sync = installed;
-          else throw err;
+          if (installed) {
+            this._sync = installed;
+          } else {
+            throw err;
+          }
+        } catch (e) {
+          throw err;
         }
       }
     }
