@@ -32,7 +32,7 @@ export class SyncEngine {
    * Canonical factory to obtain a SyncEngine bound to a concrete store and peerId.
    * Preference order:
    *  1) If the store exposes getSyncEngine/setSyncEngine, use that API to get/create the engine.
-   *  2) Fallback to a WeakMap keyed by the concrete store object.
+   *  2) No fallback: rely solely on the canonical store-backed registry.
    * This centralizes registration and avoids silent duplicate engines.
    */
   static getOrCreate(store: DocumentStoreLike, peerId: string): SyncEngine {

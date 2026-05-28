@@ -1,6 +1,6 @@
 import type { SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
-import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
+import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 
 /**
  * Create a lightweight lazy SyncEngine proxy that defers creating/attaching

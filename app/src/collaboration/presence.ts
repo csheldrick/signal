@@ -25,40 +25,11 @@ export const PRESENCE_STATUS = {
 export interface PeerPresence extends PeerPresenceContract {}
 
 
+// Deprecated compatibility shim: removed. Callers should use createValidatorFromPluginContext
+// or PresenceTracker.setPluginContext to provide a PluginContext-based validator.
+// keep a stub to preserve exports for older callers but throw to force migration.
 export function createValidatorFromStore(_store: any): (id: string) => Promise<boolean> {
-  // Deprecated: direct store validators are no longer supported for realtime
-  // presence validation. Require a PluginContext to avoid accidental
-  // synchronous IO on realtime paths and to make the sandbox contract
-  // explicit. If a PluginContext is supplied, provide a thin wrapper that
-  // uses PluginContext.getDocument. Otherwise fail fast so callers migrate.
-  try {
-    const maybeCtx = (_store as any) as PluginContext | undefined;
-    if (maybeCtx && typeof (maybeCtx as any).getDocument === 'function') {
-      let warned = false;
-      const ctx = maybeCtx as PluginContext;
-      const validator = async (id: string) => {
-        if (!warned) {
-          try { console.warn('createValidatorFromStore called with a PluginContext: using PluginContext.getDocument for validation. Prefer createValidatorFromPluginContext or PresenceTracker.setPluginContext.'); } catch (_) {}
-          warned = true;
-        }
-        try {
-          const d = ctx.getDocument(id);
-          return !!d;
-        } catch (_) {
-          return false;
-        }
-      };
-      (validator as any).dispose = () => { /* no-op */ };
-      return validator;
-    }
-  } catch (_) {
-    // fall through to throwing below
-  }
-
-  // Fail fast: callers must migrate to PluginContext-based validators which
-  // provide a sandboxed, non-IO realtime contract. This avoids accidental
-  // direct store or network IO on the realtime path.
-  throw new Error('createValidatorFromStore is deprecated; use createValidatorFromPluginContext or PresenceTracker.setPluginContext to provide a PluginContext-based validator.');
+  throw new Error('createValidatorFromStore removed: use createValidatorFromPluginContext or PresenceTracker.setPluginContext');
 }
 
 /**
