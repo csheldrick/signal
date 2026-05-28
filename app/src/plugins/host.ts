@@ -5,8 +5,8 @@
 import type { DocumentSnapshot, SearchQuery, SearchResultSnapshot } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import { normalizeSearchQuery } from '../core/types.js';
-import type { StorageEvent, StorageEventType } from '../storage/events.js';
-export type { StorageEvent, StorageEventType } from '../storage/events.js';
+import type { StorageEventType } from '../storage/events.js';
+export type { StorageEventType } from '../storage/events.js'; // do not re-export StorageEvent to reduce plugin surface area; plugins receive frozen event snapshots via PluginContext
 
 export type { SearchQuery } from '../core/types.js';
 export type { SearchResultSnapshot as SearchResult } from '../core/types.js';
@@ -42,9 +42,11 @@ export interface PluginContext {
 
   /**
    * Observe storage events in a readonly, sandboxed way. Returns a dispose
-   * function that removes the listener when called.
+   * function that removes the listener when called. The event shape is
+   * intentionally typed as 'any' here so plugins cannot rely on internal
+   * concrete StorageEvent types and instead treat events as opaque snapshots.
    */
-  onStorageEvent(type: StorageEventType | '*', listener: (event: Readonly<StorageEvent>) => void): () => void;
+  onStorageEvent(type: StorageEventType | '*', listener: (event: Readonly<any>) => void): () => void;
 
   /**
    * Request a readonly summarization for a document id. The host decides
@@ -111,7 +113,7 @@ export class PluginHost {
   // Shared per-event-type managers to avoid registering one upstream
   // listener per plugin. This consolidates upstream listeners and
   // reduces StorageEventBus fan-out under load.
-  private pluginEventManagers: Map<StorageEventType | '*', { upstreamDispose?: () => void; listeners: Set<(event: Readonly<StorageEvent>) => void> }> = new Map();
+  private pluginEventManagers: Map<StorageEventType | '*', { upstreamDispose?: () => void; listeners: Set<(event: Readonly<any>) => void> }> = new Map();
   private context: PluginContext;
   // Security policy: by default plugins are not allowed to trigger
   // network-backed summarization. Hosts may opt-in globally or per-plugin
@@ -302,7 +304,7 @@ export class PluginHost {
           return {};
         },
 
-        onStorageEvent: (type: StorageEventType | '*', listener: (event: Readonly<StorageEvent>) => void) => {
+        onStorageEvent: (type: StorageEventType | '*', listener: (event: Readonly<any>) => void) => {
           try {
             const maybe = (this.context as any)?.onStorageEvent;
             if (typeof maybe === 'function') {
@@ -340,10 +342,10 @@ export class PluginHost {
 
               // Install upstream listener when first plugin subscribes for this type.
               if (!mgr.upstreamDispose) {
-                const upstreamWrapped = (ev: StorageEvent) => {
+                const upstreamWrapped = (ev: any) => {
                   try {
                     // Prepare a frozen snapshot tailored to the event type.
-                    let toSend: Readonly<StorageEvent> = Object.freeze(ev as any);
+                    let toSend: Readonly<any> = Object.freeze(ev as any);
                     try {
                       switch (ev.type) {
                         case 'created': {

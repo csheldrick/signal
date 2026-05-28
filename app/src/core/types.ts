@@ -28,13 +28,12 @@ export interface Document {
 export type DeprecatedDocumentChange = DocumentChange;
 
 /**
- * DeprecatedDocumentStore: legacy alias used by older code that imported a
- * concrete store type from core. Kept as `any` to avoid introducing a hard
- * dependency on the storage module in core types and to ease gradual
- * migration. New code should import the concrete DocumentStore from
- * storage/store.ts instead of relying on this alias.
+ * DeprecatedDocumentStore: removed. Legacy code should migrate to importing
+ * concrete store types from the storage module. Using this alias will now
+ * produce a type error to surface migration sites and encourage updating
+ * imports instead of relying on a deprecated global alias.
  */
-export type DeprecatedDocumentStore = any;
+export type DeprecatedDocumentStore = never;
 
 export interface DocumentSnapshot {
   readonly id: string;
