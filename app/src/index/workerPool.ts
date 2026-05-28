@@ -24,15 +24,15 @@ export class WorkerPool {
     // excessive parallelism on small hosts. We favor more workers than the
     // previous overly-conservative default to reduce indexing lag under load
     // while capping to a reasonable upper bound to avoid extreme fan-out.
-    const defaultWorkers = Math.min(8, Math.max(1, cpus - 1));
+    const defaultWorkers = Math.min(4, Math.max(1, cpus - 1));
     // Cap upper bound to a modest number (8) to provide headroom on multi-core
     // machines while preventing runaway task explosion.
-    this.numWorkers = Math.min(8, provided ?? defaultWorkers);
+    this.numWorkers = Math.min(4, provided ?? defaultWorkers);
 
     // Tune chunk size to balance throughput and latency. Smaller chunks
     // reduce per-worker blocking and improve responsiveness; allow hosts to
     // override via options when needed.
-    const defaultMax = 5;
+    const defaultMax = 2;
     this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
       ? Math.max(1, options.maxDocsPerWorker)
       : defaultMax;

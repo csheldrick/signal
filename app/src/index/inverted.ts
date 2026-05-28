@@ -32,7 +32,7 @@ class InvertedIndexImpl implements InvertedIndex {
 
   // Evict oldest documents when maxDocs is provided to bound memory usage and
   // avoid unbounded growth under heavy write loads.
-  private readonly DEFAULT_MAX_DOCS = 5000; // cap documents in the index to bound memory
+  private readonly DEFAULT_MAX_DOCS = 2000; // cap documents in the index to bound memory (reduced to limit memory under heavy load)
   private evictToMax(maxDocs: number | undefined) {
     try {
       if (!maxDocs || maxDocs <= 0) return;
@@ -202,12 +202,12 @@ export class Indexer implements IndexerContract {
     const cpus = (() => { try { const os = require('node:os'); return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
     const desired = typeof envWorkers === 'number' && !Number.isNaN(envWorkers) ? Math.max(1, Math.floor(envWorkers)) : Math.max(1, Math.floor(Math.max(1, cpus - 1)));
     // Conservative defaults to avoid overloading local CPU and downstream subsystems
-    const poolWorkers = Math.min(4, desired);
+    const poolWorkers = Math.min(2, desired);
     // Reduce per-worker chunk sizes to avoid large synchronous batches that can overload the index.
-    this.workerPool = new WorkerPool({ numWorkers: poolWorkers, maxDocsPerWorker: 10 });
+    this.workerPool = new WorkerPool({ numWorkers: poolWorkers, maxDocsPerWorker: 2 });
     if (!events || !this.index) return;
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 500) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
+      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 200) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const updated = (ev: any) => { try { if (ev && ev.current) { this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
 

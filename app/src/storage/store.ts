@@ -67,8 +67,8 @@ export class DocumentStore {
   // flush them in bounded-size batches using the macrotask queue.
   private _eventQueue: any[] = [];
   private _eventFlushScheduled: boolean = false;
-  private static readonly _EVENT_MAX_FLUSH = 3; // max events per flush (reduced to limit instantaneous fan-out)
-  private static readonly _EVENT_MAX_QUEUE = 50; // max queued events (drop oldest beyond this)
+  private static readonly _EVENT_MAX_FLUSH = 2; // max events per flush (reduced to limit instantaneous fan-out)
+  private static readonly _EVENT_MAX_QUEUE = 30; // max queued events (drop oldest beyond this)
 
   private emitAsyncEvent(ev: any): void {
     try {
@@ -155,8 +155,8 @@ export class DocumentStore {
   };
 
   // Soft limits to avoid unbounded work for naive callers
-  private static readonly MAX_SEARCH_RESULTS = 20;
-  private static readonly DEFAULT_LIST_PREVIEW = 20;
+  private static readonly MAX_SEARCH_RESULTS = 10; // reduced to limit search result payloads
+  private static readonly DEFAULT_LIST_PREVIEW = 10; // reduced default preview size to limit event payloads
 
   constructor(events?: StorageEventBus) {
     DocumentStore._instances += 1;

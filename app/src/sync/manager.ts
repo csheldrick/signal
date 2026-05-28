@@ -70,7 +70,7 @@ export class SyncManager {
   // for tests and to avoid relying on Math.random() at runtime.
   private msgCounter: number = 0;
   private authValidator?: (peerId: string, message?: SyncMessage) => boolean;
-  private static readonly MAX_TELEMETRY_LISTENERS = 16; // lower cap to reduce listener fan-out
+  private static readonly MAX_TELEMETRY_LISTENERS = 8; // lower cap to reduce listener fan-out and memory pressure
   private telemetryListeners: Set<(event: { type: string; payload: any }) => void> = new Set();
 
   constructor(
@@ -107,8 +107,8 @@ export class SyncManager {
       // initialize timers/maps
       this.sessionLastSeen = new Map<string, number>();
       this.sessionStale = new Map<string, boolean>();
-      const HEARTBEAT_INTERVAL_MS = 60_000; // heartbeat cadence (conservative to reduce timer churn)
-      const STALE_MS = 120_000; // consider a session stale after 120s of inactivity to reduce churn
+      const HEARTBEAT_INTERVAL_MS = 90_000; // heartbeat cadence (increased to reduce timer churn and timers under load)
+      const STALE_MS = 180_000; // consider a session stale after 180s of inactivity to reduce churn
 
       this.heartbeatTimer = setInterval(() => {
         try {

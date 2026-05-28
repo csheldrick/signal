@@ -41,8 +41,8 @@ export class ExportPlugin implements Plugin {
 
     try {
       const all = this.context.listDocuments();
-      const MAX_EXPORT = 100; // hard cap for exported documents
-      const CONTENT_MAX = 10_000; // cap per-document content size to limit memory
+      const MAX_EXPORT = 50; // hard cap for exported documents (reduced to limit plugin work)
+      const CONTENT_MAX = 5_000; // cap per-document content size to limit memory (reduced)
 
       const total = Array.isArray(all) ? all.length : 0;
       const docs = Array.isArray(all) ? all.slice(0, MAX_EXPORT) : [];
