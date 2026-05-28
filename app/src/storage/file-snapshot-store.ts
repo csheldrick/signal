@@ -11,6 +11,9 @@ import type { DocumentSnapshot } from '../core/types.js';
  */
 export class FileSnapshotStore implements SnapshotStore {
   private dir: string;
+  // pending writes are coalesced per-document to reduce IO pressure
+  private _pending: Map<string, { snapshot: DocumentSnapshot; timer: ReturnType<typeof setTimeout>; resolvers: Array<() => void> }> = new Map();
+
   constructor(dir: string) {
     this.dir = dir;
     try { mkdirSync(this.dir, { recursive: true }); } catch (_) {}
@@ -34,6 +37,10 @@ export class FileSnapshotStore implements SnapshotStore {
 
   async getLatestSnapshot(documentId: string): Promise<DocumentSnapshot | undefined> {
     try {
+      // If a pending write exists for this id, prefer the pending snapshot
+      const pState = this._pending.get(documentId);
+      if (pState && pState.snapshot) return pState.snapshot;
+
       const p = this.fileForId(documentId);
       if (!existsSync(p)) return undefined;
       const raw = readFileSync(p, 'utf-8');
@@ -47,8 +54,34 @@ export class FileSnapshotStore implements SnapshotStore {
 
   async putSnapshot(documentId: string, snapshot: DocumentSnapshot): Promise<void> {
     try {
-      const p = this.fileForId(documentId);
-      writeFileSync(p, JSON.stringify(snapshot, null, 2), 'utf-8');
+      // Coalesce rapid successive writes for the same document to reduce
+      // filesystem churn. Return a Promise that resolves when the write
+      // has been flushed to disk.
+      const existing = this._pending.get(documentId);
+      if (existing) {
+        existing.snapshot = snapshot;
+        return new Promise<void>((resolve) => { existing.resolvers.push(resolve); });
+      }
+
+      const resolvers: Array<() => void> = [];
+      const debounceMs = 50; // short debounce to group bursts
+      const timer = setTimeout(() => {
+        try {
+          const state = this._pending.get(documentId);
+          if (!state) return;
+          const p = this.fileForId(documentId);
+          try {
+            writeFileSync(p, JSON.stringify(state.snapshot, null, 2), 'utf-8');
+          } catch (_) { /* swallow write errors */ }
+          // resolve all awaiting promises
+          try { for (const r of state.resolvers) { try { r(); } catch (_) {} } } catch (_) {}
+        } finally {
+          this._pending.delete(documentId);
+        }
+      }, debounceMs);
+
+      this._pending.set(documentId, { snapshot, timer, resolvers });
+      return new Promise<void>((resolve) => { resolvers.push(resolve); });
     } catch (_) { /* swallow */ }
   }
 }

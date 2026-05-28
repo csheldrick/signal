@@ -10,6 +10,7 @@ import type { DocumentSnapshot } from '../core/types.js';
  */
 export class DiskDocumentSnapshotStore {
   private readonly basePath: string;
+  private _pending: Map<string, { snapshot: DocumentSnapshot; timer: ReturnType<typeof setTimeout>; resolvers: Array<() => void> }> = new Map();
 
   constructor(basePath = '.snapshots') {
     // Assign before any closure captures to satisfy strict-initialization
@@ -35,36 +36,57 @@ export class DiskDocumentSnapshotStore {
   /**
    * Persist a snapshot atomically and prune older snapshots while keeping at
    * least two most-recent snapshots. Implements SnapshotStore.putSnapshot.
+   * This implementation coalesces rapid successive writes per-document to
+   * reduce filesystem pressure.
    */
   async putSnapshot(documentId: string, snapshot: DocumentSnapshot): Promise<void> {
     try {
-      const dir = this.docDir(documentId);
-      await fsPromises.mkdir(dir, { recursive: true });
+      // Coalesce rapid successive writes for the same document to reduce
+      // filesystem churn. Return a Promise that resolves when the write
+      // has been flushed to disk.
+      const existing = this._pending.get(documentId);
+      if (existing) {
+        existing.snapshot = snapshot;
+        return new Promise<void>((resolve) => { existing.resolvers.push(resolve); });
+      }
 
-      const timestamp = Date.now();
-      const rand = Math.floor(Math.random() * 1e9).toString(36);
-      const tmpName = `${timestamp}.${rand}.tmp`;
-      const finalName = `${timestamp}.json`;
+      const resolvers: Array<() => void> = [];
+      const debounceMs = 50; // short debounce to group bursts
+      const timer = setTimeout(async () => {
+        try {
+          const state = this._pending.get(documentId);
+          if (!state) return;
+          const dir = this.docDir(documentId);
+          try { await fsPromises.mkdir(dir, { recursive: true }); } catch (_) {}
 
-      const tmpPath = path.join(dir, tmpName);
-      const finalPath = path.join(dir, finalName);
+          const timestamp = Date.now();
+          const rand = Math.floor(Math.random() * 1e9).toString(36);
+          const tmpName = `${timestamp}.${rand}.tmp`;
+          const finalName = `${timestamp}.json`;
 
-      // Serialize snapshot deterministically
-      const payload = JSON.stringify(snapshot);
+          const tmpPath = path.join(dir, tmpName);
+          const finalPath = path.join(dir, finalName);
 
-      // Write tmp file
-      await fsPromises.writeFile(tmpPath, payload, { encoding: 'utf8' });
+          const payload = JSON.stringify(state.snapshot);
+          try {
+            await fsPromises.writeFile(tmpPath, payload, { encoding: 'utf8' });
+            await fsPromises.rename(tmpPath, finalPath);
+            await this.pruneSnapshots(dir, 2);
+          } catch (_) {
+            // Best-effort: swallow write/rename errors
+          }
 
-      // Atomic rename into final path. On most platforms this is atomic
-      // as a file system rename/replace operation.
-      await fsPromises.rename(tmpPath, finalPath);
+          // resolve all awaiting promises
+          try { for (const r of state.resolvers) { try { r(); } catch (_) {} } } catch (_) {}
+        } finally {
+          this._pending.delete(documentId);
+        }
+      }, debounceMs);
 
-      // Prune older snapshots but keep at least two most recent.
-      await this.pruneSnapshots(dir, 2);
+      this._pending.set(documentId, { snapshot, timer, resolvers });
+      return new Promise<void>((resolve) => { resolvers.push(resolve); });
     } catch (err) {
-      // Swallow errors to avoid interfering with live writes; callers may
-      // inspect logs if needed.
-      try { console.warn && console.warn('DiskDocumentSnapshotStore: failed to put snapshot', err); } catch (_) {}
+      try { console.warn && console.warn('DiskDocumentSnapshotStore.putSnapshot failed', err); } catch (_) {}
     }
   }
 
