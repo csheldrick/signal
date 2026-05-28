@@ -14,7 +14,6 @@ import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
 import { createLazySyncEngine } from './lazyEngine.js';
 import { telemetry } from './telemetry.js';
-import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 
 import { SyncQueue } from './queue.js';
 import { OfflineSyncQueue } from './offline-queue.js';

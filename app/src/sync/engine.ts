@@ -27,7 +27,6 @@ export class SyncEngine {
   // keeps the engine stateless from a persistence PoV but improves determinism.
   private messageCounter: number = 0;
   // Registry of SyncEngine instances keyed by the concrete store object to detect accidental duplicates.
-  private static _instancesByStore: WeakMap<object, SyncEngine> = new WeakMap<object, SyncEngine>();
 
   /**
    * Canonical factory to obtain a SyncEngine bound to a concrete store and peerId.
@@ -43,20 +42,10 @@ export class SyncEngine {
       const created = new SyncEngine(store, peerId, { internal: true });
       try { setSyncEngineOnStore(store as any, created); } catch (_) {}
       return created;
-    } catch (_) {}
-
-    // Fallback to WeakMap registry
-    const keyObj = (typeof store === 'object' && store !== null) ? (store as unknown as object) : undefined;
-    if (!keyObj) return new SyncEngine(store, peerId, { internal: true });
-
-    try {
-      const existing = SyncEngine._instancesByStore.get(keyObj);
-      if (existing) return existing;
-    } catch (_) {}
-
-    const created = new SyncEngine(store, peerId, { internal: true });
-    try { SyncEngine._instancesByStore.set(keyObj, created); } catch (_) {}
-    return created;
+    } catch (_) {
+      // If registry helpers are unavailable or throw, fall back to direct construction.
+      return new SyncEngine(store, peerId, { internal: true });
+    }
   }
 
   constructor(
@@ -74,19 +63,6 @@ export class SyncEngine {
         const existing = getSyncEngineFromStore(this.store as any);
         if (existing && existing !== undefined) {
           throw new Error('SyncEngine: duplicate engine already registered on store');
-        } else {
-          const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
-          if (keyObj) {
-            try {
-              const existing2 = SyncEngine._instancesByStore.get(keyObj);
-              if (existing2 && existing2 !== undefined) {
-                throw new Error('SyncEngine: duplicate engine already registered for this store');
-              }
-            } catch (e) {
-              // Surface registry read errors so callers can migrate to getOrCreate
-              throw e;
-            }
-          }
         }
       } catch (e) {
         // Fail fast on duplicates / registry errors so callers can migrate to getOrCreate
@@ -99,15 +75,10 @@ export class SyncEngine {
     if (!options?.internal) {
       try {
         try { setSyncEngineOnStore(this.store as any, this); } catch (e) {
-          const keyObj = (typeof this.store === 'object' && this.store !== null) ? (this.store as unknown as object) : undefined;
-          if (keyObj) {
-            try { SyncEngine._instancesByStore.set(keyObj, this); } catch (e2) { console.warn('SyncEngine: instance registry unavailable (write)', e2); }
-          } else {
-            console.warn('SyncEngine: instance registry unavailable (write)', e);
-          }
+          try { console.warn('SyncEngine: instance registry unavailable (write)', e); } catch (_) {}
         }
       } catch (e) {
-        console.warn('SyncEngine: instance registry unavailable (write)', e);
+        try { console.warn('SyncEngine: instance registry unavailable (write)', e); } catch (_) {}
       }
     }
 

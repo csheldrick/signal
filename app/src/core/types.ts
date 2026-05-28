@@ -17,6 +17,8 @@ export interface Document {
 // Minimal, readonly-friendly snapshot used at subsystem/plugin boundaries.
 // This mirrors the main Document shape but is explicit to signal the
 // lightweight, readonly contract for external consumers such as plugins.
+
+// Deprecated aliases removed: prefer DocumentChange and normalizeDocumentChange.
 export interface DocumentSnapshot {
   id: string;
   title: string;

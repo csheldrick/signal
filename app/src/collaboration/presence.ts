@@ -9,22 +9,9 @@ import type { DocumentSnapshot } from '../core/types.js';
 import { getSignalStorageEventBus } from '../core/globals.js';
 import { telemetry } from '../sync/telemetry.js';
 
-// Types exposed for backwards compatibility — deprecated direct imports.
-// Use PluginContext.listDocuments().map(...) instead.
-export type SyncEngine = PluginContext;
-
-// Deprecated aliases removed to reduce cross-subsystem coupling. Prefer PluginContext APIs.
-// DeprecatedDocumentStore removed: prefer PluginContext APIs and core/types.DocumentSnapshot for compatibility; do NOT import this deprecated alias from presence module.
-
-// Deprecated interfaces — use PluginContext methods instead.
-export interface DocumentReader {
-  read(id: string): unknown | undefined;
-}
-
-// Deprecated interface — use PluginContext.getClock() instead.
-export interface ClockProvider {
-  getClock(): { [peerId: string]: number };
-}
+// The presence subsystem uses a PluginContext sandbox for readonly
+// document access. Legacy direct store/sync types have been removed to
+// avoid accidental coupling during the TypeScript migration.
 
 export type PresenceStatus = 'active' | 'idle' | 'offline';
 

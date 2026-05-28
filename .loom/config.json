@@ -1,5 +1,5 @@
 {
-  "graphId": "b16fbb87-e4fc-43f4-b1c6-b8c351605c03",
+  "graphId": "d7ac495c-f9d6-4873-a8d4-861b4ca0a2d8",
   "name": "signal",
   "type": "application",
   "dbPath": ".loom/loom.db",
@@ -17,5 +17,5 @@
     "claude": false,
     "appendMode": true
   },
-  "createdAt": "2026-05-27T22:39:01.261Z"
+  "createdAt": "2026-05-28T03:35:27.378Z"
 }

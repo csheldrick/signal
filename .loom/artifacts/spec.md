@@ -318,7 +318,7 @@ Confidence: 95%
 
 ## Detected Invariants
 
-- **error-boundary: Error boundary (try/catch)**: Detected 183 occurrence(s) of error-boundary pattern across 22 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **error-boundary: Error boundary (try/catch)**: Detected 199 occurrence(s) of error-boundary pattern across 22 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
 - **guard: Guard clause (null/undefined check)**: Detected 26 occurrence(s) of guard pattern across 14 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 13 occurrence(s) of validation pattern across 5 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
 - **sanitization: Input sanitization**: Detected 4 occurrence(s) of sanitization pattern across 3 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
