@@ -4,9 +4,7 @@
 // Loom should detect this as a cross-subsystem dependency edge.
 // Weave's ContradictionDetectionOperator should surface it as a tension.
 
-import type { Plugin, PluginContext } from './host.js';
-
-import type { SearchQuery, SearchResult } from './host.js';
+import type { Plugin, PluginContext, SearchQuery, SearchResult } from './host.js';
 
 
 export class SearchPlugin implements Plugin {
