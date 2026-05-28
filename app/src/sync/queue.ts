@@ -96,12 +96,18 @@ export class SyncQueue {
       this.index.set(key, entry);
     } else {
       if (this.entries.length >= this.maxQueueSize) {
+        // Queue is full. Instead of silently dropping the oldest entry (which
+        // can hide backpressure), reject the enqueue to allow callers (e.g.
+        // SyncManager) to persist to an offline queue or take other actions.
         const removed = this.entries.shift()!;
         const removedKey = this.keyFor(removed.message);
         this.index.delete(removedKey);
         try {
           removed.reject(new Error('Queue full — dropped oldest entry'));
         } catch (_) { /* ignore */ }
+        // Reject the caller to surface backpressure so higher layers can
+        // persist the message or apply backoff.
+        return Promise.reject(new Error('Queue full — cannot enqueue new entry'));
       }
       this.entries.push(entry);
       this.index.set(key, entry);

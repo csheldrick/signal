@@ -391,12 +391,12 @@ export class SyncManager {
         try { this.emitTelemetry('outbound_prepared', { message: prepared }); } catch (_) { /* swallow */ }
 
         enqPromises.push(
-          this.queue.enqueue(prepared).catch(err => {
+          this.queue.enqueue(prepared).catch(async (err) => {
             try { this.emitTelemetry('queue_enqueue_failed', { message: prepared, error: err }); } catch (_) {}
             try {
               if (this.offlineQueue) {
                 // Best-effort: persist into the provided offline queue
-                try { (this.offlineQueue as any).enqueue(this.peerId, prepared.documentId ?? '', prepared).catch(() => {}); } catch (_) {}
+                try { await (this.offlineQueue as any).enqueue(this.peerId, prepared.documentId ?? '', prepared); } catch (_) {}
               } else {
                 const path = `.signal_offline_${this.peerId}.json`;
                 let arr: any[] = [];
