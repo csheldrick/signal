@@ -5,15 +5,13 @@
 // store or sync engine imports.
 
 import type { Plugin, PluginContext } from '../plugins/host.js';
-import type { DocumentSnapshot, PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract } from '../core/types.js';
+import type { DocumentSnapshot, PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract, PresenceStatus } from '../core/types.js';
 import { getSignalStorageEventBus } from '../core/globals.js';
 import { telemetry } from '../sync/telemetry.js';
 
 // The presence subsystem uses a PluginContext sandbox for readonly
 // document access. Legacy direct store/sync types have been removed to
 // avoid accidental coupling during the TypeScript migration.
-
-export type PresenceStatus = 'active' | 'idle' | 'offline';
 
 export const PRESENCE_STATUS = {
   ACTIVE: 'active' as PresenceStatus,
@@ -22,7 +20,7 @@ export const PRESENCE_STATUS = {
 } as const;
 
 // Local concrete PeerPresence mirrors the lightweight contract exported in core/types
-export interface PeerPresence extends PeerPresenceContract {}
+export type PeerPresence = PeerPresenceContract;
 
 
 // Deprecated compatibility shim: removed. Callers should use createValidatorFromPluginContext
