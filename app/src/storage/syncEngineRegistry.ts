@@ -4,23 +4,31 @@ import { SYM_SYNC_ENGINE } from './store.js';
  * Registry helpers for attaching and retrieving a canonical SyncEngine
  * instance from a store-like object. To reduce split ownership and avoid
  * multiple registration surfaces, we prefer store-provided accessors when
- * available or the well-known SYM_SYNC_ENGINE symbol property. We no longer
- * maintain an in-process fallback registry to avoid divergent canonical
- * instances across hosts and to make registration errors explicit.
+ * available, then the well-known SYM_SYNC_ENGINE symbol property, and as a
+ * last-resort in-process WeakMap fallback for constrained hosts that do not
+ * permit attaching properties to exotic store objects.
  *
  * Behavior:
  *  - getSyncEngineFromStore returns the result of store.getSyncEngine() if
  *    present, otherwise consults the store's SYM_SYNC_ENGINE symbol property
- *    when available. If direct symbol access throws (e.g. exotic proxies),
- *    we attempt a best-effort stringified-key fallback to remain compatible
- *    with constrained environments. Returns undefined when no engine is found.
+ *    when available, and finally consults an internal WeakMap registry.
+ *    If direct symbol access throws (e.g. exotic proxies), we attempt a
+ *    best-effort stringified-key fallback before consulting the WeakMap.
+ *    Returns undefined when no engine is found.
  *  - setSyncEngineOnStore attempts to register via store.setSyncEngine(engine)
  *    when available; otherwise it will assign the SYM_SYNC_ENGINE symbol on
  *    the store object if possible. If defining the symbol property fails we
- *    attempt the stringified-key fallback used by some constrained runtimes.
- *    If neither mechanism is available the helper throws so callers can
- *    surface configuration failures instead of silently creating duplicate engines.
+ *    attempt the stringified-key fallback used by some constrained runtimes
+ *    and finally store the engine in an internal WeakMap. The WeakMap is
+ *    non-invasive and avoids mutating host objects while still providing a
+ *    canonical registry for environments that prohibit property attachment.
  */
+
+// Internal fallback registry for hosts that cannot accept symbol/property
+// attachment on store objects. WeakMap avoids leaking memory and is only used
+// when explicit setter or symbol property assignment is not possible. This
+// provides a predictable canonical binding in tests and exotic runtimes.
+const internalRegistry = new WeakMap<object, any>();
 
 export function getSyncEngineFromStore(store: any): any | undefined {
   if (!store) return undefined;
@@ -49,10 +57,20 @@ export function getSyncEngineFromStore(store: any): any | undefined {
       try {
         return (store as any)[String(SYM_SYNC_ENGINE)];
       } catch (_) {
-        return undefined;
+        // fall through to WeakMap fallback
       }
     }
   }
+
+  // WeakMap fallback: some hosts disallow attaching properties but the
+  // process-local registry can provide a canonical engine binding without
+  // mutating the host object. This keeps behavior deterministic in tests
+  // and exotic runtimes while remaining non-invasive.
+  try {
+    if (typeof store === 'object' || typeof store === 'function') {
+      if (internalRegistry.has(store)) return internalRegistry.get(store);
+    }
+  } catch (_) { /* swallow */ }
 
   // No canonical engine published on the store
   return undefined;
@@ -84,8 +102,7 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
   // Attempt to set the well-known symbol property if available and the
   // store is an object. Use a non-enumerable property to avoid leaking on
   // iteration. If defineProperty fails, attempt a stringified-key fallback
-  // before propagating the error so callers can detect that registration
-  // is not possible in this environment.
+  // before using the WeakMap fallback so callers have maximum compatibility.
   if (typeof SYM_SYNC_ENGINE !== 'undefined' && (typeof store === 'object' || typeof store === 'function')) {
     try {
       Object.defineProperty(store, SYM_SYNC_ENGINE, { value: engine, writable: true, configurable: true });
@@ -95,15 +112,25 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
         // Best-effort fallback for constrained environments
         (store as any)[String(SYM_SYNC_ENGINE)] = engine;
         return;
-      } catch (err) {
-        // Propagate the original failure to surface configuration issues
-        throw err instanceof Error ? err : new Error(String(err));
+      } catch (_err) {
+        // Fall through to WeakMap fallback
       }
     }
   }
 
+  // WeakMap fallback: if we cannot attach the engine to the host store,
+  // record it in the internal WeakMap registry. This avoids mutating exotic
+  // host objects while still providing a canonical process-local binding.
+  try {
+    if (typeof store === 'object' || typeof store === 'function') {
+      internalRegistry.set(store, engine);
+      return;
+    }
+  } catch (_) { /* swallow */ }
+
   // If we reach here, the host store does not provide an accessor and we
-  // cannot attach the canonical engine symbol; surface this as an error so
-  // callers can take corrective action rather than silently falling back.
-  throw new Error('setSyncEngineOnStore: unable to register SyncEngine on store (no setter or symbol property)');
+  // cannot attach the canonical engine symbol or registry; surface this as
+  // an error so callers can take corrective action rather than silently
+  // falling back.
+  throw new Error('setSyncEngineOnStore: unable to register SyncEngine on store (no setter, symbol property, or registry available)');
 }
