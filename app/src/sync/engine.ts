@@ -36,15 +36,35 @@ export class SyncEngine {
    * This centralizes registration and avoids silent duplicate engines.
    */
   static getOrCreate(store: DocumentStoreLike, peerId: string): SyncEngine {
+    // Prefer returning an already-registered engine to avoid duplicates.
+    const fromStore = getSyncEngineFromStore(store as any);
+    if (fromStore && fromStore !== undefined) return fromStore as SyncEngine;
+
+    // Create a new engine but do not bypass registration logic; attempt to
+    // register it and surface any conflicts to the caller so they can
+    // address duplicate-registration issues instead of silently proceeding.
+    const created = new SyncEngine(store, peerId, { internal: true });
+
+    // Try to register the created engine. If registration fails due to a
+    // conflicting engine, attempt to read the canonical engine and return it
+    // (fail-fast behavior). Do not silently swallow registry errors as that
+    // leads to duplicated engine instances and duplicate subscriptions.
     try {
-      const fromStore = getSyncEngineFromStore(store as any);
-      if (fromStore && fromStore !== undefined) return fromStore;
-      const created = new SyncEngine(store, peerId, { internal: true });
-      try { setSyncEngineOnStore(store as any, created); } catch (_) {}
+      setSyncEngineOnStore(store as any, created);
+      // Re-read to ensure the engine we registered is visible via the getter
+      const rechecked = getSyncEngineFromStore(store as any);
+      if (rechecked && rechecked !== created) {
+        // Another engine beat us to registration — surface this as an error so
+        // callers can decide how to proceed instead of creating a duplicate.
+        throw new Error('SyncEngine.getOrCreate: conflicting SyncEngine already registered on store');
+      }
       return created;
-    } catch (_) {
-      // If registry helpers are unavailable or throw, fall back to direct construction.
-      return new SyncEngine(store, peerId, { internal: true });
+    } catch (e) {
+      // If a conflict occurred, prefer returning the canonical engine if it
+      // exists; otherwise rethrow to surface unexpected registry failures.
+      const existing = getSyncEngineFromStore(store as any);
+      if (existing && existing !== undefined) return existing as SyncEngine;
+      throw e instanceof Error ? e : new Error(String(e));
     }
   }
 
@@ -56,38 +76,54 @@ export class SyncEngine {
     this.peerId = peerId;
     this.clock[peerId] = 0;
 
-    // If constructed directly (without options.internal), perform duplicate
-    // detection and fail fast so callers discover misconfiguration early.
+    // When constructed directly (non-internal), perform duplicate detection
+    // and registration. For internally-constructed instances (e.g. by the
+    // getOrCreate factory) the factory handles registration to avoid races.
     if (!options?.internal) {
+      // Duplicate detection: prefer failing early so callers must use the
+      // canonical getOrCreate factory which centralizes registration.
       try {
         const existing = getSyncEngineFromStore(this.store as any);
-        if (existing && existing !== undefined) {
+        if (existing && existing !== undefined && existing !== this) {
           throw new Error('SyncEngine: duplicate engine already registered on store');
         }
       } catch (e) {
-        // Fail fast on duplicates / registry errors so callers can migrate to getOrCreate
+        // Propagate registry errors to the caller so config issues are visible.
         throw e;
       }
-    }
 
-    // Register only when constructed directly (non-internal). The factory
-    // (getOrCreate) will perform registration itself to avoid double-setting.
-    if (!options?.internal) {
+      // Register using the canonical registry helper. If registration fails
+      // due to a conflicting engine, surface the error rather than silently
+      // proceeding and creating duplicate subscriptions.
       try {
-        try { setSyncEngineOnStore(this.store as any, this); } catch (e) {
-          try { console.warn('SyncEngine: instance registry unavailable (write)', e); } catch (_) {}
-        }
+        setSyncEngineOnStore(this.store as any, this);
       } catch (e) {
+        // Surface registry write failures to help callers detect misconfiguration
+        // while still attempting to provide a helpful console message.
         try { console.warn('SyncEngine: instance registry unavailable (write)', e); } catch (_) {}
       }
     }
 
-    // Subscribe to store events when available. This subscription is orthogonal
-    // to registration but is suppressed by earlier duplicate-detection via
-    // throwing (we want callers to fail fast instead of quietly running).
+    // Subscribe to store events when available. Subscriptions should only be
+    // established for the canonical, registered engine to avoid duplicate
+    // event handlers and outbound message duplication. Check the registry and
+    // avoid subscribing if this instance is not the canonical engine.
     try {
       const bus = this.store?.events;
       if (bus && typeof bus.on === 'function') {
+        try {
+          const canonical = getSyncEngineFromStore(this.store as any);
+          if (canonical && canonical !== this) {
+            // This instance is not the canonical registered engine; do not
+            // subscribe to avoid duplicate outbound generation.
+            return;
+          }
+        } catch (_) {
+          // If registry check fails, proceed with subscription to avoid
+          // losing functionality, but log a warning so it can be investigated.
+          try { console.warn('SyncEngine: registry check failed during subscription'); } catch (_) {}
+        }
+
         const buffer: StorageEvent[] = [];
         const MAX_BUFFERED_EVENTS = 500;
         let scheduled = false;

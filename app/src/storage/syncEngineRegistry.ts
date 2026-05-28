@@ -54,6 +54,20 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
   try {
     if (!store) return;
 
+    // If an engine is already registered on this store and it differs from
+    // the provided one, fail fast so callers can detect configuration errors
+    // instead of silently creating duplicate engines.
+    try {
+      const existing = getSyncEngineFromStore(store);
+      if (existing !== undefined && existing !== engine) {
+        throw new Error('setSyncEngineOnStore: conflicting SyncEngine already registered on store');
+      }
+    } catch (e) {
+      // If getSyncEngineFromStore itself throws, propagate to caller to
+      // surface the registry inconsistency.
+      throw e;
+    }
+
     // Prefer explicit setter API when present.
     try {
       if (typeof store.setSyncEngine === 'function') {

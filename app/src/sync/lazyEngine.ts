@@ -23,7 +23,7 @@ export function createLazySyncEngine(store: any, peerId: string, provided?: Sync
 
     // Create and register a concrete engine when first needed.
     real = SyncEngine.getOrCreate(store as any, peerId) as SyncEngine;
-    try { setSyncEngineOnStore(store as any, real); } catch (_) { /* best-effort */ }
+    // getOrCreate handles registration; avoid duplicating registration here.
     return real as SyncEngine;
   };
 
