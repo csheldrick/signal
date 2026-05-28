@@ -20,13 +20,13 @@ export interface Document {
 
 // Deprecated aliases removed: prefer DocumentChange and normalizeDocumentChange.
 export interface DocumentSnapshot {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-  links: DocumentLink[];
-  createdAt: number;
-  updatedAt: number;
+  readonly id: string;
+  readonly title: string;
+  readonly content: string;
+  readonly tags: readonly string[];
+  readonly links: readonly DocumentLink[];
+  readonly createdAt: number;
+  readonly updatedAt: number;
 }
 
 export interface DocumentLink {
@@ -225,4 +225,6 @@ export interface InvertedIndex {
   // Basic stats for observability
   stats(maxDocs?: number): IndexStats;
 }
+
+export interface IndexerContract { dispose(): void; }
 

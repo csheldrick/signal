@@ -112,7 +112,7 @@ export class DocumentSnapshotService {
       if (!Array.isArray(ids) || ids.length === 0) return;
 
       // Bound the number of ids processed per pass to avoid long blocking
-      const MAX_PER_PASS = 50; // reduced from 200 to lower per-pass pressure
+      const MAX_PER_PASS = 20; // further reduced to lower per-pass IO pressure
       let count = 0;
       for (const id of ids) {
         if (this.stopped) break;

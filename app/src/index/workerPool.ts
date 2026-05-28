@@ -11,8 +11,8 @@ export interface IndexWorker {
 }
 
 export interface WorkerPoolOptions {
-  numWorkers: number;
-  maxDocsPerWorker: number;
+  numWorkers?: number;
+  maxDocsPerWorker?: number;
 }
 
 export class WorkerPool {
@@ -28,12 +28,15 @@ export class WorkerPool {
     const provided = options && typeof options.numWorkers === 'number' ? Math.max(1, options.numWorkers) : undefined;
     const cpus = (() => { try { return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
     // Default to (cpus - 1) but at least 2 workers; cap to avoid extreme parallelism
-    const defaultWorkers = Math.max(2, Math.min(16, Math.max(1, cpus - 1)));
-    this.numWorkers = Math.min(64, provided ?? defaultWorkers);
+    // Conservative defaults: prefer fewer workers to avoid overwhelming
+    // downstream subsystems on machines with many CPUs. Cap to a modest
+    // upper bound to prevent extreme parallelism in serverless/CI envs.
+    const defaultWorkers = Math.max(1, Math.min(8, Math.max(1, cpus - 1)));
+    this.numWorkers = Math.min(32, provided ?? defaultWorkers);
 
-    // Ensure a safe default and a lower bound for maxDocsPerWorker to avoid
-    // pathological chunk sizes that could create extremely large macrotasks.
-    const defaultMax = 250;
+    // Lower the default maxDocsPerWorker to produce smaller, more frequent
+    // chunks which helps keep task latency bounded and reduces peak memory.
+    const defaultMax = 100;
     this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
       ? Math.max(1, options.maxDocsPerWorker)
       : defaultMax;
@@ -117,13 +120,20 @@ export class WorkerPool {
           active++;
 
           // Run chunk asynchronously so we yield to the event loop between chunks.
+          // Schedule chunk processing with a short macrotask yield to avoid
+          // synchronous bursts; also yield inside the chunk via a microtask to
+          // let other I/O progress when processing many small docs.
           setTimeout(() => {
             try {
-              for (const doc of docs) {
-                const normalized = doc.text ? doc.text.toLowerCase() : '';
-                const words = normalized.split(/\s+/).filter(w => w.length > 0);
-                // No-op with words; worker would use tokens for indexing.
-              }
+              Promise.resolve().then(() => {
+                for (const doc of docs) {
+                  try {
+                    const normalized = doc.text ? doc.text.toLowerCase() : '';
+                    const words = normalized.split(/\s+/).filter(w => w.length > 0);
+                    // No-op with words; worker would use tokens for indexing.
+                  } catch (_) { /* per-doc defensive */ }
+                }
+              }).catch(() => {});
             } catch (_) {
               // Swallow per-chunk errors to avoid leaving the pool unresolved.
             } finally {

@@ -97,7 +97,7 @@ export const dire: any = ((): any => {
 })();
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 4; // tightened to reduce plugin subsystem fan-out and resource pressure (reduced default)
+  private static readonly MAX_REGISTERED_PLUGINS = 2; // tightened to reduce plugin subsystem fan-out and resource pressure
   private plugins: Map<string, Plugin> = new Map();
   private static readonly MAX_ENABLED_PLUGINS = 1;
   private enabled: Set<string> = new Set();
@@ -295,7 +295,7 @@ export class PluginHost {
                 // avoid unbounded growth of pluginEventManagers (each distinct
                 // type can hold many listeners). If the cap is reached, avoid
                 // adding another manager and fall back to a no-op behaviour.
-                const MAX_EVENT_TYPES = 6;
+                const MAX_EVENT_TYPES = 4; // reduced to limit distinct event-type managers and control fan-out
                 if (this.pluginEventManagers.size >= MAX_EVENT_TYPES) {
                   try { console.warn('PluginHost: event manager type limit reached; registering noop listener'); } catch (_) {}
                   mgr = { upstreamDispose: undefined, listeners: new Set() };
@@ -309,7 +309,7 @@ export class PluginHost {
                             // Prevent runaway listener growth per plugin: cap listeners to a reasonable bound.
               // Reuse existing PluginHost limit for a simple protective heuristic.
               try {
-                if (mgr.listeners.size >= Math.max(3, Math.floor(PluginHost.MAX_REGISTERED_PLUGINS / 2))) {
+                if (mgr.listeners.size >= Math.max(2, Math.floor(PluginHost.MAX_REGISTERED_PLUGINS / 2))) {
                   try { console.warn('PluginHost: per-event listener registration limit reached'); } catch (_) {}
                   // Return a no-op disposer to keep caller expectations consistent.
                   return () => {};

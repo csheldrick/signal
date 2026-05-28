@@ -2,7 +2,7 @@
 // This module provides runtime implementations only; the InvertedIndex interface
 // is declared in core/types.ts so multiple implementations can coexist.
 
-import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex } from '../core/types.js';
+import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex, IndexerContract } from '../core/types.js';
 import { normalizeSearchQuery } from '../core/types.js';
 import { WorkerPool, WorkerPoolOptions } from './workerPool.js';
 import { telemetry } from '../sync/telemetry.js';
@@ -30,10 +30,25 @@ class InvertedIndexImpl implements InvertedIndex {
   private docTerms: Map<string, Set<string>> = new Map();
   private termCounts: Map<string, number> = new Map();
 
+  // Evict oldest documents when maxDocs is provided to bound memory usage and
+  // avoid unbounded growth under heavy write loads.
+  private evictToMax(maxDocs: number | undefined) {
+    try {
+      if (!maxDocs || maxDocs <= 0) return;
+      while (this.docStore.size > maxDocs) {
+        const it = this.docStore.keys();
+        const oldest = it.next();
+        if (oldest.done) break;
+        const id = oldest.value;
+        this.removeDocument(id);
+      }
+    } catch (_) { /* swallow */ }
+  }
+
   indexDocument(doc: DocumentSnapshot, maxDocs?: number): void {
     if (!doc || typeof doc.id !== 'string') return;
     if (this.docStore.has(doc.id)) {
-      this.updateDocument(doc);
+      this.updateDocument(doc, maxDocs);
       return;
     }
     this.docStore.set(doc.id, doc);
@@ -47,6 +62,9 @@ class InvertedIndexImpl implements InvertedIndex {
         this.termCounts.set(t, (this.termCounts.get(t) || 0) + 1);
       }
     }
+
+    // Enforce optional document cap after insertion.
+    this.evictToMax(maxDocs);
   }
 
   updateDocument(doc: DocumentSnapshot, maxDocs?: number): void {
@@ -74,6 +92,9 @@ class InvertedIndexImpl implements InvertedIndex {
         this.termCounts.set(t, (this.termCounts.get(t) || 0) + 1);
       }
     }
+
+    // Enforce optional document cap after update.
+    this.evictToMax(maxDocs);
   }
 
   removeDocument(documentId: string): void {
@@ -167,7 +188,6 @@ export function createInvertedIndex(): InvertedIndex {
   return new InvertedIndexImpl();
 }
 
-export interface IndexerContract { dispose(): void; }
 
 export class Indexer implements IndexerContract {
   private disposers: Array<() => void> = [];
