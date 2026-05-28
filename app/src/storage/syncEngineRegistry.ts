@@ -1,5 +1,14 @@
 import { SYM_SYNC_ENGINE } from './store.js';
 
+// Exported in-process fallback registry for hosts that cannot accept symbol/property
+// attachment on store objects. Tests and other subsystems may read this registry
+// for deterministic inspection in exotic runtimes.
+export const fallbackRegistry: { weak: WeakMap<object, any>; map: Map<string, any> } = {
+  weak: new WeakMap<object, any>(),
+  map: new Map<string, any>(),
+};
+
+
 /**
  * Registry helpers for attaching and retrieving a canonical SyncEngine
  * instance from a store-like object. To reduce split ownership and avoid
@@ -24,11 +33,12 @@ import { SYM_SYNC_ENGINE } from './store.js';
  *    canonical registry for environments that prohibit property attachment.
  */
 
-// Internal fallback registry for hosts that cannot accept symbol/property
-// attachment on store objects. WeakMap avoids leaking memory and is only used
-// when explicit setter or symbol property assignment is not possible. This
-// provides a predictable canonical binding in tests and exotic runtimes.
-const internalRegistry = new WeakMap<object, any>();
+// Note: keep a non-invasive, process-local fallback registry. We use a
+// WeakMap for object/function store keys and a Map<string,any> for primitive
+// or non-WeakMap-able keys. The exported `fallbackRegistry` above is the
+// authoritative in-process registry consumers/tests may inspect.
+// (declared above)
+
 
 export function getSyncEngineFromStore(store: any): any | undefined {
   if (!store) return undefined;
@@ -62,13 +72,17 @@ export function getSyncEngineFromStore(store: any): any | undefined {
     }
   }
 
-  // WeakMap fallback: some hosts disallow attaching properties but the
+  // WeakMap / Map fallback: some hosts disallow attaching properties but the
   // process-local registry can provide a canonical engine binding without
-  // mutating the host object. This keeps behavior deterministic in tests
-  // and exotic runtimes while remaining non-invasive.
+  // mutating the host object. Use WeakMap for object/function keys and Map
+  // for primitive or string-keyed stores. This keeps behavior deterministic
+  // in tests and exotic runtimes while remaining non-invasive.
   try {
     if (typeof store === 'object' || typeof store === 'function') {
-      if (internalRegistry.has(store)) return internalRegistry.get(store);
+      if (fallbackRegistry.weak.has(store)) return fallbackRegistry.weak.get(store);
+    } else {
+      const key = String(store);
+      if (fallbackRegistry.map.has(key)) return fallbackRegistry.map.get(key);
     }
   } catch (_) { /* swallow */ }
 
@@ -102,7 +116,7 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
   // Attempt to set the well-known symbol property if available and the
   // store is an object. Use a non-enumerable property to avoid leaking on
   // iteration. If defineProperty fails, attempt a stringified-key fallback
-  // before using the WeakMap fallback so callers have maximum compatibility.
+  // before using the in-process fallback so callers have maximum compatibility.
   if (typeof SYM_SYNC_ENGINE !== 'undefined' && (typeof store === 'object' || typeof store === 'function')) {
     try {
       Object.defineProperty(store, SYM_SYNC_ENGINE, { value: engine, writable: true, configurable: true });
@@ -113,19 +127,22 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
         (store as any)[String(SYM_SYNC_ENGINE)] = engine;
         return;
       } catch (_err) {
-        // Fall through to WeakMap fallback
+        // Fall through to in-process fallback
       }
     }
   }
 
-  // WeakMap fallback: if we cannot attach the engine to the host store,
-  // record it in the internal WeakMap registry. This avoids mutating exotic
-  // host objects while still providing a canonical process-local binding.
+  // In-process fallback: if we cannot attach the engine to the host store,
+  // record it in the exported fallbackRegistry. Use WeakMap for object
+  // keys and Map<string,any> for primitive keys.
   try {
     if (typeof store === 'object' || typeof store === 'function') {
-      internalRegistry.set(store, engine);
+      fallbackRegistry.weak.set(store, engine);
       return;
     }
+    const key = String(store);
+    fallbackRegistry.map.set(key, engine);
+    return;
   } catch (_) { /* swallow */ }
 
   // If we reach here, the host store does not provide an accessor and we
