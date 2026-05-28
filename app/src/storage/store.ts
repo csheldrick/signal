@@ -20,11 +20,21 @@ function cloneLink(l: import('../core/types.js').DocumentLink): import('../core/
   return { ...l };
 }
 
-function cloneDocument(d: import('../core/types.js').Document): import('../core/types.js').Document {
+function cloneDocument(d: import('../core/types.js').Document | import('../core/types.js').DocumentSnapshot): import('../core/types.js').Document {
+  // Explicitly construct a mutable Document from either a Document or a
+  // readonly DocumentSnapshot to avoid carrying readonly array types (e.g.
+  // tags: readonly string[]) into the mutable Document shape which would
+  // break assignments to Map<string, Document> and other mutable consumers.
+  const anyD: any = d;
   return {
-    ...d,
-    tags: Array.isArray(d.tags) ? [...d.tags] : [],
-    links: Array.isArray(d.links) ? d.links.map(cloneLink) : [],
+    id: String(anyD.id),
+    title: String(anyD.title),
+    content: String(anyD.content),
+    tags: Array.isArray(anyD.tags) ? Array.from(anyD.tags) as string[] : [],
+    links: Array.isArray(anyD.links) ? anyD.links.map(cloneLink) : [],
+    createdAt: Number(anyD.createdAt) || Date.now(),
+    updatedAt: Number(anyD.updatedAt) || Date.now(),
+    version: typeof anyD.version === 'number' ? anyD.version : undefined,
   };
 }
 
