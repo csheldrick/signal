@@ -34,4 +34,6 @@ class TelemetryCenter {
   }
 }
 
-export const telemetry = new TelemetryCenter();
+import type { Observability } from '../core/types.js';
+
+export const telemetry: Observability = new TelemetryCenter();

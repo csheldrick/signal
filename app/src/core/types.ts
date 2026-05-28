@@ -283,11 +283,22 @@ export interface PresenceTracker {
 // messages when transports are unavailable. Keeping a minimal interface
 // here avoids importing the concrete class in many places.
 export interface OfflineSyncQueue {
-  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
-  size(peerId: string): number;
-  list(peerId: string): any[];
-  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
-  clear(peerId: string): void;
-  dispose(): void;
+	  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
+	  size(peerId: string): number;
+	  list(peerId: string): any[];
+	  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
+	  clear(peerId: string): void;
+	  dispose(): void;
+	}
+
+// Cross-cutting observability contract. Declaring a lightweight Observability
+// interface in core types makes the telemetry/metrics/tracing facility visible
+// to architectural analysis and allows subsystems to depend on the stable
+// contract rather than the concrete implementation location.
+export interface Observability {
+  emit(type: string, payload: any): void;
+  on(listener: (event: { type: string; payload: any }) => void): () => void;
+  clear(): void;
 }
+
 
