@@ -743,12 +743,7 @@ export class SignalApp {
     if (bgActive !== undefined) (this as any)._bgSummarizeActive = 0;
     if (bgQueue !== undefined) (this as any)._bgSummarizeQueue = [];
 
-    // Disable all plugins
-    for (const p of this.plugins.list()) {
-      if (p.enabled) this.plugins.disable(p.id);
-    }
-
-    // Disable all plugins
+    // Disable all plugins (idempotent and safe to call once).
     for (const p of this.plugins.list()) {
       if (p.enabled) this.plugins.disable(p.id);
     }

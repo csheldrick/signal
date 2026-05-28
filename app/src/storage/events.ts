@@ -292,8 +292,19 @@ export class StorageEventBus implements StorageEventBusContract {
     // Observe only the concrete events we care about to maintain an internal existence set.
     // Using a wildcard '*' listener increases star-listener fan-out on the StorageEventBus
     // and can overload downstream subsystems. We only need 'created' and 'deleted' here.
-    this.on('created', listener);
-    this.on('deleted', listener);
+    // Register the listener using the async path to avoid adding synchronous
+    // listeners that run on every emit() call; the async path yields to the
+    // event loop which reduces synchronous fan-out pressure on emitters.
+    if (typeof this.onAsync === 'function') {
+      this.onAsync('created', listener);
+      this.onAsync('deleted', listener);
+    } else {
+      // Fallback to synchronous registration when async listeners are not
+      // available (older environments), preserving behaviour but risking
+      // higher synchronous fan-out.
+      this.on('created', listener);
+      this.on('deleted', listener);
+    }
 
     // Return an async validator function. For callers that wish to stop
     // observing events (and avoid keeping the listener referenced) a
@@ -304,7 +315,17 @@ export class StorageEventBus implements StorageEventBusContract {
       return known.has(id);
     };
 
-    (validator as any).dispose = () => { this.off('created', listener); this.off('deleted', listener); };
+    (validator as any).dispose = () => {
+      try {
+        if (typeof this.offAsync === 'function') {
+          this.offAsync('created', listener);
+          this.offAsync('deleted', listener);
+        } else {
+          this.off('created', listener);
+          this.off('deleted', listener);
+        }
+      } catch (_) {}
+    };
 
     return validator;
   }
