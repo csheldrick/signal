@@ -62,8 +62,8 @@ export interface StorageEventBusContract {
   offAsync(type: StorageEventType | '*', listener: Listener): void;
   emit(event: StorageEvent): void;
   emitAsync(event: StorageEvent): void;
-  attachDocumentValidatorFromEvents(initial?: Iterable<string>): (id: string) => Promise<boolean> & { dispose?: () => void };
-  attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean & { dispose?: () => void };
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): ((id: string) => Promise<boolean>) & { dispose?: () => void };
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): ((id: string) => boolean) & { dispose?: () => void };
   /** Return a snapshot of recently emitted storage events for diagnostics */
   getTrace(): ReadonlyArray<StorageEvent>;
 }
@@ -223,7 +223,7 @@ export class StorageEventBus implements StorageEventBusContract {
    * a migration-friendly, testable replacement for direct store access so
    * callers (e.g. PresenceTracker) need not import DocumentStore.
    */
-  attachDocumentValidatorFromEvents(initial?: Iterable<string>): (id: string) => Promise<boolean> {
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): ((id: string) => Promise<boolean>) & { dispose?: () => void } {
     const known = new Set<string>();
 
     // Seed from provided iterable (e.g., current store snapshot) so callers can validate
@@ -276,7 +276,7 @@ export class StorageEventBus implements StorageEventBusContract {
    * require a pure (non-Promise) check, while still keeping the event-driven
    * updates happening in the background.
    */
-  attachDocumentValidatorSnapshot(initial?: Iterable<string>): (id: string) => boolean {
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): ((id: string) => boolean) & { dispose?: () => void } {
     const known = new Set<string>();
 
     if (initial) {
