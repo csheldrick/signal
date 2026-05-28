@@ -45,6 +45,10 @@ export class OfflineSyncQueue extends EventEmitter {
   // same promise rather than returning early. This prevents races where one
   // caller thinks a drain completed while another is still replaying entries.
   private drainingPromises: Map<string, Promise<void>> = new Map();
+  // Re-entrant guard to prevent overlapping drain rewrites for a peer.
+  // This ensures concurrent drain calls receive the same promise and that
+  // only one rewrite occurs at a time for a given peer.
+  private drainRewriteLocks: Map<string, Promise<void>> = new Map();
 
   constructor(opts?: OfflineSyncQueueOptions) {
     super();
@@ -209,11 +213,22 @@ export class OfflineSyncQueue extends EventEmitter {
     // promise so callers can await completion rather than returning early.
     if (this.drainingPromises.has(peerId)) return this.drainingPromises.get(peerId)!;
 
+    // Acquire a lightweight rewrite lock so multiple concurrent drains that
+    // start at the same time will coordinate their disk rewrite step rather
+    // than racing to rewrite the same file. We represent the lock by storing
+    // a promise that resolves when the rewrite is complete; subsequent
+    // callers awaiting the same drain will reuse the promise.
+    if (this.drainRewriteLocks.has(peerId)) {
+      // Another drain is already performing the rewrite; return its promise.
+      return this.drainRewriteLocks.get(peerId)!;
+    }
+
     const promise = (async () => {
       // Prevent concurrent drains for the same peer to avoid duplicate delivery
       // and disk-rewrite races.
       this.drainingPeers.add(peerId);
 
+      // Remember to release the rewrite lock when finished.
       try {
         const diskEntries = this.readAllFromDisk(peerId);
         const mem = this.memQueues.get(peerId) ?? [];
@@ -280,11 +295,16 @@ export class OfflineSyncQueue extends EventEmitter {
         try { this.drainingPeers.delete(peerId); } catch (_) {}
         // Remove the promise entry so future drains create a new one.
         try { this.drainingPromises.delete(peerId); } catch (_) {}
+        // Release the rewrite lock so other concurrent drains can proceed.
+        try { this.drainRewriteLocks.delete(peerId); } catch (_) {}
       }
     })();
 
     // Track the in-flight promise so concurrent callers can await it.
     this.drainingPromises.set(peerId, promise);
+    // Also publish the rewrite lock so simultaneous callers reuse the same rewrite
+    // coordination promise instead of racing file rewrites.
+    this.drainRewriteLocks.set(peerId, promise);
     return promise;
   }
 

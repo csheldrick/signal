@@ -20,16 +20,19 @@ export class WorkerPool {
   constructor(options: WorkerPoolOptions, onWorkerFinish?: (workerIndex: number) => void) {
     const provided = options && typeof options.numWorkers === 'number' ? Math.max(1, options.numWorkers) : undefined;
     const cpus = (() => { try { return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
-    // Default to a single worker to reduce local parallelism and downstream pressure.
-    // Conservative defaults avoid overwhelming local CPU and downstream subsystems,
-    // especially in serverless or CI environments.
-    const defaultWorkers = 1;
-    // Cap upper bound to a small number to avoid extreme task fan-out.
-    this.numWorkers = Math.min(2, provided ?? defaultWorkers);
+    // Default worker count derived from CPU count but bounded to avoid
+    // excessive parallelism on small hosts. We favor more workers than the
+    // previous overly-conservative default to reduce indexing lag under load
+    // while capping to a reasonable upper bound to avoid extreme fan-out.
+    const defaultWorkers = Math.min(8, Math.max(1, cpus - 1));
+    // Cap upper bound to a modest number (8) to provide headroom on multi-core
+    // machines while preventing runaway task explosion.
+    this.numWorkers = Math.min(8, provided ?? defaultWorkers);
 
-    // Lower the default maxDocsPerWorker to produce smaller, more frequent
-    // chunks which helps keep task latency bounded and reduces peak memory.
-    const defaultMax = 10;
+    // Tune chunk size to balance throughput and latency. Smaller chunks
+    // reduce per-worker blocking and improve responsiveness; allow hosts to
+    // override via options when needed.
+    const defaultMax = 5;
     this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
       ? Math.max(1, options.maxDocsPerWorker)
       : defaultMax;
