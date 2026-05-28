@@ -6,6 +6,13 @@
  * unavailable this helper will return undefined or throw on set to make
  * the absence of a canonical registry explicit to callers.
  */
+// Provide a lightweight fallback registry when hosts do not expose
+// explicit getSyncEngine/setSyncEngine accessors. This uses a WeakMap so
+// we do not retain strong references to store objects and keeps behavior
+// deterministic for tests/environments where the host store cannot be
+// modified to implement the accessor API.
+const fallbackRegistry: WeakMap<any, any> = new WeakMap();
+
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
     if (!store) return undefined;
@@ -20,10 +27,10 @@ export function getSyncEngineFromStore(store: any): any | undefined {
       throw err;
     }
 
-    // If the host does not expose an accessor, do not fabricate a parallel
-    // registry here. Returning undefined makes the absence of a canonical
-    // engine explicit and avoids accidental duplicate surfaces.
-    return undefined;
+    // Fallback: return any engine previously registered for this store
+    // using the internal WeakMap registry. This avoids fabricating global
+    // mutable state on the store object and keeps tests deterministic.
+    return fallbackRegistry.get(store);
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
@@ -47,9 +54,9 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
     }
 
     // Prefer explicit setter API when present. Hosts should implement this
-    // to participate in canonical registration. If absent we throw rather
-    // than creating an alternative registry surface which otherwise leads
-    // to duplicate engines and ambiguous ownership.
+    // to participate in canonical registration. If absent we use the
+    // internal weakmap fallback which keeps behavior deterministic instead
+    // of throwing and causing callers to create duplicate engines.
     try {
       if (typeof store.setSyncEngine === 'function') {
         store.setSyncEngine(engine);
@@ -59,10 +66,13 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
       throw err;
     }
 
-    // Host does not support setSyncEngine — surface as an error to encourage
-    // callers to either provide their own engine via options or ensure the
-    // host store implements the required accessor methods.
-    throw new Error('setSyncEngineOnStore: store does not expose setSyncEngine; cannot register SyncEngine');
+    // Store does not provide a setter — record in the fallback registry.
+    try {
+      fallbackRegistry.set(store, engine);
+      return;
+    } catch (err) {
+      throw err;
+    }
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
