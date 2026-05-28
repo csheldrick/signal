@@ -257,7 +257,9 @@ export class SyncManager {
     // to avoid blocking callers and emit telemetry for observability.
     if (this.offlineQueue) {
       try {
-        (async () => {
+        // Record the offline drain as a managed promise so flush() can await
+        // replay completion and preserve offline-first ordering guarantees.
+        this.offlineDrainPromise = (async () => {
           try {
             await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
               try {
@@ -274,6 +276,11 @@ export class SyncManager {
             try { telemetry.emit('offline_queue_drained', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
           } catch (err) {
             try { telemetry.emit('offline_queue_drain_failed', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+          } finally {
+            // Clear the promise reference so subsequent flush() calls do not
+            // await a completed/cleared drain. flush() also clears this in its
+            // finally block but defensive cleanup here keeps state consistent.
+            this.offlineDrainPromise = undefined;
           }
         })();
       } catch (_) {}

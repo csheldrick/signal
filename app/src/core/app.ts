@@ -580,7 +580,7 @@ export class SignalApp {
     const syncValidator = snapshotValidator;
     const asyncValidator = async (id: string) => snapshotValidator(id);
 
-    // Ensure disposers release the underlying bus listener when presence no
+      // Ensure disposers release the underlying bus listener when presence no
     // longer needs validation.
     (syncValidator as any).dispose = () => { try { (snapshotValidator as any).dispose && (snapshotValidator as any).dispose(); } catch (_) {} };
     (asyncValidator as any).dispose = () => { try { (snapshotValidator as any).dispose && (snapshotValidator as any).dispose(); } catch (_) {} };
@@ -588,9 +588,11 @@ export class SignalApp {
     this.presence.setValidator(syncValidator);
     this.presence.setAsyncValidator(asyncValidator);
 
-    // Storage events are forwarded to the SyncEngine internally when appropriate.
-    // Avoid registering a second, duplicate forwarder here to prevent duplicate
-    // outbound message generation (the SyncEngine subscribes to store events itself).
+    // The SyncManager is responsible for forwarding storage events to the
+    // sync subsystem (SyncEngine). Do not register direct store→engine
+    // forwarders here to avoid duplicate subscriptions; rely on the manager
+    // to centralize event handling and ordering guarantees.
+
   }
 
   enableRemoteSummarizer(fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>, options?: { allowNetwork?: boolean; maxSentences?: number }): boolean {
