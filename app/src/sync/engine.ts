@@ -37,8 +37,15 @@ export class SyncEngine {
    */
   static getOrCreate(store: DocumentStoreLike, peerId: string): SyncEngine {
     // Prefer returning an already-registered engine to avoid duplicates.
-    const fromStore = getSyncEngineFromStore(store as any);
-    if (fromStore && fromStore !== undefined) return fromStore as SyncEngine;
+    let fromStore: any;
+    try {
+      fromStore = getSyncEngineFromStore(store as any);
+      if (fromStore !== undefined && fromStore) return fromStore as SyncEngine;
+    } catch (e) {
+      // Propagate registry read errors so callers become aware of misconfiguration
+      // rather than silently proceeding and creating duplicate engines.
+      throw e instanceof Error ? e : new Error(String(e));
+    }
     // If a store exposes a getSyncEngine() that returns a proxy wrapper rather
     // than the concrete SyncEngine, prefer to re-use it to avoid duplicate
     // instances; but guard against self-referential wrappers by checking for
@@ -57,8 +64,9 @@ export class SyncEngine {
     try {
       setSyncEngineOnStore(store as any, created);
       // Re-read to ensure the engine we registered is visible via the getter
-      const rechecked = getSyncEngineFromStore(store as any);
-      if (rechecked && rechecked !== created) {
+      let rechecked: any;
+      try { rechecked = getSyncEngineFromStore(store as any); } catch (err) { throw err; }
+      if (rechecked !== undefined && rechecked !== created) {
         // Another engine beat us to registration — surface this as an error so
         // callers can decide how to proceed instead of creating a duplicate.
         throw new Error('SyncEngine.getOrCreate: conflicting SyncEngine already registered on store');
@@ -67,8 +75,12 @@ export class SyncEngine {
     } catch (e) {
       // If a conflict occurred, prefer returning the canonical engine if it
       // exists; otherwise rethrow to surface unexpected registry failures.
-      const existing = getSyncEngineFromStore(store as any);
-      if (existing && existing !== undefined) return existing as SyncEngine;
+      try {
+        const existing = getSyncEngineFromStore(store as any);
+        if (existing !== undefined && existing) return existing as SyncEngine;
+      } catch (_) {
+        // ignore read failures here — we'll rethrow the original error below
+      }
       throw e instanceof Error ? e : new Error(String(e));
     }
   }
@@ -89,7 +101,7 @@ export class SyncEngine {
       // canonical getOrCreate factory which centralizes registration.
       try {
         const existing = getSyncEngineFromStore(this.store as any);
-        if (existing && existing !== undefined && existing !== this) {
+        if (existing !== undefined && existing && existing !== this) {
           throw new Error('SyncEngine: duplicate engine already registered on store');
         }
       } catch (e) {
@@ -104,8 +116,9 @@ export class SyncEngine {
         setSyncEngineOnStore(this.store as any, this);
       } catch (e) {
         // Surface registry write failures to help callers detect misconfiguration
-        // while still attempting to provide a helpful console message.
+        // — do not silently ignore; rethrow after logging.
         try { console.warn('SyncEngine: instance registry unavailable (write)', e); } catch (_) {}
+        throw e instanceof Error ? e : new Error(String(e));
       }
     }
 

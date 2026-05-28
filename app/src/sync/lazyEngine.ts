@@ -11,13 +11,19 @@ import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 export function createLazySyncEngine(store: any, peerId: string, provided?: SyncEngine) {
   let real: SyncEngine | undefined = provided;
 
-  const ensure = (): SyncEngine => {
+    const ensure = (): SyncEngine => {
     if (real) return real as SyncEngine;
     try {
-      const fromStore = getSyncEngineFromStore(store as any);
-      if (fromStore) {
-        real = fromStore as SyncEngine;
-        return real as SyncEngine;
+      try {
+        const fromStore = getSyncEngineFromStore(store as any);
+        if (fromStore !== undefined && fromStore) {
+          real = fromStore as SyncEngine;
+          return real as SyncEngine;
+        }
+      } catch (err) {
+        // Propagate registry errors to help callers detect misconfiguration
+        // rather than silently creating a duplicate engine.
+        throw err;
       }
     } catch (_) { /* swallow */ }
 

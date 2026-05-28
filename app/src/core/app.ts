@@ -246,8 +246,12 @@ export class SignalApp {
               // to avoid accidental duplicate SyncEngine instances and to
               // centralize engine registration. Fall back to the app-local
               // _sync only if the store does not expose a registered engine.
-              const fromStore = (this.store ? getSyncEngineFromStore(this.store) : undefined);
-              if (fromStore && typeof fromStore.getClock === 'function') return fromStore;
+              try {
+                const fromStore = (this.store ? getSyncEngineFromStore(this.store) : undefined);
+                if (fromStore !== undefined && fromStore && typeof fromStore.getClock === 'function') return fromStore;
+              } catch (err) {
+                // If registry lookup fails, swallow and fall back to app-local _sync
+              }
             } catch (_) { /* swallow */ }
             try { return (this as any)._sync; } catch (_) { return undefined; }
           })();
@@ -669,12 +673,14 @@ export class SignalApp {
         // rethrow the original error so callers can handle it explicitly.
         try {
           const installed = getSyncEngineFromStore(this.store);
-          if (installed) {
+          if (installed !== undefined && installed) {
             this._sync = installed;
           } else {
             throw err;
           }
         } catch (e) {
+          // If registry lookup fails, rethrow the original error to surface
+          // that getOrCreate() failed rather than silently continuing.
           throw err;
         }
       }
