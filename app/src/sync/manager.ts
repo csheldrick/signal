@@ -204,6 +204,17 @@ export class SyncManager {
 
   private attachStoreSubscriptions(): void {
     try {
+      // If an offline drain is in progress, defer attaching live store
+      // subscriptions until it completes to avoid interleaving replayed
+      // persisted messages with live-generated ones which can cause
+      // ordering anomalies or duplicate deliveries.
+      try {
+        if (this.offlineDrainPromise) {
+          this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
+          return;
+        }
+      } catch (_) {}
+
       if ((this as any)._storeSubscriptionsAttached) return;
       (this as any)._storeSubscriptionsAttached = true;
       const busAny: any = (this.store as any).events;

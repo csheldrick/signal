@@ -345,7 +345,7 @@ export class SignalApp {
     // Global resonance loop protection: prevent cascading summarization triggers
     // by limiting total background summarization activity and adding a global cooldown.
     let globalSummarizeActive = 0;
-    const GLOBAL_MAX_ACTIVE = 2;
+    const GLOBAL_MAX_ACTIVE = 1; // reduce global background summarization concurrency to lower LocalSummarizer pressure
     const GLOBAL_COOLDOWN_MS = 5000;
     let globalCooldownUntil = 0;
     const scheduleSummarize = (docId: string) => {

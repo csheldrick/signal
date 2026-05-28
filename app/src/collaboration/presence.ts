@@ -67,10 +67,11 @@ export class PresenceTracker {
   private leaveBatch: Map<string, string | undefined> = new Map();
   private leaveBatchScheduled: boolean = false;
 
-  private static readonly MAX_PEERS = 150; // tightened to reduce memory/processing pressure
+  private static readonly MAX_PEERS = 100; // tightened to reduce memory/processing pressure and bound presence fan-out
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
-  private static readonly MAX_PENDING_VALIDATIONS = 4; // lower cap to avoid IO burst when many peers reference many docs
+  // Tighter cap reduces concurrent IO pressure when many peers are active.
+  private static readonly MAX_PENDING_VALIDATIONS = 2; // lower cap to avoid IO burst when many peers reference many docs
 
   private evictIfNeeded(): void {
     try {
@@ -200,7 +201,7 @@ export class PresenceTracker {
   private lastClock: { [peerId: string]: number } = {};
 
   private cleanupTimer?: ReturnType<typeof setInterval>;
-  private static readonly INACTIVITY_MS = 2 * 60 * 1000; // 2 minutes (shorter to free inactive peers sooner)
+  private static readonly INACTIVITY_MS = 60 * 1000; // 1 minute (shorter to free inactive peers sooner)
 
   constructor(context?: PluginContext) {
     this.context = context;
@@ -221,7 +222,7 @@ export class PresenceTracker {
         } catch (_) {
           /* swallow cleanup errors */
         }
-      }, 60 * 1000); // run cleanup every 1 minute to reduce stale entries faster
+      }, 30 * 1000); // run cleanup every 30s to detect inactive peers faster and free resources
     } catch (_) {
       // If timers are not available for any reason (test envs), degrade silently.
     }

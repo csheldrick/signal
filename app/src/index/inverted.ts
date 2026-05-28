@@ -200,10 +200,12 @@ export class Indexer implements IndexerContract {
     const envWorkers = (typeof process !== 'undefined' && process.env && process.env.INDEX_WORKERS) ? Number(process.env.INDEX_WORKERS) : undefined;
     const cpus = (() => { try { const os = require('node:os'); return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
     const desired = typeof envWorkers === 'number' && !Number.isNaN(envWorkers) ? Math.max(1, Math.floor(envWorkers)) : Math.max(1, Math.floor(Math.max(1, cpus - 1)));
-    this.workerPool = new WorkerPool({ numWorkers: Math.min(8, desired), maxDocsPerWorker: 100 });
+    // Conservative defaults to avoid overloading local CPU and downstream subsystems
+    const poolWorkers = Math.min(4, desired);
+    this.workerPool = new WorkerPool({ numWorkers: poolWorkers, maxDocsPerWorker: 25 });
     if (!events || !this.index) return;
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 1000) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
+      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 500) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const updated = (ev: any) => { try { if (ev && ev.current) { this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
 

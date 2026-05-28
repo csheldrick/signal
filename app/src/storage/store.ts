@@ -153,7 +153,7 @@ export class DocumentStore {
   };
 
   // Soft limits to avoid unbounded work for naive callers
-  private static readonly MAX_SEARCH_RESULTS = 25;
+  private static readonly MAX_SEARCH_RESULTS = 20;
   private static readonly DEFAULT_LIST_PREVIEW = 20;
 
   constructor(events?: StorageEventBus) {

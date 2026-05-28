@@ -111,6 +111,10 @@ export class PluginHost {
   // using the options parameter to the constructor.
   private allowNetworkSummaries: boolean = false;
   private allowedNetworkPluginIds?: Set<string> | undefined;
+  // Lightweight audit log for plugin lifecycle events to assist operators in
+  // reviewing plugin activity without requiring external tooling. Kept small
+  // to avoid memory growth; hosts may choose to export or persist entries.
+  private auditLog: Array<{ event: string; pluginId?: string; detail?: any; timestamp: number }> = [];
 
   constructor(context: PluginContext, options?: { allowNetworkSummaries?: boolean; allowedNetworkPlugins?: string[] }) {
     this.context = context;
@@ -144,6 +148,7 @@ export class PluginHost {
       throw new Error(`PluginHost: plugin '${plugin.id}' is already registered`);
     }
     this.plugins.set(plugin.id, plugin);
+    try { this.auditLog.push({ event: 'registered', pluginId: plugin.id, detail: { name: plugin.name }, timestamp: Date.now() }); } catch (_) {}
     try { telemetry.emit('plugin_registered_success', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
   }
 
@@ -438,6 +443,7 @@ export class PluginHost {
     }
 
     this.enabled.add(pluginId);
+    try { this.auditLog.push({ event: 'enabled', pluginId, timestamp: Date.now() }); } catch (_) {}
     try { telemetry.emit('plugin_enabled', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
     return true;
   }
@@ -448,6 +454,7 @@ export class PluginHost {
     if (!plugin || !this.enabled.has(pluginId)) return false;
     try { plugin.deactivate(); } catch (_) {}
     this.enabled.delete(pluginId);
+    try { this.auditLog.push({ event: 'disabled', pluginId, timestamp: Date.now() }); } catch (_) {}
     try { telemetry.emit('plugin_disabled', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
     return true;
   }
