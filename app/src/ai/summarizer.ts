@@ -434,6 +434,7 @@ export class RemoteSummarizer implements Summarizer {
         while (attempt < maxAttempts) {
           attempt++;
           telemetry.emit('remote_summarizer_attempt', { documentId: id, attempt, timestamp: Date.now() });
+            try { telemetry.emit('summarizer_stats', { type: 'remote_attempt', documentId: id, attempt, timestamp: Date.now() }); } catch (_) {}
 
           try {
             // Race the fetcher against the configured timeout for this attempt
@@ -462,11 +463,13 @@ export class RemoteSummarizer implements Summarizer {
               // Success path
               this.recordSuccess();
               telemetry.emit('remote_summarizer_success', { documentId: id, attempt, timestamp: Date.now() });
+              try { telemetry.emit('summarizer_stats', { type: 'remote_success', documentId: id, attempt, timestamp: Date.now() }); } catch (_) {}
               return result;
             }
           } catch (err) {
             lastError = err;
             telemetry.emit('remote_summarizer_error', { documentId: id, attempt, error: String(err), timestamp: Date.now() });
+            try { telemetry.emit('summarizer_stats', { type: 'remote_error', documentId: id, attempt, error: String(err), timestamp: Date.now() }); } catch (_) {}
             // recordFailure only on a real network/remote failure; recordFailure
             // will also set cooldowns when repeated failures occur.
             this.recordFailure();
@@ -482,6 +485,7 @@ export class RemoteSummarizer implements Summarizer {
 
         // All attempts exhausted: fall back to local summary
         telemetry.emit('remote_summarizer_fallback', { documentId: id, attempts: attempt, lastError: String(lastError), timestamp: Date.now() });
+        try { telemetry.emit('summarizer_stats', { type: 'remote_fallback', documentId: id, attempts: attempt, lastError: String(lastError), timestamp: Date.now() }); } catch (_) {}
         return this.fallback.summarize(document);
       } finally {
         // Ensure the remote global active counter is decremented even on timeout/failure.

@@ -72,6 +72,9 @@ export class SyncManager {
   private authValidator?: (peerId: string, message?: SyncMessage) => boolean;
   private static readonly MAX_TELEMETRY_LISTENERS = 8; // lower cap to reduce listener fan-out and memory pressure
   private telemetryListeners: Set<(event: { type: string; payload: any }) => void> = new Set();
+  // Also subscribe to global telemetry center to mirror important events into
+  // the manager-level telemetry listeners for consolidated monitoring.
+  private globalTelemetryDisposer: (() => void) | undefined = undefined;
 
   constructor(
     private readonly store: DocumentStore,
@@ -198,6 +201,18 @@ export class SyncManager {
     // ensuring that replay does not block the manager construction. Replayed
     // entries will be handed to the manager's transport when available via
     // start/attach logic below — for now we emit telemetry to indicate presence.
+
+    // Subscribe to the global telemetry center to mirror index and sync metrics
+    // into the manager-level listeners. This helps consolidate observability
+    // without requiring every consumer to subscribe to the global telemetry.
+    try {
+      const { telemetry: globalTelemetry } = require('./telemetry.js');
+      if (globalTelemetry && typeof globalTelemetry.on === 'function') {
+        this.globalTelemetryDisposer = globalTelemetry.on((ev: any) => {
+          try { this.emitTelemetry(ev.type, ev.payload); } catch (_) {}
+        });
+      }
+    } catch (_) {}
     if (this.offlineQueue) {
       try {
         // Emit size/health telemetry to help operators know there's pending offline data
@@ -365,6 +380,20 @@ export class SyncManager {
     } catch (_) {}
 
     this.telemetryListeners.add(listener);
+    // Mirror manager listeners to global telemetry as well for cross-cutting
+    // observability; this reduces duplication where callers register with the
+    // manager and expect to receive global index/summarizer metrics too.
+    try {
+      const { telemetry: globalTelemetry } = require('./telemetry.js');
+      if (globalTelemetry && typeof globalTelemetry.on === 'function') {
+        const dispose = globalTelemetry.on((ev: any) => {
+          try { listener(ev); } catch (_) {}
+        });
+        // Track disposer so we can clear it when the manager disposes its listeners
+        try { (listener as any).__globalTelemetryDisposer = dispose; } catch (_) {}
+      }
+    } catch (_) {}
+
     return () => { this.telemetryListeners.delete(listener); };
   }
 
@@ -429,6 +458,8 @@ export class SyncManager {
         const localClock = this.engine.getClock();
         if (isConflict(localClock, message.clock)) {
       try { this.emitTelemetry('conflict_detected', { documentId: message.documentId, peerId: message.peerId, localClock, remoteClock: message.clock }); } catch (_) { /* swallow */ }
+          // Emit a lightweight conflict stats event for monitoring aggregated conflict rates
+          try { this.emitTelemetry('conflict_stats', { documentId: message.documentId, timestamp: Date.now() }); } catch (_) { /* swallow */ }
           const remoteDoc = (() => {
             const payload = message.payload as {
               title?: string;

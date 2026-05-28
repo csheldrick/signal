@@ -16,6 +16,7 @@ interface DocumentStoreLike {
 import type { StorageEvent } from '../storage/events.js';
 import type { SyncMessage, VectorClock } from './protocol.js';
 import { mergeClocks } from './protocol.js';
+import { telemetry } from './telemetry.js';
 import { isValidDocumentSnapshot } from '../core/types.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 
@@ -299,6 +300,7 @@ export class SyncEngine {
     }
 
     if (message) {
+      try { telemetry.emit('engine_outbound_update', { operation: message.operation, documentId: message.documentId, outboundLength: this.outbound.length, clockSize: Object.keys(this.clock).length, timestamp: Date.now() }); } catch (_) {}
       // Persistence of outbound messages is a responsibility of the SyncManager
       // or an explicitly provided OfflineSyncQueue. The engine must avoid
       // durably persisting outbound messages to prevent duplicated writes and

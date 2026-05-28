@@ -6,6 +6,7 @@
  */
 
 import type { DocumentSnapshot } from '../core/types.js';
+import { telemetry } from '../sync/telemetry.js';
 import type { VectorClock } from '../sync/protocol.js';
 
 export interface SnapshotStore {
@@ -35,6 +36,7 @@ export class DocumentSnapshotService {
     this.maxClockEntries = opts && typeof opts.maxClockEntries === 'number' ? Math.max(4, opts.maxClockEntries) : 8;
 
     if (this.store && this.compactionIntervalMs > 0) {
+      try { telemetry.emit('snapshot_service_configured', { compactionIntervalMs: this.compactionIntervalMs, maxClockEntries: this.maxClockEntries, timestamp: Date.now() }); } catch (_) {}
       try {
         this.timer = setInterval(() => { void this.runCompactionPass(); }, this.compactionIntervalMs);
       } catch (_) {
