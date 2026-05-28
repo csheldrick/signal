@@ -197,7 +197,20 @@ export interface InvertedIndexSearchHit extends SearchHit {
 export interface IndexStats {
   docCount: number;
   termCount: number;
-  topTerms: Array<{ term: string; count: number }>;
+  // Provide a readonly/top-level view so callers don't hold mutable references to
+  // the internal index structures. Returning readonly arrays reduces accidental
+  // mutation and encourages consumers to copy when necessary.
+  topTerms: ReadonlyArray<{ term: string; count: number }>;
+}
+
+// Summarizer contract lives in core types to reduce direct coupling between
+// high-level app code and concrete implementations. Implementations may live
+// in ai/summarizer.ts but should conform to this lightweight interface.
+export interface Summarizer {
+  readonly isRemote: boolean;
+  readonly allowsNetwork: boolean;
+  readonly isPure: boolean;
+  summarize(document: Document): Promise<string>;
 }
 
 export interface InvertedIndex {

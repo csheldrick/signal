@@ -9,17 +9,8 @@
 import type { Document } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 
-export interface Summarizer {
-  readonly isRemote: boolean;
-  readonly allowsNetwork: boolean;
-  /**
-   * isPure = true indicates calling summarize() performs no external I/O
-   * or side-effects (network/disk). Consumers that require deterministic,
-   * realtime-safe behaviour should prefer implementations with isPure = true.
-   */
-  readonly isPure: boolean;
-  summarize(document: Document): Promise<string>;
-}
+import type { Summarizer } from '../core/types.js';
+// LocalSummarizer and RemoteSummarizer implement the Summarizer contract declared in core/types.ts.
 
 export class LocalSummarizer implements Summarizer {
   readonly isRemote = false; readonly isPure = true;
@@ -217,7 +208,7 @@ export class RemoteSummarizer implements Summarizer {
   // global cap is reached we immediately return a local summary to avoid
   // overloading the remote service and downstream subsystems.
   private static globalActiveRequests: number = 0;
-  private static readonly GLOBAL_MAX_CONCURRENT = 6;
+  private static readonly GLOBAL_MAX_CONCURRENT = 3; // reduced to avoid overloading remote service under bursty traffic
   // Rate limit the total number of remote summarization attempts to avoid
   // overwhelming the remote service. This is separate from concurrency
   // control and provides protection against burst traffic.

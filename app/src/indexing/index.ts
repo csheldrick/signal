@@ -206,7 +206,7 @@ export class InvertedIndex {
     const computed: IndexStats = {
       docCount: docCount,
       termCount: termCount,
-      topTerms,
+      topTerms: Object.freeze(topTerms),
     };
 
     this.cachedStats = computed;

@@ -97,9 +97,9 @@ export const dire: any = ((): any => {
 })();
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 6; // tightened to reduce plugin subsystem fan-out and resource pressure (reduced default)
+  private static readonly MAX_REGISTERED_PLUGINS = 4; // tightened to reduce plugin subsystem fan-out and resource pressure (reduced default)
   private plugins: Map<string, Plugin> = new Map();
-  private static readonly MAX_ENABLED_PLUGINS = 2;
+  private static readonly MAX_ENABLED_PLUGINS = 1;
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
   // listener per plugin. This consolidates upstream listeners and

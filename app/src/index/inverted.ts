@@ -146,7 +146,7 @@ class InvertedIndexImpl implements InvertedIndex {
       arr.sort((a, b) => b[1] - a[1]);
       for (let i = 0; i < Math.min(10, arr.length); i++) top.push({ term: arr[i][0], count: arr[i][1] });
     } catch (_) { }
-    return { docCount, termCount, topTerms: top };
+    return { docCount, termCount, topTerms: Object.freeze(top) };
   }
 
   private extractTerms(doc: DocumentSnapshot): Set<string> {

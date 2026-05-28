@@ -14,8 +14,8 @@ import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
 import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 import { createLazyGraph, createLazyPluginHost, createLazyPresenceTracker } from './factories.js';
 
-import type { LocalSummarizer, RemoteSummarizer, Summarizer } from '../ai/summarizer.js';
-import type { Document, DocumentSnapshot } from '../core/types.js';
+import type { Document, DocumentSnapshot, Summarizer } from '../core/types.js';
+
 
 export interface AppConfig {
   dataPath: string;
