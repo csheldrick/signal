@@ -130,5 +130,4 @@ export class DocumentSnapshotService {
 }
 
 export { default as DiskDocumentSnapshotStore } from './snapshotService.js';
-
 export default DocumentSnapshotService;
