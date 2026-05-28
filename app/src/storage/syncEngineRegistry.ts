@@ -43,16 +43,12 @@ export const fallbackRegistry: { weak: WeakMap<object, any>; map: Map<string, an
 export function getSyncEngineFromStore(store: any): any | undefined {
   if (!store) return undefined;
 
-  // Prefer store-provided getter when present so hosts can explicitly
-  // manage the canonical engine on their store implementation.
-  if (typeof store.getSyncEngine === 'function') {
-    try {
-      return store.getSyncEngine();
-    } catch (err) {
-      // Propagate to make misconfigured accessors visible to callers
-      throw err instanceof Error ? err : new Error(String(err));
-    }
-  }
+  // Centralized lookup: consult the well-known symbol property or the
+  // in-process fallback registry. We intentionally avoid calling arbitrary
+  // store.getSyncEngine/setSyncEngine accessors here to prevent split
+  // ownership and accidental recursive accessor cycles. Hosts should use
+  // the registry helpers to register engines rather than implementing
+  // custom getters/setters on store objects.
 
   // If the store exposes a well-known symbol property (DocumentStore sets
   // this symbol), prefer returning that value. Some constrained hosts may
