@@ -2,7 +2,7 @@
 // Detects concurrent writes and applies a configurable merge strategy.
 // Depends on: core/types, sync/protocol.
 
-import type { Document, DocumentSnapshot } from '../core/types.js';
+import type { Document, DocumentSnapshot, ConflictResolution } from '../core/types.js';
 import type { ConflictRecord, ConflictStrategy, VectorClock } from './protocol.js';
 import { isConcurrent } from './protocol.js';
 
@@ -14,10 +14,6 @@ export interface ConflictCandidate {
   remoteClock: VectorClock;
 }
 
-export interface ConflictResolution {
-  winner: Document;
-  record: ConflictRecord;
-}
 
 /**
  * Detect whether a remote document write genuinely conflicts with the local

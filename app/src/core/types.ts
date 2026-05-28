@@ -213,6 +213,16 @@ export interface Summarizer {
   summarize(document: Document): Promise<string>;
 }
 
+// Conflict resolution contract is surfaced here in the core types so higher-level
+// modules can depend on the lightweight shape without importing the sync
+// subsystem. The concrete ConflictRecord used by the sync layer is intentionally
+// not referenced here to avoid coupling; callers that need audit details can
+// treat `record` as an opaque value.
+export interface ConflictResolution {
+  winner: Document;
+  record: any;
+}
+
 export interface InvertedIndex {
   // Index a document snapshot (idempotent for new ids)
   indexDocument(doc: DocumentSnapshot, maxDocs?: number): void;
