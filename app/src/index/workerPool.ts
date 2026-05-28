@@ -3,6 +3,9 @@
 // This eliminates the bottleneck where all indexing operations flow
 // through a single thread.
 
+import os from 'node:os';
+import { telemetry } from '../sync/telemetry.js';
+
 export interface IndexWorker {
   work(): void;
 }
@@ -11,9 +14,6 @@ export interface WorkerPoolOptions {
   numWorkers: number;
   maxDocsPerWorker: number;
 }
-
-import os from 'node:os';
-import { telemetry } from '../sync/telemetry.js';
 
 export class WorkerPool {
   private workers: IndexWorker[] = [];
