@@ -2,7 +2,7 @@
 // Plugin lifecycle manager. Defines the sandbox boundary.
 // Plugins receive a PluginContext — NOT the store directly.
 
-import type { DocumentSnapshot, SearchQuery, SearchResult, SearchResultSnapshot } from '../core/types.js';
+import type { DocumentSnapshot, SearchQuery, SearchResultSnapshot } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import { normalizeSearchQuery } from '../core/types.js';
 import type { StorageEvent, StorageEventType } from '../storage/events.js';
@@ -242,7 +242,7 @@ export class PluginHost {
                 tags: Array.isArray(d.tags) ? [...d.tags] : [],
               });
               return deepFreeze({ document: safeDoc, score: r.score ?? 0, highlights });
-            }).filter((x): x is Readonly<SearchResult> => !!x).slice(0, 5);
+            }).filter((x): x is Readonly<SearchResultSnapshot> => !!x).slice(0, 5);
 
             searchCache.set(key, { ts: now, results });
             return results;
