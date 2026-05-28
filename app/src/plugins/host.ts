@@ -125,6 +125,10 @@ export class PluginHost {
   // to avoid memory growth; hosts may choose to export or persist entries.
   private auditLog: Array<{ event: string; pluginId?: string; detail?: any; timestamp: number }> = [];
 
+  // Per-plugin summarize request rate tracking to avoid abusive or buggy
+  // plugins flooding the network summarizer.
+  private summarizeRate: Map<string, { windowStart: number; count: number }> = new Map();
+
   private requireAudit: boolean = false;
   constructor(context: PluginContext, options?: { allowNetworkSummaries?: boolean; allowedNetworkPlugins?: string[]; requireAudit?: boolean }) {
     this.context = context;
@@ -433,6 +437,24 @@ export class PluginHost {
               })();
 
               try { telemetry.emit('plugin_summarize_request', { pluginId: plugin.id, documentId, allowNetwork, pluginAllowed, timestamp: Date.now() }); } catch (_) {}
+              // Rate-limit plugin summarize requests: simple sliding window per-plugin.
+              try {
+                const RATE_WINDOW_MS = 60_000; // 1 minute
+                const MAX_PER_WINDOW = 6; // allow up to 6 requests per minute per plugin
+                const now = Date.now();
+                const record = this.summarizeRate.get(plugin.id) || { windowStart: now, count: 0 };
+                if (now - record.windowStart > RATE_WINDOW_MS) {
+                  record.windowStart = now;
+                  record.count = 0;
+                }
+                if (record.count >= MAX_PER_WINDOW) {
+                  try { telemetry.emit('plugin_summarize_rate_limited', { pluginId: plugin.id, documentId, timestamp: Date.now() }); } catch (_) {}
+                  return undefined;
+                }
+                record.count++;
+                this.summarizeRate.set(plugin.id, record);
+              } catch (_) {}
+
               const res = await maybe(documentId, allowNetwork && pluginAllowed);
               if (res === undefined) {
                 try { telemetry.emit('plugin_summarize_denied', { pluginId: plugin.id, documentId, allowNetwork, pluginAllowed, timestamp: Date.now() }); } catch (_) {}
