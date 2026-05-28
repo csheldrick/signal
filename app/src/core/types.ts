@@ -295,6 +295,10 @@ export interface PresenceTracker {
   stopCleanupTimer?(): void;
 }
 
+// Document validator types used by PresenceTracker and the StorageEventBus
+export type DocumentValidatorAsync = ((id: string) => Promise<boolean>) & { dispose?: () => void };
+export type DocumentValidatorSync = ((id: string) => boolean) & { dispose?: () => void };
+
 // Offline sync queue contract used by SyncManager to persist outbound
 // messages when transports are unavailable. Keeping a minimal interface
 // here avoids importing the concrete class in many places.

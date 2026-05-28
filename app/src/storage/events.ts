@@ -2,26 +2,12 @@
 // Event types for storage mutations. Other modules subscribe
 // to these events, creating depends_on edges in the graph.
 
-// Minimal local types to avoid importing the high-centrality core/types module.
-// This keeps the event layer lightweight and reduces architectural fan-out.
+import type { DocumentSnapshot, DocumentLink, DocumentValidatorAsync, DocumentValidatorSync } from '../core/types.js';
+
+// Event types for storage mutations. Other modules subscribe
+// to these events, creating depends_on edges in the graph.
+
 export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
-
-export interface DocumentLink {
-  readonly sourceId: string;
-  readonly targetId: string;
-  readonly kind: string;
-}
-
-export interface DocumentSnapshot {
-  readonly id: string;
-  readonly title: string;
-  readonly content: string;
-  readonly tags: readonly string[];
-  readonly links: readonly DocumentLink[];
-  readonly createdAt: number;
-  readonly updatedAt: number;
-  readonly version?: number;
-}
 
 export interface StorageEventCreated {
   readonly type: 'created';
@@ -71,9 +57,6 @@ export type StorageEvent =
 // reduce coupling between event producers and consumers.
 
 type Listener = (event: Readonly<StorageEvent>) => void;
-
-export type DocumentValidatorAsync = ((id: string) => Promise<boolean>) & { dispose?: () => void };
-export type DocumentValidatorSync = ((id: string) => boolean) & { dispose?: () => void };
 
 export interface StorageEventBusContract {
   on(type: StorageEventType | '*', listener: Listener): void;

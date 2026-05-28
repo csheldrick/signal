@@ -8,7 +8,9 @@ import type { DocumentSnapshot } from '../core/types.js';
  * - Retains at least two most-recent snapshots per document (prunes older)
  * - Performs all work asynchronously so live document writes are not blocked
  */
-export class DiskDocumentSnapshotStore {
+import type { SnapshotStore } from './snapshot-service.js';
+
+export class DiskDocumentSnapshotStore implements SnapshotStore {
   private readonly basePath: string;
   private _pending: Map<string, { snapshot: DocumentSnapshot; timer: ReturnType<typeof setTimeout>; resolvers: Array<() => void> }> = new Map();
 
