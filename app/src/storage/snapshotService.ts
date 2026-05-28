@@ -8,7 +8,7 @@ import type { DocumentSnapshot } from '../core/types.js';
  * - Retains at least two most-recent snapshots per document (prunes older)
  * - Performs all work asynchronously so live document writes are not blocked
  */
-export class DocumentSnapshotService {
+export class DiskDocumentSnapshotStore {
   private readonly basePath: string;
 
   constructor(basePath = '.snapshots') {
@@ -33,12 +33,12 @@ export class DocumentSnapshotService {
   }
 
   /**
-   * Save a snapshot atomically and prune older snapshots while keeping at
-   * least two most-recent snapshots.
+   * Persist a snapshot atomically and prune older snapshots while keeping at
+   * least two most-recent snapshots. Implements SnapshotStore.putSnapshot.
    */
-  async saveSnapshot(doc: DocumentSnapshot): Promise<void> {
+  async putSnapshot(documentId: string, snapshot: DocumentSnapshot): Promise<void> {
     try {
-      const dir = this.docDir(doc.id);
+      const dir = this.docDir(documentId);
       await fsPromises.mkdir(dir, { recursive: true });
 
       const timestamp = Date.now();
@@ -50,7 +50,7 @@ export class DocumentSnapshotService {
       const finalPath = path.join(dir, finalName);
 
       // Serialize snapshot deterministically
-      const payload = JSON.stringify(doc);
+      const payload = JSON.stringify(snapshot);
 
       // Write tmp file
       await fsPromises.writeFile(tmpPath, payload, { encoding: 'utf8' });
@@ -64,7 +64,7 @@ export class DocumentSnapshotService {
     } catch (err) {
       // Swallow errors to avoid interfering with live writes; callers may
       // inspect logs if needed.
-      try { console.warn && console.warn('DocumentSnapshotService: failed to save snapshot', err); } catch (_) {}
+      try { console.warn && console.warn('DiskDocumentSnapshotStore: failed to put snapshot', err); } catch (_) {}
     }
   }
 
@@ -81,8 +81,7 @@ export class DocumentSnapshotService {
       /* swallow prune errors */ }
   }
 
-  /** Read the latest snapshot for a document if present. */
-  async readLatest(documentId: string): Promise<DocumentSnapshot | undefined> {
+  async getLatestSnapshot(documentId: string): Promise<DocumentSnapshot | undefined> {
     try {
       const dir = this.docDir(documentId);
       const files = await fsPromises.readdir(dir);
@@ -107,4 +106,18 @@ export class DocumentSnapshotService {
       return [];
     }
   }
+
+  /** List known document ids (best-effort). Implements SnapshotStore.listDocumentIds. */
+  async listDocumentIds(): Promise<string[]> {
+    try {
+      const entries = await fsPromises.readdir(this.basePath, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      // decodeURIComponent to match docDir encoding
+      return dirs.map(d => decodeURIComponent(d));
+    } catch (_) {
+      return [];
+    }
+  }
 }
+
+export default DiskDocumentSnapshotStore;

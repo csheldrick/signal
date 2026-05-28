@@ -28,8 +28,9 @@ export class SyncSessionTracker extends EventEmitter {
 
   constructor(opts?: SyncSessionTrackerOptions) {
     super();
-    this.heartbeatIntervalMs = opts?.heartbeatIntervalMs ?? 10_000; // default 10s
-    this.staleTimeoutMs = opts?.staleTimeoutMs ?? 30_000; // default 30s
+    // Increase defaults to reduce hot timers and event fan-out
+    this.heartbeatIntervalMs = opts?.heartbeatIntervalMs ?? 30_000; // default 30s
+    this.staleTimeoutMs = opts?.staleTimeoutMs ?? 120_000; // default 2min
 
     try {
       this.timer = setInterval(() => this.checkStale(), Math.max(1000, Math.floor(this.heartbeatIntervalMs / 2)));
@@ -63,8 +64,16 @@ export class SyncSessionTracker extends EventEmitter {
       try { this.emit('event', { type: 'opened', peerId, timestamp: now } as SyncSessionEvent); } catch (_) {}
       return;
     }
+
+    // Only emit heartbeat events periodically to avoid heavy fan-out when
+    // many peers frequently pulse. Emit at most once per (heartbeatIntervalMs/2).
+    const minDelta = Math.floor(this.heartbeatIntervalMs / 2);
+    const shouldEmitHeartbeat = (now - prev.lastHeartbeat) >= minDelta;
+
     this.sessions.set(peerId, { state: 'open', lastHeartbeat: now });
-    try { this.emit('event', { type: 'heartbeat', peerId, timestamp: now } as SyncSessionEvent); } catch (_) {}
+    if (shouldEmitHeartbeat) {
+      try { this.emit('event', { type: 'heartbeat', peerId, timestamp: now } as SyncSessionEvent); } catch (_) {}
+    }
   }
 
   list(): string[] {
