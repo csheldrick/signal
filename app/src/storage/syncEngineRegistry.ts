@@ -1,14 +1,22 @@
 import { SYM_SYNC_ENGINE } from './store.js';
 
+// Internal WeakMap-based registry used when the store object does not
+// provide explicit getter/setter APIs. This avoids polluting host objects
+// with multiple registration surfaces and centralizes registration for
+// testability and determinism.
+const weakRegistry = new WeakMap<object, any>();
+
 /**
  * Retrieve a SyncEngine previously attached to a concrete store object.
- * This helper is tolerant of two registration surfaces:
+ * Preference order:
  *  - store.getSyncEngine() / store.setSyncEngine(engine) (preferred)
  *  - a symbol-backed property (legacy / direct augmentation)
+ *  - an internal WeakMap registry (new and preferred for non-intrusive hosts)
  */
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
     if (!store) return undefined;
+
     // Prefer explicit getter methods when present on the store object.
     try {
       if (typeof store.getSyncEngine === 'function') {
@@ -16,12 +24,20 @@ export function getSyncEngineFromStore(store: any): any | undefined {
       }
     } catch (_) {}
 
-    // Fallback to symbol-backed property used by older codepaths.
+    // Next prefer a non-enumerable symbol-backed property used by older codepaths.
     try {
-      return (store as any)[SYM_SYNC_ENGINE];
-    } catch (_) {
-      return undefined;
-    }
+      const symVal = (store as any)[SYM_SYNC_ENGINE];
+      if (symVal !== undefined) return symVal;
+    } catch (_) { /* ignore */ }
+
+    // Finally consult the internal WeakMap registry for non-intrusive attachments.
+    try {
+      if (typeof store === 'object' && store !== null && weakRegistry.has(store)) {
+        return weakRegistry.get(store);
+      }
+    } catch (_) {}
+
+    return undefined;
   } catch (_) {
     return undefined;
   }
@@ -29,26 +45,35 @@ export function getSyncEngineFromStore(store: any): any | undefined {
 
 /**
  * Attach a SyncEngine to the provided store object.
- * If the store exposes a setSyncEngine method we prefer calling it so
- * stores can implement custom registration semantics; otherwise we attach
- * under a non-enumerable symbol property for compatibility.
+ * Preference for registration:
+ *  - call store.setSyncEngine(engine) when provided
+ *  - set a non-enumerable symbol property when possible (legacy hosts)
+ *  - otherwise register in the internal WeakMap to avoid mutating host objects
  */
 export function setSyncEngineOnStore(store: any, engine: any): void {
   try {
     if (!store) return;
+
     // Prefer explicit setter API when present.
     try {
       if (typeof store.setSyncEngine === 'function') {
-        try { store.setSyncEngine(engine); return; } catch (_) { /* fallthrough to symbol */ }
+        try { store.setSyncEngine(engine); return; } catch (_) { /* fallthrough */ }
       }
     } catch (_) {}
 
-    // Fallback to symbol-backed non-enumerable property.
+    // Attempt to set a non-enumerable symbol-backed property for compatibility
     try {
       Object.defineProperty(store, SYM_SYNC_ENGINE, { value: engine, enumerable: false, configurable: true, writable: true });
+      return;
     } catch (_) {
-      // Some hosts disallow defineProperty — fall back to direct assignment.
-      try { (store as any)[SYM_SYNC_ENGINE] = engine; } catch (_) { /* swallow */ }
+      // fallthrough to WeakMap-based registration
+    }
+
+    // Fallback: register in internal WeakMap to avoid mutating exotic host objects
+    try {
+      if (typeof store === 'object' && store !== null) weakRegistry.set(store, engine);
+    } catch (_) {
+      // Swallow to be defensive about exotic host objects
     }
   } catch (_) {
     // Swallow to be defensive about exotic host objects
