@@ -1,30 +1,45 @@
 /**
  * Registry helpers for attaching and retrieving a canonical SyncEngine
  * instance from a store-like object. To reduce split ownership and avoid
- * multiple registration surfaces, we require hosts to provide explicit
- * getSyncEngine / setSyncEngine accessors on their store implementation.
+ * multiple registration surfaces, we prefer store-provided accessors when
+ * available but fall back to a deterministic in-process registry to avoid
+ * accidental duplicate SyncEngine instances when hosts do not expose the
+ * expected getters/setters (or when the store is non-extensible/proxied).
  *
  * Behavior:
  *  - getSyncEngineFromStore returns the result of store.getSyncEngine() if
- *    present, otherwise undefined. It will propagate errors thrown by the
- *    host getter to make misconfiguration visible.
+ *    present, otherwise consults an in-process registry keyed by the store
+ *    object (WeakMap) or by the store reference for primitives. Returns
+ *    undefined when no engine is found.
  *  - setSyncEngineOnStore attempts to register via store.setSyncEngine(engine)
- *    when available. If the store does not expose a setter this helper will
- *    throw to make the lack of a canonical registry explicit to callers so
- *    they can migrate their store implementation to include the accessor.
+ *    when available. If the setter is absent the helper will install the
+ *    engine in the in-process registry. If an engine is already registered
+ *    and differs from the provided one the helper throws to make conflicts
+ *    explicit.
  */
+
+const __weakRegistry = typeof WeakMap !== 'undefined' ? new WeakMap<any, any>() : undefined;
+const __primitiveRegistry = new Map<any, any>();
 
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
     if (!store) return undefined;
 
+    // Prefer store-provided getter when present so hosts can explicitly
+    // manage the canonical engine on their store implementation.
     if (typeof store.getSyncEngine === 'function') {
       return store.getSyncEngine();
     }
 
-    // No explicit getter provided by the store — return undefined so callers
-    // can decide how to proceed (e.g. create a new engine or fail fast).
-    return undefined;
+    // Fall back to in-process registry keyed by store object when available.
+    if (typeof store === 'object' || typeof store === 'function') {
+      if (__weakRegistry) return __weakRegistry.get(store);
+      // If WeakMap isn't available, fall back to primitive Map keyed by the object reference.
+      return __primitiveRegistry.get(store);
+    }
+
+    // For primitive store identifiers (unlikely but supported), consult the primitive registry.
+    return __primitiveRegistry.get(store);
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
@@ -48,15 +63,28 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
     }
 
     // Prefer explicit setter API when present. Hosts should implement this
-    // to participate in canonical registration. If absent throw so callers
-    // are forced to opt-in by implementing the accessor rather than relying
-    // on a hidden global fallback which can lead to duplicate engines.
+    // to participate in canonical registration.
     if (typeof store.setSyncEngine === 'function') {
       store.setSyncEngine(engine);
       return;
     }
 
-    throw new Error('setSyncEngineOnStore: store does not expose setSyncEngine — implement setSyncEngine on your store to allow canonical engine registration');
+    // If the host store does not provide accessors, use the in-process
+    // registry as a deterministic fallback. Use WeakMap for object keys
+    // to avoid preventing GC; for primitives or in environments lacking
+    // WeakMap, use the primitiveRegistry Map.
+    if (typeof store === 'object' || typeof store === 'function') {
+      if (__weakRegistry) {
+        __weakRegistry.set(store, engine);
+        return;
+      }
+      __primitiveRegistry.set(store, engine);
+      return;
+    }
+
+    // Primitive store identifier
+    __primitiveRegistry.set(store, engine);
+    return;
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
