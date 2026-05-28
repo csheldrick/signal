@@ -1,10 +1,10 @@
-import { SYM_SYNC_ENGINE } from './store.js';
-
 /**
- * Retrieve a SyncEngine previously attached to a concrete store object.
- * Preference order:
- *  - store.getSyncEngine() (preferred if provided by the host)
- *  - a symbol-backed property (legacy / direct augmentation)
+ * Registry helpers for attaching and retrieving a canonical SyncEngine
+ * instance from a store-like object. To reduce split ownership and avoid
+ * multiple registration surfaces, we prefer an explicit host-provided
+ * accessor API (store.getSyncEngine / store.setSyncEngine). If these are
+ * unavailable this helper will return undefined or throw on set to make
+ * the absence of a canonical registry explicit to callers.
  */
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
@@ -13,38 +13,22 @@ export function getSyncEngineFromStore(store: any): any | undefined {
     // Prefer explicit getter methods when present on the store object.
     try {
       if (typeof store.getSyncEngine === 'function') {
-        try { return store.getSyncEngine(); } catch (err) { throw err; }
+        return store.getSyncEngine();
       }
     } catch (err) {
       // Propagate errors from host getter so callers can surface misconfiguration.
       throw err;
     }
 
-    // Next prefer a non-enumerable symbol-backed property used by older codepaths.
-    try {
-      const symVal = (store as any)[SYM_SYNC_ENGINE];
-      if (symVal !== undefined) return symVal;
-    } catch (_) { /* ignore read failures */ }
-
+    // If the host does not expose an accessor, do not fabricate a parallel
+    // registry here. Returning undefined makes the absence of a canonical
+    // engine explicit and avoids accidental duplicate surfaces.
     return undefined;
   } catch (e) {
-    // Surface unexpected errors explicitly rather than swallowing to aid
-    // debugging of registry-related failures.
     throw e instanceof Error ? e : new Error(String(e));
   }
 }
 
-/**
- * Attach a SyncEngine to the provided store object.
- * Preference for registration:
- *  - call store.setSyncEngine(engine) when provided
- *  - set a non-enumerable symbol property when possible (legacy hosts)
- *
- * This centralizes registration and reduces accidental duplicate engine
- * creation by relying on the store's own accessor API when available and
- * otherwise falling back to a symbol property. We intentionally do NOT use
- * a WeakMap fallback to avoid creating an alternate registry surface.
- */
 export function setSyncEngineOnStore(store: any, engine: any): void {
   try {
     if (!store) return;
@@ -53,7 +37,7 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
     // the provided one, fail fast so callers can detect configuration errors
     // instead of silently creating duplicate engines.
     try {
-      const existing = getSyncEngineFromStore(store);
+      const existing = getSyncEngineFromStore(store as any);
       if (existing !== undefined && existing !== engine) {
         throw new Error('setSyncEngineOnStore: conflicting SyncEngine already registered on store');
       }
@@ -62,34 +46,24 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
       throw e;
     }
 
-    // Prefer explicit setter API when present.
+    // Prefer explicit setter API when present. Hosts should implement this
+    // to participate in canonical registration. If absent we throw rather
+    // than creating an alternative registry surface which otherwise leads
+    // to duplicate engines and ambiguous ownership.
     try {
       if (typeof store.setSyncEngine === 'function') {
-        try {
-          store.setSyncEngine(engine);
-          return;
-        } catch (err) {
-          // If the host setter failed, surface the error to aid diagnostics.
-          throw err;
-        }
+        store.setSyncEngine(engine);
+        return;
       }
     } catch (err) {
       throw err;
     }
 
-    // Attempt to set a non-enumerable symbol-backed property for compatibility
-    try {
-      Object.defineProperty(store, SYM_SYNC_ENGINE, { value: engine, enumerable: false, configurable: true, writable: true });
-      return;
-    } catch (err) {
-      // If we cannot set the property, propagate the error so callers can
-      // detect that registration is unavailable rather than silently
-      // creating an alternate registry surface.
-      throw err;
-    }
+    // Host does not support setSyncEngine — surface as an error to encourage
+    // callers to either provide their own engine via options or ensure the
+    // host store implements the required accessor methods.
+    throw new Error('setSyncEngineOnStore: store does not expose setSyncEngine; cannot register SyncEngine');
   } catch (e) {
-    // Re-throw to ensure callers become aware of registry failures which
-    // would otherwise lead to duplicate engines or missed registrations.
     throw e instanceof Error ? e : new Error(String(e));
   }
 }
