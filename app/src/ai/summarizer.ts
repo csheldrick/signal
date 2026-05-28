@@ -6,7 +6,7 @@
 // falls back to LocalSummarizer to preserve deterministic behaviour for
 // callers that do not opt in to network side effects.
 
-import type { Document } from '../core/types.js';
+import type { Document, DocumentSnapshot } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 
 import type { Summarizer } from '../core/types.js';
@@ -80,7 +80,7 @@ export class LocalSummarizer implements Summarizer {
     this.maxSentences = maxSentences;
   }
 
-  async summarize(document: Document): Promise<string> {
+  async summarize(document: Document | DocumentSnapshot): Promise<string> {
     const id = document?.id ?? '';
     const updatedAt = (document as any)?.updatedAt ?? 0;
 
@@ -214,7 +214,7 @@ export class LocalSummarizer implements Summarizer {
 export class RemoteSummarizer implements Summarizer {
   readonly isRemote = true; readonly isPure = false;
   readonly allowsNetwork: boolean;
-  private readonly _fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>;
+  private readonly _fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>; 
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;
   private readonly authToken?: string;
@@ -362,7 +362,7 @@ export class RemoteSummarizer implements Summarizer {
     this.cooldownUntil = 0;
   }
 
-  async summarize(document: Document): Promise<string> {
+  async summarize(document: Document | DocumentSnapshot): Promise<string> {
     const id = document?.id ?? '';
 
     let now = this.now();
@@ -437,8 +437,19 @@ export class RemoteSummarizer implements Summarizer {
 
           try {
             // Race the fetcher against the configured timeout for this attempt
+            // Ensure we pass a mutable Document to the fetcher. Convert snapshots to a mutable copy
+            const fetchDoc: Document = {
+              id: (document as any).id,
+              title: (document as any).title,
+              content: (document as any).content,
+              tags: Array.isArray((document as any).tags) ? [...(document as any).tags as any] : [],
+              links: Array.isArray((document as any).links) ? (document as any).links.map((l: any) => ({ ...l })) : [],
+              createdAt: (document as any).createdAt,
+              updatedAt: (document as any).updatedAt,
+              version: (document as any).version,
+            };
             const result: string = await Promise.race([
-              this._fetcher(document, { authToken: this.authToken }),
+              this._fetcher(fetchDoc, { authToken: this.authToken }),
               new Promise<string>((_, reject) => setTimeout(() => reject(new Error('summarizer timeout')), this.timeoutMs)),
             ]);
 

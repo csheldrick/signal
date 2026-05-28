@@ -214,7 +214,9 @@ export interface Summarizer {
   readonly isRemote: boolean;
   readonly allowsNetwork: boolean;
   readonly isPure: boolean;
-  summarize(document: Document): Promise<string>;
+  // Accept either a live Document or a readonly DocumentSnapshot so callers
+  // can pass snapshots across subsystem boundaries without forcing a copy.
+  summarize(document: Document | DocumentSnapshot): Promise<string>;
 }
 
 // Conflict resolution contract is surfaced here in the core types so higher-level
