@@ -40,6 +40,8 @@ function cloneDocument(d: import('../core/types.js').Document | import('../core/
 
 
 export const SYM_SYNC_ENGINE = Symbol('signal:sync-engine');
+export const SYM_PERSISTED_CLOCKS = Symbol('signal:persisted-clocks');
+
 
 // Singleton helper to reduce accidental multiple DocumentStore instances
 // which can lead to divergent state and make tests/observability brittle.
@@ -190,6 +192,30 @@ export class DocumentStore {
     } catch (_) {
       // Best-effort fallback for constrained environments
       try { (this as any)[String(SYM_SYNC_ENGINE)] = engine; } catch (_) { /* swallow */ }
+    }
+  }
+
+  /** Persisted vector-clock helpers. These allow the store to carry a
+   * durable snapshot of known vector-clock entries so sync engines can
+   * restore causally-relevant state across restarts. Stored as a
+   * non-enumerable symbol-backed property to avoid leaking on iteration. */
+  getPersistedClocks(): { [peerId: string]: number } | undefined {
+    try {
+      return (this as any)[SYM_PERSISTED_CLOCKS];
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  setPersistedClocks(clocks?: { [peerId: string]: number }): void {
+    try {
+      if (clocks === undefined) {
+        try { delete (this as any)[SYM_PERSISTED_CLOCKS]; } catch (_) { (this as any)[SYM_PERSISTED_CLOCKS] = undefined; }
+        return;
+      }
+      Object.defineProperty(this, SYM_PERSISTED_CLOCKS, { value: clocks, writable: true, configurable: true });
+    } catch (_) {
+      try { (this as any)[String(SYM_PERSISTED_CLOCKS)] = clocks; } catch (_) { /* swallow */ }
     }
   }
 
@@ -498,6 +524,7 @@ export class DocumentStore {
       mutationLog: this.mutationLog,
       seqCounter: this.seqCounter,
       appliedMutationIds: Array.from(this.appliedMutationIds),
+      persistedClocks: this.getPersistedClocks ? this.getPersistedClocks() : undefined,
     };
 
     const data = JSON.stringify(payload, null, 2);
@@ -590,6 +617,13 @@ export class DocumentStore {
       } catch (_) {
         this.appliedMutationIds = new Set();
       }
+
+      // Load persisted clocks if present so sync engines can restore vector-clock state
+      try {
+        if (parsed && parsed.persistedClocks && typeof parsed.persistedClocks === 'object' && this.setPersistedClocks) {
+          try { this.setPersistedClocks(parsed.persistedClocks); } catch (_) { /* swallow */ }
+        }
+      } catch (_) { /* swallow */ }
     } else {
       // Unknown format — bail out without mutating in-memory store.
       return;

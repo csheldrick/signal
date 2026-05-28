@@ -94,6 +94,23 @@ export class SyncEngine {
     this.peerId = peerId;
     this.clock[peerId] = 0;
 
+    // Attempt to seed the engine clock with any persisted clocks published
+    // on the underlying store so that vector-clock based decisions remain
+    // deterministic after restarts. This is best-effort and must not throw.
+    try {
+      try {
+        const maybeGet = (this.store as any).getPersistedClocks;
+        if (typeof maybeGet === 'function') {
+          const persisted = maybeGet.call(this.store);
+          if (persisted && typeof persisted === 'object') {
+            this.clock = mergeClocks(this.clock, persisted as VectorClock);
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
+    } catch (_) {}
+
     // When constructed directly (non-internal), perform duplicate detection
     // and registration. For internally-constructed instances (e.g. by the
     // getOrCreate factory) the factory handles registration to avoid races.
@@ -355,6 +372,15 @@ export class SyncEngine {
         if (Number.isFinite(n) && n > 0) normalized[k] = n;
       }
       this.clock = normalized;
+
+      // Best-effort persist of compacted clocks onto the store so that
+      // subsequent process restarts can restore causally-relevant state.
+      try {
+        const maybeSet = (this.store as any).setPersistedClocks;
+        if (typeof maybeSet === 'function') {
+          try { maybeSet.call(this.store, { ...this.clock }); } catch (_) { /* swallow */ }
+        }
+      } catch (_) { /* swallow */ }
     } catch (_) {
       // swallow — compaction is best-effort
     }
