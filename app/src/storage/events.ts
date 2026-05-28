@@ -55,6 +55,9 @@ export type StorageEvent =
 
 type Listener = (event: Readonly<StorageEvent>) => void;
 
+export type DocumentValidatorAsync = ((id: string) => Promise<boolean>) & { dispose?: () => void };
+export type DocumentValidatorSync = ((id: string) => boolean) & { dispose?: () => void };
+
 export interface StorageEventBusContract {
   on(type: StorageEventType | '*', listener: Listener): void;
   onAsync(type: StorageEventType | '*', listener: Listener): void;
@@ -62,8 +65,8 @@ export interface StorageEventBusContract {
   offAsync(type: StorageEventType | '*', listener: Listener): void;
   emit(event: StorageEvent): void;
   emitAsync(event: StorageEvent): void;
-  attachDocumentValidatorFromEvents(initial?: Iterable<string>): ((id: string) => Promise<boolean>) & { dispose?: () => void };
-  attachDocumentValidatorSnapshot(initial?: Iterable<string>): ((id: string) => boolean) & { dispose?: () => void };
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): DocumentValidatorAsync;
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): DocumentValidatorSync;
   /** Return a snapshot of recently emitted storage events for diagnostics */
   getTrace(): ReadonlyArray<StorageEvent>;
   /** Return counts of registered listeners for diagnostics */
@@ -245,7 +248,7 @@ export class StorageEventBus implements StorageEventBusContract {
    * a migration-friendly, testable replacement for direct store access so
    * callers (e.g. PresenceTracker) need not import DocumentStore.
    */
-  attachDocumentValidatorFromEvents(initial?: Iterable<string>): ((id: string) => Promise<boolean>) & { dispose?: () => void } {
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): DocumentValidatorAsync {
     const known = new Set<string>();
 
     // Seed from provided iterable (e.g., current store snapshot) so callers can validate
@@ -298,7 +301,7 @@ export class StorageEventBus implements StorageEventBusContract {
    * require a pure (non-Promise) check, while still keeping the event-driven
    * updates happening in the background.
    */
-  attachDocumentValidatorSnapshot(initial?: Iterable<string>): ((id: string) => boolean) & { dispose?: () => void } {
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): DocumentValidatorSync {
     const known = new Set<string>();
 
     if (initial) {
