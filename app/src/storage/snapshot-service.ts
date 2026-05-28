@@ -1,52 +1,38 @@
 /*
  * DocumentSnapshotService
  *
- * Exposes a SnapshotStore contract and a DocumentSnapshotService that
- * periodically compacts document history into versioned snapshots and
- * provides compactClock utilities to bound VectorClock vector size.
- *
- * The service is defensive about IO, swallows errors from underlying
- * stores, and exposes a compactClock(clock) method which SyncManager and
- * SyncEngine can call during conflict resolution or outbound message
- * preparation.
+ * Best-effort service that compacts document snapshots and provides a
+ * compactClock utility to bound VectorClock size.
  */
 
 import type { DocumentSnapshot } from '../core/types.js';
 import type { VectorClock } from '../sync/protocol.js';
 
 export interface SnapshotStore {
-  /** Return a list of known document ids (best-effort). */
   listDocumentIds(): Promise<string[]>;
-  /** Get the latest stored snapshot for a document, or undefined */
   getLatestSnapshot(documentId: string): Promise<DocumentSnapshot | undefined>;
-  /** Persist a snapshot for a document. */
   putSnapshot(documentId: string, snapshot: DocumentSnapshot): Promise<void>;
 }
 
 export interface DocumentSnapshotServiceOptions {
-  /** Number of ms between background compaction runs. Set <=0 to disable. */
   compactionIntervalMs?: number;
-  /** Limit on the number of vector-clock entries retained by compactClock. */
   maxClockEntries?: number;
 }
 
 export class DocumentSnapshotService {
   private store?: SnapshotStore;
-  private timer: ReturnType<typeof setInterval> | undefined;
+  private timer?: ReturnType<typeof setInterval>;
   private readonly compactionIntervalMs: number;
   private readonly maxClockEntries: number;
   private stopped = false;
 
   constructor(store?: SnapshotStore, opts?: DocumentSnapshotServiceOptions) {
     this.store = store;
-    // Default to a longer interval (15 minutes) to reduce periodic IO bursts;
-    // enforce a minimum of 60s to avoid pathological rapid compaction.
-    const defaultInterval = 30 * 60 * 1000; // 30min default to further reduce IO pressure
-    const requested = typeof opts?.compactionIntervalMs === 'number' ? opts!.compactionIntervalMs : defaultInterval;
-    // Enforce a conservative minimum (5 minutes) to avoid frequent compaction under load
-    this.compactionIntervalMs = Math.max(5 * 60_000, requested);
-    // Reduce default retained clock entries to lower per-operation work
-    this.maxClockEntries = typeof opts?.maxClockEntries === 'number' ? Math.max(4, opts!.maxClockEntries) : 8; // lower default to reduce per-pass work
+    const defaultInterval = 30 * 60 * 1000; // 30 minutes
+    const requested = opts && typeof opts.compactionIntervalMs === 'number' ? opts.compactionIntervalMs : defaultInterval;
+    // minimum 5 minutes
+    this.compactionIntervalMs = Math.max(5 * 60 * 1000, requested);
+    this.maxClockEntries = opts && typeof opts.maxClockEntries === 'number' ? Math.max(4, opts.maxClockEntries) : 8;
 
     if (this.store && this.compactionIntervalMs > 0) {
       try {
@@ -57,64 +43,50 @@ export class DocumentSnapshotService {
     }
   }
 
-  /** Attach or replace the underlying SnapshotStore. */
   setSnapshotStore(store?: SnapshotStore): void {
     this.store = store;
     try {
-      if (this.timer && !this.store) { clearInterval(this.timer); this.timer = undefined; }
+      if (this.timer && !this.store) {
+        clearInterval(this.timer);
+        this.timer = undefined;
+      }
       if (!this.timer && this.store && this.compactionIntervalMs > 0) {
         this.timer = setInterval(() => { void this.runCompactionPass(); }, this.compactionIntervalMs);
       }
-    } catch (_) { /* swallow */ }
+    } catch (_) {
+      // swallow
+    }
   }
 
-  /**
-   * Compact a VectorClock by removing zero/invalid entries and bounding
-   * its size to the configured maxClockEntries. Returns a new VectorClock.
-   */
   compactClock(clock?: VectorClock): VectorClock {
     const out: VectorClock = {};
     if (!clock || typeof clock !== 'object') return out;
     try {
-      for (const [peer, tick] of Object.entries(clock)) {
-        const t = Number.isFinite(tick as number) ? Math.max(0, tick as number) : 0;
-        if (t > 0) out[peer] = t;
+      for (const k of Object.keys(clock)) {
+        const v = Number(clock[k]);
+        if (Number.isFinite(v) && v > 0) out[k] = v;
       }
 
       const entries = Object.entries(out);
-      if (entries.length <= this.maxClockEntries) {
-        return Object.fromEntries(entries) as VectorClock;
-      }
-
-      // Keep the highest ticks (most recent) to preserve useful causality
-      entries.sort(([, aTick], [, bTick]) => (bTick as number) - (aTick as number));
+      if (entries.length <= this.maxClockEntries) return { ...out } as VectorClock;
+      entries.sort(([, a], [, b]) => (b as number) - (a as number));
       return Object.fromEntries(entries.slice(0, this.maxClockEntries)) as VectorClock;
     } catch (_) {
       return out;
     }
   }
 
-  /**
-   * Perform a best-effort compaction pass across snapshots in the store.
-   * This function is defensive and swallows errors to avoid affecting
-   * realtime flows. If a store is not attached it is a no-op.
-   */
   async runCompactionPass(): Promise<void> {
     if (this.stopped) return;
     const store = this.store;
     if (!store) return;
-
-    // Prevent overlapping compaction runs which can cause bursts of IO and
-    // unexpectedly high load if a previous pass is still running.
     if ((this as any)._running) return;
     (this as any)._running = true;
 
     try {
-      const ids = await Promise.resolve(store.listDocumentIds()).catch(() => []);
+      const ids = await Promise.resolve(store.listDocumentIds()).catch(() => [] as string[]);
       if (!Array.isArray(ids) || ids.length === 0) return;
-
-      // Bound the number of ids processed per pass to avoid long blocking
-      const MAX_PER_PASS = 5; // further reduced to lower per-pass IO pressure and IO bursts
+      const MAX_PER_PASS = 5;
       let count = 0;
       for (const id of ids) {
         if (this.stopped) break;
@@ -123,33 +95,28 @@ export class DocumentSnapshotService {
           const snap = await Promise.resolve(store.getLatestSnapshot(id)).catch(() => undefined);
           if (!snap) continue;
           const compacted = this.compactSnapshot(snap);
-          // Fire-and-forget put to avoid blocking the compaction loop on slow IO;
-          // errors are swallowed to preserve best-effort semantics.
-          void Promise.resolve(store.putSnapshot(id, compacted)).catch(() => { /* swallow */ });
-        } catch (_) { /* continue on error */ }
+          void Promise.resolve(store.putSnapshot(id, compacted)).catch(() => {});
+        } catch (_) {
+          // continue on error
+        }
       }
     } finally {
       try { delete (this as any)._running; } catch (_) { (this as any)._running = false; }
     }
   }
 
-  /**
-   * Trim any pathological snapshot fields to keep snapshots bounded.
-   * This is intentionally conservative and mirrors DocumentSnapshot
-   * shape expectations from core/types.
-   */
   private compactSnapshot(s: DocumentSnapshot): DocumentSnapshot {
     try {
       const trimmed: DocumentSnapshot = {
         id: String(s.id),
-        title: typeof s.title === 'string' ? (s.title.length > 5000 ? s.title.slice(0, 5000) : s.title) : (s.title as any),
-        content: typeof s.content === 'string' ? (s.content.length > 200_000 ? s.content.slice(0, 200_000) : s.content) : (s.content as any),
-        tags: Array.isArray(s.tags) ? s.tags.slice(0, 100).map(t => (typeof t === 'string' ? (t.length > 100 ? t.slice(0, 100) : t) : String(t))) : [],
-        links: Array.isArray(s.links) ? s.links.map(l => ({ sourceId: String(l.sourceId), targetId: String(l.targetId), kind: (l.kind as any) })) : [],
-        createdAt: Number.isFinite(s.createdAt) ? s.createdAt : Date.now(),
-        updatedAt: Number.isFinite(s.updatedAt) ? s.updatedAt : Date.now(),
-        version: Number.isFinite((s as any).version) ? (s as any).version : undefined,
-      };
+        title: typeof s.title === 'string' ? (s.title.length > 5000 ? s.title.slice(0, 5000) : s.title) : String(s.title),
+        content: typeof s.content === 'string' ? (s.content.length > 200000 ? s.content.slice(0, 200000) : s.content) : String(s.content),
+        tags: Array.isArray(s.tags) ? s.tags.slice(0, 100).map(t => String(t)) : [],
+        links: Array.isArray(s.links) ? s.links.map(l => ({ sourceId: String((l as any).sourceId), targetId: String((l as any).targetId), kind: (l as any).kind })) : [],
+        createdAt: Number.isFinite((s as any).createdAt) ? (s as any).createdAt : Date.now(),
+        updatedAt: Number.isFinite((s as any).updatedAt) ? (s as any).updatedAt : Date.now(),
+        version: typeof (s as any).version === 'number' ? (s as any).version : undefined,
+      } as DocumentSnapshot;
       return trimmed;
     } catch (_) {
       return s;
