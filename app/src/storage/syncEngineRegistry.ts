@@ -1,36 +1,30 @@
 /**
  * Registry helpers for attaching and retrieving a canonical SyncEngine
  * instance from a store-like object. To reduce split ownership and avoid
- * multiple registration surfaces, we prefer an explicit host-provided
- * accessor API (store.getSyncEngine / store.setSyncEngine). If these are
- * unavailable this helper will return undefined or throw on set to make
- * the absence of a canonical registry explicit to callers.
+ * multiple registration surfaces, we require hosts to provide explicit
+ * getSyncEngine / setSyncEngine accessors on their store implementation.
+ *
+ * Behavior:
+ *  - getSyncEngineFromStore returns the result of store.getSyncEngine() if
+ *    present, otherwise undefined. It will propagate errors thrown by the
+ *    host getter to make misconfiguration visible.
+ *  - setSyncEngineOnStore attempts to register via store.setSyncEngine(engine)
+ *    when available. If the store does not expose a setter this helper will
+ *    throw to make the lack of a canonical registry explicit to callers so
+ *    they can migrate their store implementation to include the accessor.
  */
-// Provide a lightweight fallback registry when hosts do not expose
-// explicit getSyncEngine/setSyncEngine accessors. This uses a WeakMap so
-// we do not retain strong references to store objects and keeps behavior
-// deterministic for tests/environments where the host store cannot be
-// modified to implement the accessor API.
-export const fallbackRegistry: WeakMap<any, any> = new WeakMap();
 
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
     if (!store) return undefined;
 
-    // Prefer explicit getter methods when present on the store object.
-    try {
-      if (typeof store.getSyncEngine === 'function') {
-        return store.getSyncEngine();
-      }
-    } catch (err) {
-      // Propagate errors from host getter so callers can surface misconfiguration.
-      throw err;
+    if (typeof store.getSyncEngine === 'function') {
+      return store.getSyncEngine();
     }
 
-    // Fallback: return any engine previously registered for this store
-    // using the internal WeakMap registry. This avoids fabricating global
-    // mutable state on the store object and keeps tests deterministic.
-    return fallbackRegistry.get(store);
+    // No explicit getter provided by the store — return undefined so callers
+    // can decide how to proceed (e.g. create a new engine or fail fast).
+    return undefined;
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
@@ -54,25 +48,15 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
     }
 
     // Prefer explicit setter API when present. Hosts should implement this
-    // to participate in canonical registration. If absent we use the
-    // internal weakmap fallback which keeps behavior deterministic instead
-    // of throwing and causing callers to create duplicate engines.
-    try {
-      if (typeof store.setSyncEngine === 'function') {
-        store.setSyncEngine(engine);
-        return;
-      }
-    } catch (err) {
-      throw err;
+    // to participate in canonical registration. If absent throw so callers
+    // are forced to opt-in by implementing the accessor rather than relying
+    // on a hidden global fallback which can lead to duplicate engines.
+    if (typeof store.setSyncEngine === 'function') {
+      store.setSyncEngine(engine);
+      return;
     }
 
-    // Store does not provide a setter — record in the fallback registry.
-    try {
-      fallbackRegistry.set(store, engine);
-      return;
-    } catch (err) {
-      throw err;
-    }
+    throw new Error('setSyncEngineOnStore: store does not expose setSyncEngine — implement setSyncEngine on your store to allow canonical engine registration');
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
