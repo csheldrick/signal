@@ -46,7 +46,7 @@ export class DocumentSnapshotService {
     // Enforce a conservative minimum (5 minutes) to avoid frequent compaction under load
     this.compactionIntervalMs = Math.max(5 * 60_000, requested);
     // Reduce default retained clock entries to lower per-operation work
-    this.maxClockEntries = typeof opts?.maxClockEntries === 'number' ? Math.max(4, opts!.maxClockEntries) : 32;
+    this.maxClockEntries = typeof opts?.maxClockEntries === 'number' ? Math.max(4, opts!.maxClockEntries) : 8; // lower default to reduce per-pass work
 
     if (this.store && this.compactionIntervalMs > 0) {
       try {
@@ -114,7 +114,7 @@ export class DocumentSnapshotService {
       if (!Array.isArray(ids) || ids.length === 0) return;
 
       // Bound the number of ids processed per pass to avoid long blocking
-      const MAX_PER_PASS = 10; // further reduced to lower per-pass IO pressure
+      const MAX_PER_PASS = 5; // further reduced to lower per-pass IO pressure and IO bursts
       let count = 0;
       for (const id of ids) {
         if (this.stopped) break;

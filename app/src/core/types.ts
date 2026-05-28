@@ -19,6 +19,23 @@ export interface Document {
 // lightweight, readonly contract for external consumers such as plugins.
 
 // Deprecated aliases removed: prefer DocumentChange and normalizeDocumentChange.
+// For backward compatibility with older callers that import legacy symbols,
+// expose lightweight deprecated aliases that map to the canonical types.
+// These aliases are intended to be short-lived and provide a gentler
+// migration path while keeping the core types strictly defined.
+
+/** Deprecated alias: use DocumentChange instead. */
+export type DeprecatedDocumentChange = DocumentChange;
+
+/**
+ * DeprecatedDocumentStore: legacy alias used by older code that imported a
+ * concrete store type from core. Kept as `any` to avoid introducing a hard
+ * dependency on the storage module in core types and to ease gradual
+ * migration. New code should import the concrete DocumentStore from
+ * storage/store.ts instead of relying on this alias.
+ */
+export type DeprecatedDocumentStore = any;
+
 export interface DocumentSnapshot {
   readonly id: string;
   readonly title: string;

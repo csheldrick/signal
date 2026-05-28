@@ -66,7 +66,7 @@ export class SyncManager {
   // for tests and to avoid relying on Math.random() at runtime.
   private msgCounter: number = 0;
   private authValidator?: (peerId: string, message?: SyncMessage) => boolean;
-  private static readonly MAX_TELEMETRY_LISTENERS = 32;
+  private static readonly MAX_TELEMETRY_LISTENERS = 16; // lower cap to reduce listener fan-out
   private telemetryListeners: Set<(event: { type: string; payload: any }) => void> = new Set();
 
   constructor(
@@ -103,8 +103,8 @@ export class SyncManager {
       // initialize timers/maps
       this.sessionLastSeen = new Map<string, number>();
       this.sessionStale = new Map<string, boolean>();
-      const HEARTBEAT_INTERVAL_MS = 30_000; // heartbeat cadence
-      const STALE_MS = 60_000; // consider a session stale after 60s of inactivity
+      const HEARTBEAT_INTERVAL_MS = 60_000; // heartbeat cadence (conservative to reduce timer churn)
+      const STALE_MS = 120_000; // consider a session stale after 120s of inactivity to reduce churn
 
       this.heartbeatTimer = setInterval(() => {
         try {
@@ -220,7 +220,7 @@ export class SyncManager {
       const busAny: any = (this.store as any).events;
       if (busAny && (typeof busAny.on === 'function' || typeof busAny.onAsync === 'function')) {
         const buffer: StorageEvent[] = [];
-        const MAX_BUFFERED_EVENTS = 500;
+        const MAX_BUFFERED_EVENTS = 200; // reduced to bound memory and downstream fan-out
         let scheduled = false;
         const flush = () => {
           if (scheduled) return;
@@ -268,7 +268,7 @@ export class SyncManager {
     // the event loop when many peers are connected.
     this.authValidator = authValidator;
 
-    const WRAP_SESSION_THRESHOLD = 50;
+    const WRAP_SESSION_THRESHOLD = 25; // wrap earlier to yield during larger session counts
     this.transport = async (peerId: string, message: SyncMessage) => {
       try {
         if (this.sessions.size > WRAP_SESSION_THRESHOLD) {
@@ -432,6 +432,8 @@ export class SyncManager {
             this.conflictStrategy,
           );
           this.conflictLog.push(record);
+          // Cap conflict log size to avoid unbounded growth under repeated conflicts
+          try { const MAX_CONFLICT_LOG = 200; if (this.conflictLog.length > MAX_CONFLICT_LOG) this.conflictLog.splice(0, this.conflictLog.length - MAX_CONFLICT_LOG); } catch (_) {}
           session.markResolved();
 
           // Apply the winning version if it differs from what we have.
@@ -471,7 +473,7 @@ export class SyncManager {
       // Batch enqueue outbound messages to avoid long synchronous bursts. Yield
       // to the event loop every BATCH_SIZE messages so the flush loop doesn't
       // monopolize the host when many outbound messages are present.
-      const BATCH_SIZE = 50;
+      const BATCH_SIZE = 25; // smaller batch size to yield more frequently and avoid long sync bursts
       const enqPromises: Promise<void>[] = [];
 
       for (let i = 0; i < outbound.length; i++) {
@@ -587,7 +589,7 @@ export class SyncManager {
 
   // ── Lifecycle ─────────────────────────────────────────────
 
-  start(flushIntervalMs = 1000): void {
+  start(flushIntervalMs = 2000): void {
     if (this.flushTimer !== undefined) return;
 
     // If an OfflineSyncQueue is attached, kick off an asynchronous best-effort
