@@ -11,7 +11,7 @@
 // we do not retain strong references to store objects and keeps behavior
 // deterministic for tests/environments where the host store cannot be
 // modified to implement the accessor API.
-const fallbackRegistry: WeakMap<any, any> = new WeakMap();
+export const fallbackRegistry: WeakMap<any, any> = new WeakMap();
 
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
