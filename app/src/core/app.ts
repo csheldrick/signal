@@ -3,7 +3,8 @@
 // from every module — gives Loom a central hub in the graph.
 
 import { DocumentStore } from '../storage/store.js';
-import { StorageEventBus, StorageEventBusContract } from '../storage/events.js';
+import { StorageEventBus } from '../storage/events.js';
+import type { StorageEventBusContract } from '../storage/events.js';
 import { GraphBuilder } from '../graph/builder.js';
 import { createInvertedIndex, Indexer } from '../index/inverted.js';
 import type { PresenceTracker as PresenceTrackerContract, OfflineSyncQueue as OfflineSyncQueueContract } from '../core/types.js';
