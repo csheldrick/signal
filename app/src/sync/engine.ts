@@ -104,73 +104,12 @@ export class SyncEngine {
       }
     }
 
-    // Subscribe to store events when available. Subscriptions should only be
-    // established for the canonical, registered engine to avoid duplicate
-    // event handlers and outbound message duplication. Check the registry and
-    // avoid subscribing if this instance is not the canonical engine.
-    try {
-      const bus = this.store?.events;
-      if (bus && typeof bus.on === 'function') {
-        try {
-          const canonical = getSyncEngineFromStore(this.store as any);
-          if (canonical && canonical !== this) {
-            // This instance is not the canonical registered engine; do not
-            // subscribe to avoid duplicate outbound generation.
-            return;
-          }
-        } catch (_) {
-          // If registry check fails, proceed with subscription to avoid
-          // losing functionality, but log a warning so it can be investigated.
-          try { console.warn('SyncEngine: registry check failed during subscription'); } catch (_) {}
-        }
-
-        const buffer: StorageEvent[] = [];
-        const MAX_BUFFERED_EVENTS = 500;
-        let scheduled = false;
-        const flush = () => {
-          if (scheduled) return;
-          scheduled = true;
-          Promise.resolve().then(() => {
-            scheduled = false;
-            const toProcess = buffer.splice(0);
-            for (const ev of toProcess) {
-              try {
-                this.generateOutbound(ev);
-              } catch (err) {
-                try { console.error('SyncEngine: error handling storage event', err); } catch (_) { /* swallow */ }
-              }
-            }
-          }).catch(err => { try { console.error('SyncEngine: flush error', err); } catch (_) {} });
-        };
-
-        const pushAndFlush = (ev: StorageEvent) => {
-          try {
-            if (buffer.length >= MAX_BUFFERED_EVENTS) buffer.shift();
-            buffer.push(ev);
-            flush();
-          } catch (err) {
-            try { console.error('SyncEngine: error buffering storage event', err); } catch (_) { /* swallow */ }
-          }
-        };
-
-        try {
-          if (typeof bus.onAsync === 'function') {
-            try { bus.onAsync('created', pushAndFlush); } catch (_) {}
-            try { bus.onAsync('updated', pushAndFlush); } catch (_) {}
-            try { bus.onAsync('deleted', pushAndFlush); } catch (_) {}
-            try { bus.onAsync('linked', pushAndFlush); } catch (_) {}
-          } else {
-            try { bus.on('created', pushAndFlush); } catch (_) {}
-            try { bus.on('updated', pushAndFlush); } catch (_) {}
-            try { bus.on('deleted', pushAndFlush); } catch (_) {}
-            try { bus.on('linked', pushAndFlush); } catch (_) {}
-          }
-        } catch (_) {};
-
-      }
-    } catch (err) {
-      console.warn('SyncEngine: failed to subscribe to store events', err);
-    }
+    // NOTE: SyncEngine no longer subscribes to store events directly.
+    // Subscription and forwarding of StorageEvent → engine.generateOutbound
+    // is the responsibility of SyncManager to centralize event handling and
+    // avoid duplicate subscriptions across multiple engine instances.
+    // This keeps the engine focused on transforming events to SyncMessages
+    // and maintaining vector clocks rather than managing event listeners.
   }
 
   applyRemoteChange(message: SyncMessage): boolean {

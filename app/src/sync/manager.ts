@@ -48,6 +48,8 @@ export class SyncManager {
   private readonly sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
   private readonly snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
   private readonly offlineQueue?: import('./offline-queue.js').OfflineSyncQueue;
+  // Promise that resolves when an in-progress offline replay drain completes.
+  private offlineDrainPromise?: Promise<void>;
   // Observability for sessions: track last-seen and stale state and emit
   // lifecycle events on the store event bus so downstream consumers can
   // react without polling. These are best-effort and do not throw.
@@ -165,13 +167,48 @@ export class SyncManager {
     // telemetry for observability.
 
 
-    // Outbound generation is driven by the SyncEngine. Rather than subscribing
-    // directly to store.events and enqueueing immediately (which can cause
-    // duplicate enqueues and high synchronous fan-out when many listeners exist),
-    // we centralize draining the engine's outbound buffer during flush(). This
-    // provides a single controlled point for backpressure and avoids duplicate
-    // work when other engines/listeners are present.
-    // (Previously this block subscribed to store.events and enqueued directly.)
+    // Subscribe to the store's StorageEventBus and forward events to the
+    // SyncEngine.generateOutbound. SyncEngine no longer manages subscriptions
+    // itself to avoid duplicate listeners and to centralize event handling.
+    try {
+      const busAny: any = (this.store as any).events;
+      if (busAny && (typeof busAny.on === 'function' || typeof busAny.onAsync === 'function')) {
+        const buffer: StorageEvent[] = [];
+        const MAX_BUFFERED_EVENTS = 500;
+        let scheduled = false;
+        const flush = () => {
+          if (scheduled) return;
+          scheduled = true;
+          Promise.resolve().then(() => {
+            scheduled = false;
+            const toProcess = buffer.splice(0);
+            for (const ev of toProcess) {
+              try { (this.engine as any).generateOutbound(ev); } catch (err) { try { console.error('SyncManager: error forwarding storage event to engine', err); } catch (_) {} }
+            }
+          }).catch(err => { try { console.error('SyncManager: flush error', err); } catch (_) {} });
+        };
+
+        const push = (ev: StorageEvent) => {
+          try {
+            if (buffer.length >= MAX_BUFFERED_EVENTS) buffer.shift();
+            buffer.push(ev);
+            flush();
+          } catch (err) { try { console.error('SyncManager: error buffering storage event', err); } catch (_) {} }
+        };
+
+        if (typeof busAny.onAsync === 'function') {
+          try { busAny.onAsync('created', push); } catch (_) {}
+          try { busAny.onAsync('updated', push); } catch (_) {}
+          try { busAny.onAsync('deleted', push); } catch (_) {}
+          try { busAny.onAsync('linked', push); } catch (_) {}
+        } else {
+          try { busAny.on('created', push); } catch (_) {}
+          try { busAny.on('updated', push); } catch (_) {}
+          try { busAny.on('deleted', push); } catch (_) {}
+          try { busAny.on('linked', push); } catch (_) {}
+        }
+      }
+    } catch (_) {}
 
     // If an OfflineSyncQueue is provided, attempt an asynchronous best-effort
     // replay of persisted entries. This supports offline-first workflows while
@@ -369,6 +406,12 @@ export class SyncManager {
    * Called automatically by the flush loop; also available for manual flush.
    */
   async flush(): Promise<void> {
+    // If an offline replay is in progress, wait for it to complete so that
+    // persisted outbound entries are re-enqueued before we send live messages.
+    if (this.offlineDrainPromise) {
+      try { await this.offlineDrainPromise; } catch (_) { /* swallow */ } finally { this.offlineDrainPromise = undefined; }
+    }
+
     // First, drain any outbound messages produced by the SyncEngine into the queue
     // so outbound generation is coalesced and controlled by the manager's flush
     // cadence instead of being enqueued directly by every storage event.
@@ -495,6 +538,25 @@ export class SyncManager {
 
   start(flushIntervalMs = 1000): void {
     if (this.flushTimer !== undefined) return;
+
+    // If an OfflineSyncQueue is attached, kick off an asynchronous best-effort
+    // drain before allowing regular flush traffic to proceed. The flush loop
+    // will await this drain once (see flush()) to ensure persisted entries are
+    // re-enqueued before live messages are sent, reconciling offline-first
+    // ordering with realtime delivery without blocking startup.
+    if (this.offlineQueue && !this.offlineDrainPromise) {
+      this.offlineDrainPromise = (async () => {
+        try {
+          await (this.offlineQueue as any).drain(this.peerId, async (entry: any) => {
+            try { await this.queue.enqueue(entry.payload as SyncMessage); } catch (err) { throw err; }
+          });
+          try { telemetry.emit('offline_queue_drained_on_start', { peerId: this.peerId, timestamp: Date.now() }); } catch (_) {}
+        } catch (err) {
+          try { telemetry.emit('offline_queue_drain_failed_on_start', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
+        }
+      })();
+    }
+
     this.flushTimer = setInterval(() => void this.flush(), flushIntervalMs);
   }
 
