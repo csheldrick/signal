@@ -29,7 +29,7 @@ export class LocalSummarizer implements Summarizer {
   private static globalActiveRequests: number = 0;
   // Timestamp of the last recorded acquisition; used to recover from leaked slots.
   private static lastAcquireAt: number = 0;
-  static readonly GLOBAL_MAX_CONCURRENT = 3;
+  static readonly GLOBAL_MAX_CONCURRENT = 2;
 
   /**
    * Attempt to acquire a global LocalSummarizer request slot.
@@ -208,7 +208,7 @@ export class RemoteSummarizer implements Summarizer {
   // global cap is reached we immediately return a local summary to avoid
   // overloading the remote service and downstream subsystems.
   private static globalActiveRequests: number = 0;
-  private static readonly GLOBAL_MAX_CONCURRENT = 3; // reduced to avoid overloading remote service under bursty traffic
+  private static readonly GLOBAL_MAX_CONCURRENT = 2; // reduced to avoid overloading remote service under bursty traffic
   // Rate limit the total number of remote summarization attempts to avoid
   // overwhelming the remote service. This is separate from concurrency
   // control and provides protection against burst traffic.

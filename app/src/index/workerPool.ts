@@ -24,12 +24,19 @@ export class WorkerPool {
     // Conservative defaults: prefer fewer workers to avoid overwhelming
     // downstream subsystems on machines with many CPUs. Cap to a modest
     // upper bound to prevent extreme parallelism in serverless/CI envs.
-    const defaultWorkers = Math.max(1, Math.min(8, Math.max(1, cpus - 1)));
-    this.numWorkers = Math.min(32, provided ?? defaultWorkers);
+    // Conservative default: prefer fewer workers to avoid overwhelming local
+    // CPU and downstream subsystems. Cap to a small constant to prevent
+    // extreme parallelism on large machines or CI runners.
+    const defaultWorkers = Math.max(1, Math.min(4, Math.max(1, cpus - 1)));
+    // Cap hard upper bound to a modest level to avoid extreme task fan-out
+    // in environments with many CPUs.
+    this.numWorkers = Math.min(8, provided ?? defaultWorkers);
 
     // Lower the default maxDocsPerWorker to produce smaller, more frequent
     // chunks which helps keep task latency bounded and reduces peak memory.
-    const defaultMax = 100;
+    // Use smaller chunks by default to keep task latency bounded and reduce
+    // per-worker memory pressure.
+    const defaultMax = 50;
     this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
       ? Math.max(1, options.maxDocsPerWorker)
       : defaultMax;

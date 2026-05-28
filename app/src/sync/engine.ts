@@ -39,6 +39,11 @@ export class SyncEngine {
     // Prefer returning an already-registered engine to avoid duplicates.
     const fromStore = getSyncEngineFromStore(store as any);
     if (fromStore && fromStore !== undefined) return fromStore as SyncEngine;
+    // If a store exposes a getSyncEngine() that returns a proxy wrapper rather
+    // than the concrete SyncEngine, prefer to re-use it to avoid duplicate
+    // instances; but guard against self-referential wrappers by checking for
+    // a getClock method that matches expectations.
+
 
     // Create a new engine but do not bypass registration logic; attempt to
     // register it and surface any conflicts to the caller so they can

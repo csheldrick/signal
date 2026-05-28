@@ -6,6 +6,12 @@ import { SYM_SYNC_ENGINE } from './store.js';
 // testability and determinism.
 const weakRegistry = new WeakMap<object, any>();
 
+// Defensive lock to avoid races in environments that may attempt concurrent
+// registration on the same host object. This is a best-effort advisory
+// mutex; it reduces the window for duplicate engines but does not provide
+// absolute atomicity across workers or isolates.
+const registrationLocks = new WeakMap<object, boolean>();
+
 /**
  * Retrieve a SyncEngine previously attached to a concrete store object.
  * Preference order:
@@ -71,7 +77,25 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
     // Prefer explicit setter API when present.
     try {
       if (typeof store.setSyncEngine === 'function') {
-        try { store.setSyncEngine(engine); return; } catch (_) { /* fallthrough */ }
+        try {
+          // Attempt a guarded registration to reduce races where two callers
+          // try to set the engine simultaneously on exotic hosts.
+          if (typeof store === 'object' && store !== null) {
+            if (registrationLocks.has(store)) {
+              // If another registration is in-flight, prefer to re-read the
+              // canonical engine to avoid overwriting concurrently.
+              const existing = getSyncEngineFromStore(store);
+              if (existing !== undefined) return;
+            }
+            try { registrationLocks.set(store, true); } catch (_) {}
+          }
+          store.setSyncEngine(engine);
+          try { registrationLocks.delete(store); } catch (_) {}
+          return;
+        } catch (_) {
+          try { registrationLocks.delete(store); } catch (_) {}
+          /* fallthrough */
+        }
       }
     } catch (_) {}
 
