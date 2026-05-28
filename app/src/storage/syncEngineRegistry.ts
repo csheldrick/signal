@@ -1,10 +1,18 @@
 import { SYM_SYNC_ENGINE } from './store.js';
 
+// Fallback WeakMap-based registry to centralize registration when the host
+// store does not expose explicit getter/setter or is not extensible. Using a
+// WeakMap avoids leaking memory and provides a single authoritative registry
+// surface which reduces the risk of duplicate SyncEngine instances being
+// silently created by different code paths.
+const _registry = new WeakMap<object, any>();
+
 /**
  * Retrieve a SyncEngine previously attached to a concrete store object.
  * Preference order:
  *  - store.getSyncEngine() / store.setSyncEngine(engine) (preferred)
  *  - a symbol-backed property (legacy / direct augmentation)
+ *  - internal WeakMap registry (fallback)
  */
 export function getSyncEngineFromStore(store: any): any | undefined {
   try {
@@ -23,6 +31,14 @@ export function getSyncEngineFromStore(store: any): any | undefined {
       if (symVal !== undefined) return symVal;
     } catch (_) { /* ignore */ }
 
+    // Finally consult the internal WeakMap fallback registry.
+    try {
+      if (typeof store === 'object' && store !== null) {
+        const found = _registry.get(store as object);
+        if (found !== undefined) return found;
+      }
+    } catch (_) { /* ignore */ }
+
     return undefined;
   } catch (_) {
     return undefined;
@@ -34,10 +50,11 @@ export function getSyncEngineFromStore(store: any): any | undefined {
  * Preference for registration:
  *  - call store.setSyncEngine(engine) when provided
  *  - set a non-enumerable symbol property when possible (legacy hosts)
+ *  - WeakMap fallback when host objects are non-extensible or lack APIs
  *
- * Note: We deliberately avoid any internal WeakMap fallback to keep the
- * registry surface explicit and deterministic; callers should prefer using
- * the store's getter/setter API or the symbol-backed property on the store.
+ * This centralizes registration and reduces accidental duplicate engine
+ * creation by providing a deterministic fallback registry when other
+ * registration surfaces are not available.
  */
 export function setSyncEngineOnStore(store: any, engine: any): void {
   try {
@@ -74,9 +91,20 @@ export function setSyncEngineOnStore(store: any, engine: any): void {
       Object.defineProperty(store, SYM_SYNC_ENGINE, { value: engine, enumerable: false, configurable: true, writable: true });
       return;
     } catch (_) {
-      // fallthrough; if we cannot set property, we intentionally do not
-      // attempt hidden fallbacks so that callers observe explicit failures
-      // instead of silent best-effort registrations.
+      // fallthrough; if we cannot set property, use WeakMap fallback
+    }
+
+    // WeakMap fallback: use internal registry for non-extensible or unusual
+    // host objects. This avoids mutating host objects and still provides a
+    // canonical reference the rest of the system can rely on.
+    try {
+      if (typeof store === 'object' && store !== null) {
+        _registry.set(store as object, engine);
+        return;
+      }
+    } catch (_) {
+      // Swallow to be defensive about exotic host objects, but avoid
+      // providing implicit alternate registry surfaces when impossible.
     }
   } catch (_) {
     // Swallow to be defensive about exotic host objects, but avoid
