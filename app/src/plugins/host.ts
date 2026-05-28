@@ -2,11 +2,29 @@
 // Plugin lifecycle manager. Defines the sandbox boundary.
 // Plugins receive a PluginContext — NOT the store directly.
 
-import type { DocumentSnapshot, SearchResultSnapshot } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
-import { normalizeSearchQuery } from '../core/types.js';
-import type { StorageEventType } from '../storage/events.js';
-export type { StorageEventType } from '../storage/events.js'; // do not re-export StorageEvent to reduce plugin surface area; plugins receive frozen event snapshots via PluginContext
+
+// Plugin-facing minimal types: declare lightweight, readonly-friendly snapshots
+// locally so plugins do not depend on the full core types module. This reduces
+// centrality of core/types and limits architectural fan-out.
+export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
+
+export interface DocumentSnapshot {
+  readonly id: string;
+  readonly title: string;
+  readonly content: string;
+  readonly tags: readonly string[];
+  readonly links: readonly { sourceId: string; targetId: string; kind: string }[];
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly version?: number;
+}
+
+export interface SearchResultSnapshot {
+  readonly document: DocumentSnapshot;
+  readonly score: number;
+  readonly highlights: string[];
+}
 
 // Plugin-facing SearchQuery contract: keep a lightweight, intentionally decoupled
 // copy of the core SearchQuery shape so plugins do not directly depend on the
@@ -18,7 +36,7 @@ export interface SearchQuery {
   dateRange?: { from: number; to: number };
 }
 
-export type { SearchResultSnapshot as SearchResult } from '../core/types.js';
+export type SearchResult = SearchResultSnapshot;
 
 export interface Plugin {
   id: string;
@@ -273,16 +291,12 @@ export class PluginHost {
         searchDocuments: (q: SearchQuery) => {
           try {
             // Lightweight, short-lived cache to reduce repeated identical
-            // search requests from plugins. Keying by JSON.stringify(q) is
-            // sufficient for typical plugin queries; fallback to String(q)
-            // on serialization errors.
+            // search requests from plugins. Keying by a conservative JSON
+            // serialization is sufficient for typical plugin queries; avoid
+            // calling into core normalization here to keep the plugin host
+            // decoupled and reduce centrality.
             const key = (() => {
-              try {
-                  const nq = normalizeSearchQuery(q as any);
-                  return JSON.stringify(nq);
-                } catch (_) {
-                  try { return JSON.stringify(q); } catch (_) { return String(q); }
-                }
+              try { return JSON.stringify(q); } catch (_) { return String(q); }
             })();
 
             const now = Date.now();

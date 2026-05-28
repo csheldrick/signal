@@ -2,9 +2,26 @@
 // Event types for storage mutations. Other modules subscribe
 // to these events, creating depends_on edges in the graph.
 
-import type { DocumentSnapshot, DocumentLink } from '../core/types.js';
-
+// Minimal local types to avoid importing the high-centrality core/types module.
+// This keeps the event layer lightweight and reduces architectural fan-out.
 export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
+
+export interface DocumentLink {
+  readonly sourceId: string;
+  readonly targetId: string;
+  readonly kind: string;
+}
+
+export interface DocumentSnapshot {
+  readonly id: string;
+  readonly title: string;
+  readonly content: string;
+  readonly tags: readonly string[];
+  readonly links: readonly DocumentLink[];
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly version?: number;
+}
 
 export interface StorageEventCreated {
   readonly type: 'created';
