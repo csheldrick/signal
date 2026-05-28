@@ -189,6 +189,26 @@ export class LocalSummarizer implements Summarizer {
   static isInCooldown(): boolean {
     return Date.now() < LocalSummarizer.cooldownUntil;
   }
+
+  // Internal aliases: prefer these within the app to reduce coupling to the
+  // public Summarizer contract. External callers should use the Summarizer
+  // interface only. These alias methods delegate to the public implementations
+  // for backward compatibility.
+  static _getGlobalActiveRequests(): number {
+    return LocalSummarizer.globalActiveRequests;
+  }
+
+  static _tryRecordRequest(): boolean {
+    return LocalSummarizer.tryRecordRequest();
+  }
+
+  static _recordRequest(): void {
+    LocalSummarizer.recordRequest();
+  }
+
+  static _releaseRequest(): void {
+    LocalSummarizer.releaseRequest();
+  }
 }
 
 export class RemoteSummarizer implements Summarizer {

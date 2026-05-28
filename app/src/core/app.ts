@@ -411,16 +411,22 @@ export class SignalApp {
       const Lclass = getLocalSummarizerClass();
       // Prefer the class-declared GLOBAL_MAX_CONCURRENT when available so
       // the app's scheduling respects the summarizer's own concurrency policy.
+      // Determine LocalSummarizer concurrency support and active count via
+      // the safer internal alias first (_getGlobalActiveRequests) falling back
+      // to the public getter when necessary. This reduces coupling to the
+      // concrete class shape and makes in-app callers prefer the stable alias.
+      const hasGetActive = Lclass && (typeof (Lclass as any)._getGlobalActiveRequests === 'function' || typeof (Lclass as any).getGlobalActiveRequests === 'function');
       const maxLocalConcurrent = (Lclass && typeof (Lclass as any).GLOBAL_MAX_CONCURRENT === 'number')
         ? (Lclass as any).GLOBAL_MAX_CONCURRENT
-        : (Lclass && typeof Lclass.getGlobalActiveRequests === 'function' ? 5 : 10);
-      if (Lclass && Lclass.getGlobalActiveRequests && Lclass.getGlobalActiveRequests() >= maxLocalConcurrent) {
+        : (hasGetActive ? 5 : 10);
+      const getActiveFn = hasGetActive ? ((Lclass as any)._getGlobalActiveRequests || (Lclass as any).getGlobalActiveRequests) : undefined;
+      if (getActiveFn && typeof getActiveFn === 'function' && getActiveFn() >= maxLocalConcurrent) {
         // LocalSummarizer is saturated; set a short backoff timer
         const backoffT = setTimeout(() => {
-          if (Lclass && typeof Lclass.getGlobalActiveRequests === 'function') {
-            const active = Lclass.getGlobalActiveRequests();
+          try {
+            const active = getActiveFn();
             if (active < maxLocalConcurrent) globalCooldownUntil = 0;
-          }
+          } catch (_) {}
         }, 500);
         const placeholder = setTimeout(() => { try { timers.delete(docId); } catch (_) {} }, 50);
         timers.set(docId, placeholder);
@@ -440,10 +446,12 @@ export class SignalApp {
         const Lclass = getLocalSummarizerClass();
         // Use the summarizer-declared concurrency limit when present to keep
         // background scheduling aligned with the summarizer implementation.
+        const hasGetActive2 = Lclass && (typeof (Lclass as any)._getGlobalActiveRequests === 'function' || typeof (Lclass as any).getGlobalActiveRequests === 'function');
         const maxLocalConcurrent = (Lclass && typeof (Lclass as any).GLOBAL_MAX_CONCURRENT === 'number')
           ? (Lclass as any).GLOBAL_MAX_CONCURRENT
-          : (Lclass && typeof Lclass.getGlobalActiveRequests === 'function' ? 5 : 10);
-        if (Lclass && Lclass.getGlobalActiveRequests && Lclass.getGlobalActiveRequests() >= maxLocalConcurrent) {
+          : (hasGetActive2 ? 5 : 10);
+        const getActiveFn2 = hasGetActive2 ? ((Lclass as any)._getGlobalActiveRequests || (Lclass as any).getGlobalActiveRequests) : undefined;
+        if (getActiveFn2 && typeof getActiveFn2 === 'function' && getActiveFn2() >= maxLocalConcurrent) {
           // LocalSummarizer is saturated; re-enqueue with backoff
           try {
             const queue = (this as any)._bgSummarizeQueue as string[];
@@ -462,7 +470,7 @@ export class SignalApp {
         // Attempt to acquire a LocalSummarizer slot; if we cannot, re-enqueue
         // the job with a short backoff to avoid over-subscribing the local summarizer.
         const Lclass2 = getLocalSummarizerClass();
-          const acquired = Lclass2 ? (typeof Lclass2.tryRecordRequest === 'function' ? Lclass2.tryRecordRequest() : (typeof Lclass2.recordRequest === 'function' ? (Lclass2.recordRequest(), true) : true)) : true;
+          const acquired = Lclass2 ? (typeof (Lclass2 as any)._tryRecordRequest === 'function' ? (Lclass2 as any)._tryRecordRequest() : (typeof (Lclass2 as any).tryRecordRequest === 'function' ? (Lclass2 as any).tryRecordRequest() : (typeof (Lclass2 as any).recordRequest === 'function' ? ((Lclass2 as any).recordRequest(), true) : true))) : true;
         if (!acquired) {
           // Couldn't acquire: attempt to enqueue for later. If the queue is full
           // set a short placeholder timer and drop the heavy work.
@@ -506,7 +514,7 @@ export class SignalApp {
             } catch (_) { /* swallow background errors */ }
             // Mark job finished and try to drain a queued job.
             try {
-              try { const Lr = getLocalSummarizerClass(); if (Lr && typeof Lr.releaseRequest === 'function') Lr.releaseRequest(); } catch (_) {}
+              try { const Lr = getLocalSummarizerClass(); if (Lr) { if (typeof (Lr as any)._releaseRequest === 'function') (Lr as any)._releaseRequest(); else if (typeof (Lr as any).releaseRequest === 'function') (Lr as any).releaseRequest(); } } catch (_) {}
               const next = (this as any)._bgSummarizeQueue.shift();
               if (next) {
                 // Use a short defer to avoid deep synchronous recursion and to
