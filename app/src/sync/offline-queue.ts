@@ -41,6 +41,10 @@ export class OfflineSyncQueue extends EventEmitter {
   // delivery/rewrite races when multiple managers attempt to drain the same
   // peer queue simultaneously (e.g. on start + on transport attach).
   private drainingPeers: Set<string> = new Set();
+  // Track in-flight drain promises per-peer so concurrent callers get the
+  // same promise rather than returning early. This prevents races where one
+  // caller thinks a drain completed while another is still replaying entries.
+  private drainingPromises: Map<string, Promise<void>> = new Map();
 
   constructor(opts?: OfflineSyncQueueOptions) {
     super();
@@ -201,76 +205,87 @@ export class OfflineSyncQueue extends EventEmitter {
   async drain(peerId: string, handler: (entry: OfflineEntry) => Promise<void>): Promise<void> {
     if (!peerId) throw new Error('peerId required');
 
-    // Prevent concurrent drains for the same peer to avoid duplicate delivery
-    // and disk-rewrite races. If a drain is already running, return early.
-    if (this.drainingPeers.has(peerId)) return;
-    this.drainingPeers.add(peerId);
+    // If a drain is already in progress for this peer return the same
+    // promise so callers can await completion rather than returning early.
+    if (this.drainingPromises.has(peerId)) return this.drainingPromises.get(peerId)!;
 
-    try {
-      const diskEntries = this.readAllFromDisk(peerId);
-      const mem = this.memQueues.get(peerId) ?? [];
-      const all = diskEntries.concat(mem);
-      // stable sort
-      all.sort((a, b) => (a.timestamp - b.timestamp) || (a.seq - b.seq));
+    const promise = (async () => {
+      // Prevent concurrent drains for the same peer to avoid duplicate delivery
+      // and disk-rewrite races.
+      this.drainingPeers.add(peerId);
 
-      if (all.length === 0) return;
-
-      const remaining: OfflineEntry[] = [];
-      let failedError: unknown = undefined;
-      for (const entry of all) {
-        try {
-          await handler(entry);
-          try { this.emit('delivered', { peerId, entry }); } catch (_) {}
-        } catch (err) {
-          // On first failure, push this and subsequent entries to remaining
-          failedError = err;
-          remaining.push(entry);
-          // collect subsequent entries without attempting
-          const idx = all.indexOf(entry);
-          for (let j = idx + 1; j < all.length; j++) remaining.push(all[j]);
-          break;
-        }
-      }
-
-      // rewrite disk file with remaining entries (durable) and set mem queue accordingly
       try {
-        const path = this.filePathForPeer(peerId);
-        if (remaining.length === 0) {
-          // remove file and clear in-memory queue
-          if (existsSync(path)) {
-            try { unlinkSync(path); } catch (_) { /* swallow */ }
-          }
-          this.memQueues.delete(peerId);
-        } else {
-          // write remaining to file atomically
-          const tmp = path + '.tmp';
+        const diskEntries = this.readAllFromDisk(peerId);
+        const mem = this.memQueues.get(peerId) ?? [];
+        const all = diskEntries.concat(mem);
+        // stable sort
+        all.sort((a, b) => (a.timestamp - b.timestamp) || (a.seq - b.seq));
+
+        if (all.length === 0) return;
+
+        const remaining: OfflineEntry[] = [];
+        let failedError: unknown = undefined;
+        for (const entry of all) {
           try {
-            const content = remaining.map(r => JSON.stringify(r)).join('\n') + '\n';
-            writeFileSync(tmp, content, 'utf-8');
-            writeFileSync(path, content, 'utf-8');
-            try { unlinkSync(tmp); } catch (_) {}
+            await handler(entry);
+            try { this.emit('delivered', { peerId, entry }); } catch (_) {}
           } catch (err) {
-            // If rewrite fails, try to at least write what we can to disk path directly
-            try { writeFileSync(path, remaining.map(r => JSON.stringify(r)).join('\n') + '\n', 'utf-8'); } catch (_) {}
+            // On first failure, push this and subsequent entries to remaining
+            failedError = err;
+            remaining.push(entry);
+            // collect subsequent entries without attempting
+            const idx = all.indexOf(entry);
+            for (let j = idx + 1; j < all.length; j++) remaining.push(all[j]);
+            break;
           }
-          // Update in-memory queue to be any entries that were originally only in mem
-          const memSet = new Set(mem.map(m => m.id));
-          const newMem = remaining.filter(r => memSet.has(r.id));
-          if (newMem.length > 0) this.memQueues.set(peerId, newMem); else this.memQueues.delete(peerId);
         }
-      } catch (_) {
-        // swallow persistence rewrite errors but leave in-memory coherent
-      }
 
-      if (failedError) {
-        throw failedError;
-      }
+        // rewrite disk file with remaining entries (durable) and set mem queue accordingly
+        try {
+          const path = this.filePathForPeer(peerId);
+          if (remaining.length === 0) {
+            // remove file and clear in-memory queue
+            if (existsSync(path)) {
+              try { unlinkSync(path); } catch (_) { /* swallow */ }
+            }
+            this.memQueues.delete(peerId);
+          } else {
+            // write remaining to file atomically
+            const tmp = path + '.tmp';
+            try {
+              const content = remaining.map(r => JSON.stringify(r)).join('\n') + '\n';
+              writeFileSync(tmp, content, 'utf-8');
+              writeFileSync(path, content, 'utf-8');
+              try { unlinkSync(tmp); } catch (_) {}
+            } catch (err) {
+              // If rewrite fails, try to at least write what we can to disk path directly
+              try { writeFileSync(path, remaining.map(r => JSON.stringify(r)).join('\n') + '\n', 'utf-8'); } catch (_) {}
+            }
+            // Update in-memory queue to be any entries that were originally only in mem
+            const memSet = new Set(mem.map(m => m.id));
+            const newMem = remaining.filter(r => memSet.has(r.id));
+            if (newMem.length > 0) this.memQueues.set(peerId, newMem); else this.memQueues.delete(peerId);
+          }
+        } catch (_) {
+          // swallow persistence rewrite errors but leave in-memory coherent
+        }
 
-      try { this.emit('drain_complete', { peerId }); } catch (_) {}
-    } finally {
-      // Clear drain guard so subsequent drains can proceed.
-      try { this.drainingPeers.delete(peerId); } catch (_) {}
-    }
+        if (failedError) {
+          throw failedError;
+        }
+
+        try { this.emit('drain_complete', { peerId }); } catch (_) {}
+      } finally {
+        // Clear drain guard so subsequent drains can proceed.
+        try { this.drainingPeers.delete(peerId); } catch (_) {}
+        // Remove the promise entry so future drains create a new one.
+        try { this.drainingPromises.delete(peerId); } catch (_) {}
+      }
+    })();
+
+    // Track the in-flight promise so concurrent callers can await it.
+    this.drainingPromises.set(peerId, promise);
+    return promise;
   }
 
   /** Clear all entries for a peer (used when stopping manager) */

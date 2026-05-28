@@ -69,7 +69,8 @@ export class SyncEngine {
       if (rechecked !== undefined && rechecked !== created) {
         // Another engine beat us to registration — surface this as an error so
         // callers can decide how to proceed instead of creating a duplicate.
-        throw new Error('SyncEngine.getOrCreate: conflicting SyncEngine already registered on store');
+        try { console.warn('SyncEngine.getOrCreate: another engine registered concurrently; returning canonical engine'); } catch (_) {}
+        return rechecked as SyncEngine;
       }
       return created;
     } catch (e) {

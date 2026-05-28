@@ -246,15 +246,25 @@ export class SignalApp {
               // to avoid accidental duplicate SyncEngine instances and to
               // centralize engine registration. Fall back to the app-local
               // _sync only if the store does not expose a registered engine.
-              try {
-                const fromStore = (this.store ? getSyncEngineFromStore(this.store) : undefined);
-                if (fromStore !== undefined && fromStore && typeof fromStore.getClock === 'function') return fromStore;
-              } catch (err) {
-                // If registry lookup fails, swallow and fall back to app-local _sync
-              }
-            } catch (_) { /* swallow */ }
-            try { return (this as any)._sync; } catch (_) { return undefined; }
-          })();
+          try {
+            const fromStore = (this.store ? getSyncEngineFromStore(this.store) : undefined);
+            if (fromStore !== undefined && fromStore && typeof fromStore.getClock === 'function') return fromStore;
+          } catch (err) {
+            // If registry lookup fails, swallow and fall back to app-local _sync
+          }
+        } catch (_) { /* swallow */ }
+        try { return (this as any)._sync; } catch (_) { return undefined; }
+      })();
+
+      // Defensive: if the store-published engine is a proxy/wrapper that delegates
+      // to the canonical engine but returns a different object identity, prefer
+      // to use the canonical engine to avoid duplicate instance logic elsewhere.
+      try {
+        const canonical = getSyncEngineFromStore(this.store as any);
+        if (canonical && canonical !== (this as any)._sync) {
+          this._sync = canonical;
+        }
+      } catch (_) { /* swallow */ }
           if (maybeSync && typeof maybeSync.getClock === 'function') {
             try {
               const c = maybeSync.getClock();
@@ -666,24 +676,34 @@ export class SignalApp {
           // Fall through to registry lookup below via thrown error.
           throw new Error('SyncEngine.getOrCreate unavailable');
         }
-      } catch (err) {
-        // Avoid directly constructing a new SyncEngine here — prefer any
-        // already-registered engine on the store to prevent duplicate
-        // subscriptions or conflicting clocks. If no engine is available,
-        // rethrow the original error so callers can handle it explicitly.
-        try {
-          const installed = getSyncEngineFromStore(this.store);
-          if (installed !== undefined && installed) {
-            this._sync = installed;
-          } else {
+        } catch (err) {
+          // Avoid directly constructing a new SyncEngine here — prefer any
+          // already-registered engine on the store to prevent duplicate
+          // subscriptions or conflicting clocks. If no engine is available,
+          // rethrow the original error so callers can handle it explicitly.
+          try {
+            const installed = getSyncEngineFromStore(this.store);
+            if (installed !== undefined && installed) {
+              this._sync = installed;
+            } else {
+              throw err;
+            }
+          } catch (e) {
+            // If registry lookup fails, rethrow the original error to surface
+            // that getOrCreate() failed rather than silently continuing.
             throw err;
           }
-        } catch (e) {
-          // If registry lookup fails, rethrow the original error to surface
-          // that getOrCreate() failed rather than silently continuing.
-          throw err;
         }
-      }
+
+        // Ensure the registered engine is the canonical store-backed engine
+        // to avoid accidental duplicate instances due to proxy wrappers.
+        try {
+          const canonical = getSyncEngineFromStore(this.store as any);
+          if (canonical && this._sync && canonical !== this._sync) {
+            try { console.warn('SignalApp.start: store exposes a different SyncEngine instance; using canonical store-backed engine to avoid duplicates'); } catch (_) {}
+            this._sync = canonical;
+          }
+        } catch (_) { /* swallow */ }
     }
     this.started = true;
   }
