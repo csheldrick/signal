@@ -170,7 +170,42 @@ export class SyncManager {
     // Subscribe to the store's StorageEventBus and forward events to the
     // SyncEngine.generateOutbound. SyncEngine no longer manages subscriptions
     // itself to avoid duplicate listeners and to centralize event handling.
+    // When an OfflineSyncQueue is attached we defer installing live store
+    // subscriptions until after a best-effort drain completes to avoid
+    // interleaving persisted replayed messages with live-generated messages
+    // (which can cause duplicate outbound deliveries or ordering anomalies).
     try {
+      if (!this.offlineQueue) {
+        this.attachStoreSubscriptions();
+      } else {
+        // Defer attachment until after offline drain completes. attachStoreSubscriptions
+        // will be called by start()/setTransport() once the offline replay finishes.
+      }
+    } catch (_) {}
+
+    // If an OfflineSyncQueue is provided, attempt an asynchronous best-effort
+    // replay of persisted entries. This supports offline-first workflows while
+    // ensuring that replay does not block the manager construction. Replayed
+    // entries will be handed to the manager's transport when available via
+    // start/attach logic below — for now we emit telemetry to indicate presence.
+    if (this.offlineQueue) {
+      try {
+        // Emit size/health telemetry to help operators know there's pending offline data
+        try { telemetry.emit('offline_queue_attached', { peerId: this.peerId, size: this.offlineQueue.size(this.peerId), timestamp: Date.now() }); } catch (_) {}
+      } catch (_) {}
+    }
+
+    // Internal guard to ensure we only attach store listeners once.
+    (this as any)._storeSubscriptionsAttached = false;
+
+    // Helper installs the actual store subscriptions. Extracted to a method
+    // so callers can defer attachment until after offline drains complete.
+  }
+
+  private attachStoreSubscriptions(): void {
+    try {
+      if ((this as any)._storeSubscriptionsAttached) return;
+      (this as any)._storeSubscriptionsAttached = true;
       const busAny: any = (this.store as any).events;
       if (busAny && (typeof busAny.on === 'function' || typeof busAny.onAsync === 'function')) {
         const buffer: StorageEvent[] = [];
@@ -210,17 +245,6 @@ export class SyncManager {
       }
     } catch (_) {}
 
-    // If an OfflineSyncQueue is provided, attempt an asynchronous best-effort
-    // replay of persisted entries. This supports offline-first workflows while
-    // ensuring that replay does not block the manager construction. Replayed
-    // entries will be handed to the manager's transport when available via
-    // start/attach logic below — for now we emit telemetry to indicate presence.
-    if (this.offlineQueue) {
-      try {
-        // Emit size/health telemetry to help operators know there's pending offline data
-        try { telemetry.emit('offline_queue_attached', { peerId: this.peerId, size: this.offlineQueue.size(this.peerId), timestamp: Date.now() }); } catch (_) {}
-      } catch (_) {}
-    }
   }
 
   // ── Transport wiring ──────────────────────────────────────
@@ -283,6 +307,15 @@ export class SyncManager {
             this.offlineDrainPromise = undefined;
           }
         })();
+
+        // When the offline drain completes (success or failure) ensure store
+        // subscriptions are attached so live-generated outbound messages are
+        // processed. We attach after drain to avoid interleaving replayed
+        // persisted entries with freshly-generated ones which could cause
+        // ordering anomalies or duplicate delivery.
+        try {
+          this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
+        } catch (_) {}
       } catch (_) {}
     }
   }
@@ -562,6 +595,13 @@ export class SyncManager {
           try { telemetry.emit('offline_queue_drain_failed_on_start', { peerId: this.peerId, error: String(err), timestamp: Date.now() }); } catch (_) {}
         }
       })();
+
+      // Ensure store subscriptions are attached after the start-time offline
+      // drain completes to avoid interleaving replayed persisted entries with
+      // live store-generated outbound messages which can cause duplicates.
+      try {
+        this.offlineDrainPromise.then(() => { try { this.attachStoreSubscriptions(); } catch (_) {} }).catch(() => { try { this.attachStoreSubscriptions(); } catch (_) {} });
+      } catch (_) {}
     }
 
     this.flushTimer = setInterval(() => void this.flush(), flushIntervalMs);
