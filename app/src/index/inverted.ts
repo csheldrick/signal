@@ -2,9 +2,9 @@
 // This module provides runtime implementations only; the InvertedIndex interface
 // is declared in core/types.ts so multiple implementations can coexist.
 
-import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex, IndexerContract } from '../core/types.js';
+import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex, IndexerContract, WorkerPoolOptions } from '../core/types.js';
 import { normalizeSearchQuery } from '../core/types.js';
-import { WorkerPool, WorkerPoolOptions } from './workerPool.js';
+import { WorkerPool } from './workerPool.js';
 import { telemetry } from '../sync/telemetry.js';
 
 // Basic tokenizer: split on non-alphanumerics and lowercase

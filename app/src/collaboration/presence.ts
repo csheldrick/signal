@@ -5,7 +5,7 @@
 // store or sync engine imports.
 
 import type { Plugin, PluginContext } from '../plugins/host.js';
-import type { DocumentSnapshot } from '../core/types.js';
+import type { DocumentSnapshot, PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract } from '../core/types.js';
 import { getSignalStorageEventBus } from '../core/globals.js';
 import { telemetry } from '../sync/telemetry.js';
 
@@ -21,15 +21,9 @@ export const PRESENCE_STATUS = {
   OFFLINE: 'offline' as PresenceStatus,
 } as const;
 
-export interface PeerPresence {
-  peerId: string;
-  documentId: string | undefined;
-  status: PresenceStatus;
-  lastSeen: number;
-  // Monotonic sequence used to provide atomic versioning for presence
-  // entries. This enables safe compare-and-delete semantics in leave().
-  seq: number;
-}
+// Local concrete PeerPresence mirrors the lightweight contract exported in core/types
+export interface PeerPresence extends PeerPresenceContract {}
+
 
 export function createValidatorFromStore(_store: any): (id: string) => Promise<boolean> {
   // Deprecated: direct store validators are no longer supported for realtime

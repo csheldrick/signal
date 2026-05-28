@@ -228,3 +228,50 @@ export interface InvertedIndex {
 
 export interface IndexerContract { dispose(): void; }
 
+// Indexing worker & pool options - centralized contract so other modules
+// can depend on a stable type without importing concrete worker pool impls.
+export interface IndexWorker { work(): void; }
+
+export interface WorkerPoolOptions {
+  numWorkers?: number;
+  maxDocsPerWorker?: number;
+}
+
+// Presence types centralized so lightweight modules can import the minimal
+// contracts without pulling in the full PresenceTracker implementation.
+export type PresenceStatus = 'active' | 'idle' | 'offline';
+
+export interface PeerPresence {
+  peerId: string;
+  documentId: string | undefined;
+  status: PresenceStatus;
+  lastSeen: number;
+  seq: number;
+}
+
+export interface PresenceTracker {
+  setPluginContext(context?: any): void;
+  setSessionTracker(tracker?: any): void;
+  setValidator?(validate?: (id: string) => boolean | Promise<boolean>): void;
+  setAsyncValidator?(validate?: (id: string) => Promise<boolean>): void;
+  join(peerId: string, documentId?: string): PeerPresence;
+  leave(peerId: string, awaitCleanup?: boolean): Promise<void>;
+  getActive(): PeerPresence[];
+  getViewers(documentId: string): PeerPresence[];
+  focusDocument(peerId: string, documentId: string): Promise<boolean>;
+  summary(): { active: number; idle: number; offline: number };
+  stopCleanupTimer?(): void;
+}
+
+// Offline sync queue contract used by SyncManager to persist outbound
+// messages when transports are unavailable. Keeping a minimal interface
+// here avoids importing the concrete class in many places.
+export interface OfflineSyncQueue {
+  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
+  size(peerId: string): number;
+  list(peerId: string): any[];
+  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
+  clear(peerId: string): void;
+  dispose(): void;
+}
+

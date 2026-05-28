@@ -5,15 +5,8 @@
 
 import os from 'node:os';
 import { telemetry } from '../sync/telemetry.js';
-
-export interface IndexWorker {
-  work(): void;
-}
-
-export interface WorkerPoolOptions {
-  numWorkers?: number;
-  maxDocsPerWorker?: number;
-}
+import type { IndexWorker, WorkerPoolOptions } from '../core/types.js';
+export type { IndexWorker, WorkerPoolOptions };
 
 export class WorkerPool {
   private workers: IndexWorker[] = [];
