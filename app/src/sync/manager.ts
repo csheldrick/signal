@@ -16,7 +16,7 @@ import { createLazySyncEngine } from './lazyEngine.js';
 import { telemetry } from './telemetry.js';
 
 import { SyncQueue } from './queue.js';
-import { OfflineSyncQueue } from './offline-queue.js';
+import type { OfflineSyncQueue as OfflineSyncQueueContract } from '../core/types.js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
 import { isConflict, resolveConflict } from './conflict.js';
@@ -39,7 +39,7 @@ export interface SyncManagerOptions {
   /** Optional snapshot service to compact vector clocks and expose snapshot hooks. */
   snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
   /** Optional durable offline queue to persist outbound messages when enqueue fails */
-  offlineQueue?: OfflineSyncQueue;
+  offlineQueue?: OfflineSyncQueueContract;
 }
 
 export class SyncManager {
@@ -47,7 +47,7 @@ export class SyncManager {
   private readonly queue: SyncQueue;
   private readonly sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
   private readonly snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
-  private readonly offlineQueue?: import('./offline-queue.js').OfflineSyncQueue;
+  private readonly offlineQueue?: OfflineSyncQueueContract;
   // Promise that resolves when an in-progress offline replay drain completes.
   private offlineDrainPromise?: Promise<void>;
   // Observability for sessions: track last-seen and stale state and emit

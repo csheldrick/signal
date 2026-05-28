@@ -16,7 +16,7 @@ export class PeerSession {
   // Prevent unbounded growth under heavy inbound traffic; drop oldest when full.
   private maxInboundBufferSize: number;
 
-  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 20) {
+  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 10) {
     this.peerId = peerId;
     this._clock = { ...initialClock };
     this._state = 'idle';
