@@ -13,7 +13,7 @@ export class WorkerPool {
   private activeWorkers: number = 0;
   private readonly numWorkers: number;
   private readonly maxDocsPerWorker: number;
-  private readonly onWorkerFinish: ((workerIndex: number) => void) | null = null;
+  private readonly onWorkerFinish: ((workerIndex: number) => void) | null;
   // Whether the pool has been shut down; prevents scheduling additional work
   private stopped: boolean = false;
 
