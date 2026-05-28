@@ -136,7 +136,7 @@ export class SignalApp {
             const now = Date.now();
             if (now - cachedTs < TTL_MS) return cached;
             const list = this.store.list();
-            const MAX_PLUGIN_LIST = 200;
+            const MAX_PLUGIN_LIST = 100;
             const results = Array.isArray(list) ? list.slice(0, MAX_PLUGIN_LIST).map((d: any) => cloneDoc(d)) : [];
             cachedTs = now;
             cached = results;

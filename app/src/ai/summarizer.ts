@@ -99,38 +99,67 @@ export class LocalSummarizer implements Summarizer {
       if (cached && cached.updatedAt === updatedAt) {
         return cached.summary;
       }
+
+      // Coalesce concurrent local summarization requests per-document to
+      // avoid duplicate CPU work when many callers summarize the same doc.
+      const pendingEntry = LocalSummarizer.pending.get(id);
+      if (pendingEntry) {
+        // If the pending entry is stale, evict it and continue.
+        if (Date.now() - pendingEntry.ts > 30_000) {
+          LocalSummarizer.pending.delete(id);
+        } else {
+          return pendingEntry.promise;
+        }
+      }
     }
 
     // Attempt to acquire a global LocalSummarizer request slot. If the slot
     // cannot be acquired we still compute and return a local summary, but we
     // do not modify the global counters.
     const acquired = LocalSummarizer.tryRecordRequest();
-    try {
-      const sentences = (document.content || '')
-        .split(/[.!?]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
 
-      const selected = sentences.slice(0, this.maxSentences);
-      const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
+    const op = (async (): Promise<string> => {
+      try {
+        const sentences = (document.content || '')
+          .split(/[.!?]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
 
-      if (id) {
-        LocalSummarizer.cache.set(id, { updatedAt, summary });
-        // Simple bounded eviction to avoid unbounded memory growth.
-        if (LocalSummarizer.cache.size > LocalSummarizer.CACHE_MAX_SIZE) {
-          const it = LocalSummarizer.cache.keys();
-          const first = it.next().value as string | undefined;
-          if (first) LocalSummarizer.cache.delete(first);
+        const selected = sentences.slice(0, this.maxSentences);
+        const summary = selected.join('. ') + (selected.length > 0 ? '.' : '');
+
+        if (id) {
+          LocalSummarizer.cache.set(id, { updatedAt, summary });
+          // Simple bounded eviction to avoid unbounded memory growth.
+          if (LocalSummarizer.cache.size > LocalSummarizer.CACHE_MAX_SIZE) {
+            const it = LocalSummarizer.cache.keys();
+            const first = it.next().value as string | undefined;
+            if (first) LocalSummarizer.cache.delete(first);
+          }
+        }
+
+        return summary;
+      } finally {
+        // Only release the global slot if we successfully acquired it.
+        if (acquired) {
+          try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }
         }
       }
+    })();
 
-      return summary;
-    } finally {
-      // Only release the global slot if we successfully acquired it.
-      if (acquired) {
-        try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }
-      }
+    if (id) {
+      try {
+        LocalSummarizer.pending.set(id, { promise: op, ts: Date.now() });
+        if (LocalSummarizer.pending.size > LocalSummarizer.MAX_PENDING_ENTRIES) {
+          const entries = [...LocalSummarizer.pending.entries()].sort(([, a], [, b]) => a.ts - b.ts);
+          const toRemove = LocalSummarizer.pending.size - LocalSummarizer.MAX_PENDING_ENTRIES;
+          for (let i = 0; i < toRemove; i++) LocalSummarizer.pending.delete(entries[i][0]);
+        }
+      } catch (_) { /* swallow */ }
+      op.finally(() => { try { LocalSummarizer.pending.delete(id); } catch (_) {} });
     }
+
+    return op;
   }
 
   /**
@@ -147,6 +176,7 @@ export class LocalSummarizer implements Summarizer {
    */
   static recordRequest(): void {
     LocalSummarizer.globalActiveRequests++;
+    try { LocalSummarizer.lastAcquireAt = Date.now(); } catch (_) { /* swallow */ }
   }
 
   /**
@@ -155,6 +185,10 @@ export class LocalSummarizer implements Summarizer {
    */
   static releaseRequest(): void {
     LocalSummarizer.globalActiveRequests = Math.max(0, LocalSummarizer.globalActiveRequests - 1);
+    try {
+      if (LocalSummarizer.globalActiveRequests > 0) LocalSummarizer.lastAcquireAt = Date.now();
+      else LocalSummarizer.lastAcquireAt = 0;
+    } catch (_) { /* swallow */ }
   }
 
 
