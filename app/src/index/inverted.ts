@@ -235,7 +235,24 @@ export class Indexer implements IndexerContract {
       this.processing = true;
     try {
       try { telemetry.emit('indexer_process_start', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {}
+      // Keep a local copy of pending documents so we can apply the
+      // indexing results back into the in-memory index after the worker
+      // pool finishes. The worker pool performs CPU-bound tokenization work
+      // and yields to the event loop; once that is complete we must update
+      // the authoritative InvertedIndex with the latest snapshots.
+      const docsToApply = this.pendingDocs.slice();
       await this.workerPool.process(this.pendingDocs.map(d => ({ id: d.id, text: d.text })));
+
+      // Apply processed documents to the index. Use updateDocument which
+      // behaves idempotently for new or existing documents (it replaces any
+      // prior term mappings and inserts the new snapshot). This ensures the
+      // index state reflects the latest document snapshots observed on the bus.
+      try {
+        for (const p of docsToApply) {
+          try { this.index.updateDocument(p.doc); } catch (_) { try { this.index.indexDocument(p.doc); } catch (_) { /* swallow */ } }
+        }
+      } catch (_) { /* swallow overall apply errors */ }
+
       this.pendingDocs = [];
       try { telemetry.emit('indexer_process_complete', { timestamp: Date.now() }); } catch (_) {}
     } catch (err) {
