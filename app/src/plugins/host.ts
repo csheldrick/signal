@@ -2,13 +2,22 @@
 // Plugin lifecycle manager. Defines the sandbox boundary.
 // Plugins receive a PluginContext — NOT the store directly.
 
-import type { DocumentSnapshot, SearchQuery, SearchResultSnapshot } from '../core/types.js';
+import type { DocumentSnapshot, SearchResultSnapshot } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import { normalizeSearchQuery } from '../core/types.js';
 import type { StorageEventType } from '../storage/events.js';
 export type { StorageEventType } from '../storage/events.js'; // do not re-export StorageEvent to reduce plugin surface area; plugins receive frozen event snapshots via PluginContext
 
-export type { SearchQuery } from '../core/types.js';
+// Plugin-facing SearchQuery contract: keep a lightweight, intentionally decoupled
+// copy of the core SearchQuery shape so plugins do not directly depend on the
+// full core type. This reduces centrality of the core SearchQuery type and
+// limits fan-out in the dependency graph.
+export interface SearchQuery {
+  text?: string;
+  tags?: string[];
+  dateRange?: { from: number; to: number };
+}
+
 export type { SearchResultSnapshot as SearchResult } from '../core/types.js';
 
 export interface Plugin {
@@ -142,6 +151,35 @@ export class PluginHost {
   }
 
   register(plugin: Plugin): void {
+    // Wrap the plugin with a thin error-boundary so misbehaving plugins cannot
+    // throw uncaught exceptions into the host process. We handle errors from
+    // activate/deactivate and emit telemetry while preserving original plugin
+    // behaviour. This strengthens the PluginHost isolation boundary.
+    const wrapPluginWithBoundary = (p: Plugin): Plugin => {
+      return {
+        id: p.id,
+        name: p.name,
+        auditId: p.auditId,
+        usesPluginContext: p.usesPluginContext,
+        activate: (ctx: PluginContext) => {
+          try {
+            p.activate(ctx);
+          } catch (err) {
+            try { console.error(`PluginHost: plugin.activate threw for '${p.id}'`, err); } catch (_) {}
+            try { telemetry.emit('plugin_activate_error', { id: p.id, error: String(err), timestamp: Date.now() }); } catch (_) {}
+          }
+        },
+        deactivate: () => {
+          try {
+            p.deactivate();
+          } catch (err) {
+            try { console.error(`PluginHost: plugin.deactivate threw for '${p.id}'`, err); } catch (_) {}
+            try { telemetry.emit('plugin_deactivate_error', { id: p.id, error: String(err), timestamp: Date.now() }); } catch (_) {}
+          }
+        }
+      };
+    };
+
     try { telemetry.emit('plugin_registered', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
     // Enforce explicit opt-in for the PluginContext sandbox. Legacy plugins
     // that do not set usesPluginContext === true must be migrated. This
@@ -169,7 +207,10 @@ export class PluginHost {
       try { telemetry.emit('plugin_register_failed_duplicate', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
       throw new Error(`PluginHost: plugin '${plugin.id}' is already registered`);
     }
-    this.plugins.set(plugin.id, plugin);
+    // Store a wrapped plugin to ensure any host-invoked lifecycle methods are
+    // protected by an error boundary. The audit/logging still refers to the
+    // plugin id/name supplied by the original plugin object.
+    this.plugins.set(plugin.id, wrapPluginWithBoundary(plugin));
     try { this.auditLog.push({ event: 'registered', pluginId: plugin.id, detail: { name: plugin.name }, timestamp: Date.now() }); } catch (_) {}
     try { telemetry.emit('plugin_registered_success', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
   }

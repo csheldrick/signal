@@ -22,12 +22,18 @@ export interface SyncSessionTrackerOptions {
  */
 export class SyncSessionTracker extends EventEmitter {
   private sessions: Map<string, { state: SyncSessionState; lastHeartbeat: number }> = new Map();
+  // Soft cap on tracked sessions to avoid unbounded memory growth when many peers connect.
+  private static readonly MAX_SESSIONS = 1000; // cap total tracked sessions
   private heartbeatIntervalMs: number;
   private staleTimeoutMs: number;
   private timer?: ReturnType<typeof setInterval>;
 
   constructor(opts?: SyncSessionTrackerOptions) {
     super();
+    // Reduce EventEmitter listener ceiling to avoid accidental memory growth
+    // when many subsystems attach to the tracker. Callers that legitimately
+    // need more listeners may call setMaxListeners on the tracker instance.
+    try { this.setMaxListeners(50); } catch (_) {}
     // Increase defaults to reduce hot timers and event fan-out
     this.heartbeatIntervalMs = opts?.heartbeatIntervalMs ?? 30_000; // default 30s
     this.staleTimeoutMs = opts?.staleTimeoutMs ?? 120_000; // default 2min
@@ -41,6 +47,31 @@ export class SyncSessionTracker extends EventEmitter {
 
   openSession(peerId: string, _initialClock?: any): void {
     const now = Date.now();
+    // Enforce soft cap on total tracked sessions to avoid unbounded memory growth.
+    try {
+      if (!this.sessions.has(peerId) && this.sessions.size >= SyncSessionTracker.MAX_SESSIONS) {
+        // Prefer removing closed/stale sessions first
+        for (const [k, v] of this.sessions.entries()) {
+          if (v.state === 'closed') {
+            this.sessions.delete(k);
+            break;
+          }
+        }
+        // If still at capacity, evict the least-recently-updated session
+        if (this.sessions.size >= SyncSessionTracker.MAX_SESSIONS) {
+          let oldestKey: string | undefined;
+          let oldestTime = Infinity;
+          for (const [k, v] of this.sessions.entries()) {
+            if (v.lastHeartbeat < oldestTime) {
+              oldestTime = v.lastHeartbeat;
+              oldestKey = k;
+            }
+          }
+          if (oldestKey) this.sessions.delete(oldestKey);
+        }
+      }
+    } catch (_) { /* swallow eviction errors */ }
+
     const prev = this.sessions.get(peerId);
     this.sessions.set(peerId, { state: 'open', lastHeartbeat: now });
     if (!prev || prev.state !== 'open') {
