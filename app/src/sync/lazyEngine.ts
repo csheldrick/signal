@@ -13,19 +13,15 @@ export function createLazySyncEngine(store: any, peerId: string, provided?: Sync
 
     const ensure = (): SyncEngine => {
     if (real) return real as SyncEngine;
-    try {
-      try {
-        const fromStore = getSyncEngineFromStore(store as any);
-        if (fromStore !== undefined && fromStore) {
-          real = fromStore as SyncEngine;
-          return real as SyncEngine;
-        }
-      } catch (err) {
-        // Propagate registry errors to help callers detect misconfiguration
-        // rather than silently creating a duplicate engine.
-        throw err;
-      }
-    } catch (_) { /* swallow */ }
+
+    // If the store already has a canonical engine, reuse it. Allow any
+    // registry errors to propagate so callers become aware of misconfiguration
+    // rather than silently creating duplicates.
+    const fromStore = getSyncEngineFromStore(store as any);
+    if (fromStore !== undefined && fromStore) {
+      real = fromStore as SyncEngine;
+      return real as SyncEngine;
+    }
 
     // Create and register a concrete engine when first needed.
     real = SyncEngine.getOrCreate(store as any, peerId) as SyncEngine;
