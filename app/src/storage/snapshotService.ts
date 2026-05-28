@@ -51,7 +51,7 @@ export class DiskDocumentSnapshotStore {
       }
 
       const resolvers: Array<() => void> = [];
-      const debounceMs = 50; // short debounce to group bursts
+      const debounceMs = 200; // increased debounce to group bursts and reduce IO pressure
       const timer = setTimeout(async () => {
         try {
           const state = this._pending.get(documentId);

@@ -200,7 +200,7 @@ export class SignalApp {
           // calling summarizeDocument for the same documents, reducing LocalSummarizer overload.
           const lastSummarizedMap: Map<string, number> = ((this as any)._bgSummarizeLast as Map<string, number>) || new Map();
           (this as any)._bgSummarizeLast = lastSummarizedMap;
-          const MIN_SUMMARIZE_INTERVAL_MS = 30_000; // at least 30 seconds between summaries for same doc (increased to reduce repeated work)
+          const MIN_SUMMARIZE_INTERVAL_MS = 60_000; // at least 60 seconds between summaries for same doc (reduced repeated work and pressure)
           const now = Date.now();
           const last = lastSummarizedMap.get(documentId) ?? 0;
           if (now - last < MIN_SUMMARIZE_INTERVAL_MS) {
@@ -335,8 +335,8 @@ export class SignalApp {
     // Provide host-level policy options to the PluginHost (e.g. allowNetworkSummaries)
     // Compute allowed network plugins from env var SIGNAL_ALLOWED_NETWORK_PLUGINS (comma-separated).
     // Parse allowed network plugins env var safely and deterministically.
-    const envList = (typeof process !== 'undefined' && process.env && process.env.SIGNAL_ALLOWED_NETWORK_PLUGINS)
-      ? process.env.SIGNAL_ALLOWED_NETWORK_PLUGINS.split(',').map(s => s.trim()).filter(Boolean)
+    const envList = typeof process !== 'undefined' && process.env && process.env.SIGNAL_ALLOWED_NETWORK_PLUGINS
+      ? (process.env.SIGNAL_ALLOWED_NETWORK_PLUGINS || '').split(',').map((s: string) => (s || '').trim()).filter(Boolean)
       : [];
     this.plugins = createLazyPluginHost(pluginContext, {
       allowNetworkSummaries: this._allowNetwork,
@@ -356,7 +356,7 @@ export class SignalApp {
     // Global resonance loop protection: prevent cascading summarization triggers
     // by limiting total background summarization activity and adding a global cooldown.
     let globalSummarizeActive = 0;
-    const GLOBAL_MAX_ACTIVE = 1; // reduce global background summarization concurrency to lower LocalSummarizer pressure
+    const GLOBAL_MAX_ACTIVE = 2; // increase slightly to allow controlled parallelism
     const GLOBAL_COOLDOWN_MS = 5000;
     let globalCooldownUntil = 0;
     const scheduleSummarize = (docId: string) => {
@@ -410,8 +410,8 @@ export class SignalApp {
 
       // Concurrency & queueing: bound concurrent background summarization jobs
       // to avoid unbounded CPU/network pressure from many timers firing.
-      const MAX_CONCURRENT_BG = 1; // conservative default (reduced to lower LocalSummarizer pressure)
-      const MAX_QUEUE = 200; // bounded queue size to avoid memory growth and limit queued background jobs
+      const MAX_CONCURRENT_BG = 2; // allow a small amount of concurrency to improve throughput while still limiting pressure
+      const MAX_QUEUE = 500; // increased queue size to allow more queued background jobs during bursts
 
       // Initialize shared counters/queue on the app instance if absent.
       if (!((this as any)._bgSummarizeActive)) (this as any)._bgSummarizeActive = 0;

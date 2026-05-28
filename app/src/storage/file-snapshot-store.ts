@@ -64,7 +64,7 @@ export class FileSnapshotStore implements SnapshotStore {
       }
 
       const resolvers: Array<() => void> = [];
-      const debounceMs = 50; // short debounce to group bursts
+      const debounceMs = 200; // increased debounce to group bursts and reduce IO pressure
       const timer = setTimeout(() => {
         try {
           const state = this._pending.get(documentId);

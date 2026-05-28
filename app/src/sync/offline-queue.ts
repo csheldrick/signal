@@ -49,6 +49,10 @@ export class OfflineSyncQueue extends EventEmitter {
   // This ensures concurrent drain calls receive the same promise and that
   // only one rewrite occurs at a time for a given peer.
   private drainRewriteLocks: Map<string, Promise<void>> = new Map();
+  // Simple short-lived cache of on-disk queue contents to avoid repeated
+  // synchronous file reads under bursty access patterns. TTL is small to
+  // remain best-effort while reducing IO pressure.
+  private diskCache: Map<string, { ts: number; entries: OfflineEntry[] }> = new Map();
 
   constructor(opts?: OfflineSyncQueueOptions) {
     super();
@@ -131,6 +135,14 @@ export class OfflineSyncQueue extends EventEmitter {
       try {
         const line = JSON.stringify(entry) + '\n';
         appendFileSync(path, line, { encoding: 'utf-8' });
+        // Update short-lived cache to include appended entry so subsequent
+        // reads within the TTL avoid another file read.
+        try {
+          const c = this.diskCache.get(peerId) || { ts: 0, entries: [] };
+          c.entries = c.entries.concat([entry]);
+          c.ts = Date.now();
+          this.diskCache.set(peerId, c);
+        } catch (_) {}
       } catch (err) {
         try { this.emit('persist_error', { peerId, entry, error: err }); } catch (_) {}
       }
@@ -174,11 +186,26 @@ export class OfflineSyncQueue extends EventEmitter {
   }
 
   private readAllFromDisk(peerId: string): OfflineEntry[] {
+    const now = Date.now();
+    const CACHE_TTL = 1000; // ms
+    try {
+      const cached = this.diskCache.get(peerId);
+      if (cached && (now - cached.ts) < CACHE_TTL) {
+        return cached.entries.slice();
+      }
+    } catch (_) {}
+
     const path = this.filePathForPeer(peerId);
-    if (!existsSync(path)) return [];
+    if (!existsSync(path)) {
+      try { this.diskCache.set(peerId, { ts: now, entries: [] }); } catch (_) {}
+      return [];
+    }
     try {
       const raw = readFileSync(path, 'utf-8');
-      if (!raw) return [];
+      if (!raw) {
+        try { this.diskCache.set(peerId, { ts: now, entries: [] }); } catch (_) {}
+        return [];
+      }
       const lines = raw.split('\n').filter(l => l.trim().length > 0);
       const out: OfflineEntry[] = [];
       let maxSeq = -Infinity;
@@ -196,8 +223,13 @@ export class OfflineSyncQueue extends EventEmitter {
       try {
         if (maxSeq !== -Infinity) this.seqCounters.set(peerId, maxSeq);
       } catch (_) { /* swallow */ }
+      // Keep cached copy for a short window to avoid repeat IO.
+      try { this.diskCache.set(peerId, { ts: now, entries: out.slice() }); } catch (_) {}
       return out;
-    } catch (_) { return []; }
+    } catch (_) {
+      try { this.diskCache.set(peerId, { ts: now, entries: [] }); } catch (_) {}
+      return [];
+    }
   }
 
   /**
@@ -258,13 +290,15 @@ export class OfflineSyncQueue extends EventEmitter {
         // rewrite disk file with remaining entries (durable) and set mem queue accordingly
         try {
           const path = this.filePathForPeer(peerId);
-          if (remaining.length === 0) {
+            if (remaining.length === 0) {
             // remove file and clear in-memory queue
             if (existsSync(path)) {
               try { unlinkSync(path); } catch (_) { /* swallow */ }
             }
             this.memQueues.delete(peerId);
+            try { this.diskCache.set(peerId, { ts: Date.now(), entries: [] }); } catch (_) {}
           } else {
+
             // write remaining to file atomically
             const tmp = path + '.tmp';
             try {
