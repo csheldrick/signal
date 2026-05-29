@@ -209,7 +209,10 @@ export function createInvertedIndex(): InvertedIndex {
 export class Indexer implements IndexerContract {
   private disposers: Array<() => void> = [];
   private readonly workerPool: WorkerPool;
-  private pendingDocs: Array<{ doc: any; id: string; text: string }> = [];
+  // Use a Map keyed by document id to keep only the latest snapshot per document
+  // This reduces redundant re-indexing when many updates to the same doc arrive
+  // in quick succession and bounds queue growth by preferring the latest value.
+  private pendingDocs: Map<string, { doc: any; id: string; text: string }> = new Map();
   private processing: boolean = false;
 
   constructor(events: any, private readonly index: InvertedIndex) {
@@ -226,7 +229,7 @@ export class Indexer implements IndexerContract {
     // Helper to defensively clone + freeze incoming snapshots before storing
     // them in the pending queue so external mutation cannot later influence
     // index state while the doc waits in the queue.
-    const makeSafe = (doc: any) => {
+      const makeSafe = (doc: any) => {
       try {
         return createSafeSnapshot(doc as any);
       } catch (_) {
@@ -235,11 +238,27 @@ export class Indexer implements IndexerContract {
     };
 
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) { const safe = makeSafe(ev.document); this.pendingDocs.push({ doc: safe, id: safe.id, text: safe.content }); try { if (this.pendingDocs.length > 200) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {}
-      // When pendingDocs grows large, emit a lightweight index_stats event to surface current index sizes
-      try { if (this.pendingDocs.length > 100) { const stats = (() => { try { return this.index.stats(); } catch (_) { return undefined; } })(); if (stats) telemetry.emit('index_stats', { stats, pending: this.pendingDocs.length, timestamp: Date.now() }); } } catch (_) {} } } catch (_) {} };
-      const updated = (ev: any) => { try { if (ev && ev.current) { const safe = makeSafe(ev.current); this.pendingDocs.push({ doc: safe, id: safe.id, text: safe.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
+      const created = (ev: any) => { try { if (ev && ev.document) {
+          const safe = makeSafe(ev.document);
+          // Keep only the latest snapshot per document id to avoid duplicate work
+          this.pendingDocs.set(safe.id, { doc: safe, id: safe.id, text: safe.content });
+          try {
+            if (this.pendingDocs.size > 200) {
+              // Evict the oldest entry in insertion order to bound memory
+              const it = this.pendingDocs.keys();
+              const oldest = it.next().value as string | undefined;
+              if (oldest) this.pendingDocs.delete(oldest);
+              try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.size, timestamp: Date.now() }); } catch (_) {}
+            }
+            this.scheduleProcessPending();
+          } catch (_) {}
+
+          // When pendingDocs grows large, emit a lightweight index_stats event to surface current index sizes
+          try { if (this.pendingDocs.size > 100) { const stats = (() => { try { return this.index.stats(); } catch (_) { return undefined; } })(); if (stats) telemetry.emit('index_stats', { stats, pending: this.pendingDocs.size, timestamp: Date.now() }); } } catch (_) {}
+        } } catch (_) {} };
+      const updated = (ev: any) => { try { if (ev && ev.current) { const safe = makeSafe(ev.current); this.pendingDocs.set(safe.id, { doc: safe, id: safe.id, text: safe.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
+
 
       if (typeof events.onAsync === 'function') {
         events.onAsync('created', created);
@@ -263,17 +282,18 @@ export class Indexer implements IndexerContract {
   }
 
   private async processPending(): Promise<void> {
-    if (this.pendingDocs.length === 0 || this.processing) return;
+    if (this.pendingDocs.size === 0 || this.processing) return;
       this.processing = true;
     try {
-      try { telemetry.emit('indexer_process_start', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {}
+      try { telemetry.emit('indexer_process_start', { pending: this.pendingDocs.size, timestamp: Date.now() }); } catch (_) {}
       // Keep a local copy of pending documents so we can apply the
       // indexing results back into the in-memory index after the worker
       // pool finishes. The worker pool performs CPU-bound tokenization work
       // and yields to the event loop; once that is complete we must update
       // the authoritative InvertedIndex with the latest snapshots.
-      const docsToApply = this.pendingDocs.slice();
-      await this.workerPool.process(this.pendingDocs.map(d => ({ id: d.id, text: d.text })));
+      const docsToApply = Array.from(this.pendingDocs.values());
+      const workerInputs = docsToApply.map(d => ({ id: d.id, text: d.text }));
+      await this.workerPool.process(workerInputs);
 
       // Apply processed documents to the index. Use updateDocument which
       // behaves idempotently for new or existing documents (it replaces any
@@ -285,7 +305,7 @@ export class Indexer implements IndexerContract {
         }
       } catch (_) { /* swallow overall apply errors */ }
 
-      this.pendingDocs = [];
+      this.pendingDocs.clear();
       try { telemetry.emit('indexer_process_complete', { timestamp: Date.now() }); } catch (_) {}
       // Emit index stats for observability so operators can monitor index size/terms
       try {

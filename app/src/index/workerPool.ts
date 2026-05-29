@@ -88,8 +88,8 @@ export class WorkerPool {
     // Safety: if the chunk queue grows extremely large relative to worker count
     // treat this as overload and surface an error so callers (Indexer) can back off.
     try {
-      const MAX_FACTOR = 100; // allow up to 100 chunks per worker before rejecting
-      if (chunks.length > Math.max(1000, this.numWorkers * MAX_FACTOR)) {
+      const MAX_FACTOR = 20; // allow fewer chunks per worker before rejecting to provide earlier backpressure
+      if (chunks.length > Math.max(200, this.numWorkers * MAX_FACTOR)) {
         try { telemetry.emit('workerpool_overloaded', { chunks: chunks.length, numWorkers: this.numWorkers, timestamp: Date.now() }); } catch (_) {}
         return Promise.reject(new Error('workerpool overloaded'));
       }
