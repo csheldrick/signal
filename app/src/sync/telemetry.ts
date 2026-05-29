@@ -69,6 +69,4 @@ class TelemetryCenter {
   }
 }
 
-import type { Observability } from '../core/types.js';
-
-export const telemetry: Observability = new TelemetryCenter();
+export const telemetry: { emit(type: string, payload: any): void; on(listener: (event: { type: string; payload: any }) => void): () => void; clear(): void; listenerCount?: () => number; } = new TelemetryCenter();
