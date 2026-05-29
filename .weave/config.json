@@ -10,5 +10,32 @@
   "operatorActivationThreshold": 0.3,
   "confidencePropagationEveryNTicks": 5,
   "evolutionRecordEveryNTicks": 10,
-  "maintenanceEveryNTicks": 50
+  "maintenanceEveryNTicks": 50,
+  "docs": {
+    "root": "workspace",
+    "ingest": [
+      { "glob": "goals/**/*.md", "node": "goal", "edge": "supports" },
+      { "glob": "observations/**/*.md", "node": "observation", "edge": "related_to" },
+      { "glob": "architecture/decisions/**/*.md", "node": "architecture", "edge": "related_to" },
+      { "glob": "architecture/constraints/**/*.md", "node": "constraint", "edge": "blocks" },
+      { "glob": "architecture/experiments/**/*.md", "node": "hypothesis", "edge": "predicts" },
+      { "glob": "tasks/**/*.md", "node": "task", "edge": "related_to" }
+    ],
+    "output": {
+      "experimentResults": {
+        "target": "architecture/experiments/{id}-*.md",
+        "mode": "append-block",
+        "marker": "weave:results"
+      },
+      "selectionOutcomes": {
+        "target": "architecture/experiments/{id}-*.md",
+        "mode": "append-block",
+        "marker": "weave:selection"
+      },
+      "observations": {
+        "target": "observations/{slug}.md",
+        "mode": "create"
+      }
+    }
+  }
 }
