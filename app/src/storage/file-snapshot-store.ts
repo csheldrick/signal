@@ -54,8 +54,8 @@ export class FileSnapshotStore implements SnapshotStore {
     try {
       // Restore padding for base64 decode
       let b = String(name).replace(/-/g, '+').replace(/_/g, '/');
-      const pad = b.length % 4;
-      if (pad === 2) b += '=='; else if (pad === 3) b += '='; else if (pad === 1) b = b + '===';
+      const padNeeded = (4 - (b.length % 4)) % 4;
+      if (padNeeded > 0) b = b + '='.repeat(padNeeded);
       return Buffer.from(b, 'base64').toString('utf8');
     } catch (_) {
       try { return decodeURIComponent(name); } catch (_) { return name; }
