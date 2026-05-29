@@ -142,15 +142,18 @@ export class PluginHost {
     };
 
     try { telemetry.emit('plugin_registered', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
-    // Enforce explicit opt-in for the PluginContext sandbox. Legacy plugins
-    // that do not set usesPluginContext === true must be migrated. This
-    // prevents accidental sandbox escapes and makes the boundary explicit.
+    // Enforce explicit opt-in for the PluginContext sandbox when enabling.
+    // To improve migration ergonomics we allow legacy plugins to register
+    // (reduces immediate breaking changes and monolithic registration failures)
+    // but they will not be permitted to *enable* until migrated to the
+    // sandboxed PluginContext contract (usesPluginContext = true). This lets
+    // tooling discover legacy plugins while preserving a safe runtime enable
+    // policy that prevents sandbox escapes.
     if (plugin.usesPluginContext !== true) {
-      // Enforce explicit opt-in for the PluginContext sandbox. Fail fast to
-      // prevent accidental sandbox escapes and to encourage migration of
-      // legacy plugins to the sandboxed contract. Throw so callers notice
-      // misconfiguration immediately instead of silently continuing.
-      throw new Error(`PluginHost: plugin '${plugin.id}' must set usesPluginContext = true to register`);
+      try { telemetry.emit('plugin_register_legacy', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
+      // Continue registration but mark as legacy via audit log for operator visibility.
+      try { this.auditLog.push({ event: 'registered_legacy', pluginId: plugin.id, detail: { name: plugin.name }, timestamp: Date.now() }); } catch (_) {}
+      // Note: do NOT throw here to allow migration paths; enable() enforces sandbox
     }
 
     // Enforce audit requirement when configured: plugin must provide an auditId
@@ -179,6 +182,15 @@ export class PluginHost {
   enable(pluginId: string): boolean {
     const plugin = this.plugins.get(pluginId);
     if (!plugin || this.enabled.has(pluginId)) return false;
+
+    // Enforce sandbox opt-in at enable-time: legacy plugins may register
+    // but are not permitted to activate until migrated to the sandboxed
+    // PluginContext contract. This prevents accidental sandbox escapes.
+    if ((plugin as any).usesPluginContext !== true) {
+      try { telemetry.emit('plugin_enable_denied_legacy', { id: pluginId, timestamp: Date.now() }); } catch (_) {}
+      try { console.warn && console.warn(`PluginHost: enabling legacy plugin '${pluginId}' denied; migrate to usesPluginContext = true`); } catch (_) {}
+      return false;
+    }
 
     // Prevent enabling too many plugins concurrently to avoid fan-out pressure.
     if (this.enabled.size >= PluginHost.MAX_ENABLED_PLUGINS) {

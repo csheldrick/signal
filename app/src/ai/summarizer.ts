@@ -274,6 +274,7 @@ export class LocalSummarizer implements Summarizer {
 export class RemoteSummarizer implements Summarizer {
   readonly isRemote = true; readonly isPure = false;
   readonly allowsNetwork: boolean;
+  readonly allowBackgroundNetwork = false; // Remote summarizers must not be used by background jobs
   private readonly _fetcher: (document: Document, opts?: { authToken?: string }) => Promise<string>; 
   private readonly fallback: LocalSummarizer;
   private readonly allowNetwork: boolean;

@@ -243,8 +243,16 @@ export interface IndexStats {
 // in ai/summarizer.ts but should conform to this lightweight interface.
 export interface Summarizer {
   readonly isRemote: boolean;
+  /** Whether the implementation is permitted to perform network IO when
+   * requested. Implementations that are strictly local should set this to
+   * false. */
   readonly allowsNetwork: boolean;
+  /** Whether the summarizer is pure/deterministic (no side-effects). */
   readonly isPure: boolean;
+  /** Whether it is safe for background jobs (timers, schedulers) to invoke
+   * this summarizer. Remote summarizers MUST set this to false to ensure
+   * offline-first background processing remains deterministic and network-free. */
+  readonly allowBackgroundNetwork?: boolean;
   // Accept either a live Document or a readonly DocumentSnapshot so callers
   // can pass snapshots across subsystem boundaries without forcing a copy.
   summarize(document: Document | DocumentSnapshot): Promise<string>;
