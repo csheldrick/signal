@@ -9,8 +9,7 @@ import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import type { VectorClock } from '../sync/protocol.js';
 
-import type { DocumentSnapshotServiceOptions as LocalDocumentSnapshotServiceOptions } from './event-types.js';
-export type DocumentSnapshotServiceOptions = LocalDocumentSnapshotServiceOptions;
+import type { DocumentSnapshotServiceOptions } from '../core/types.js';
 
 // Attempt to import the registry to provide a canonical store getter when
 // this module is used as a public surface. The registry is optional and
