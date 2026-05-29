@@ -110,7 +110,7 @@ export class WorkerPool {
     // Process chunks with a concurrency limit equal to numWorkers. This avoids
     // dispatching an unbounded number of macrotasks at once and reduces
     // instantaneous pressure on downstream subsystems.
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       let idx = 0;
       let active = 0;
       // Mirror local active count to the instance for observability and testing.

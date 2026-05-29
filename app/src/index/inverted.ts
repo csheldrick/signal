@@ -293,20 +293,33 @@ export class Indexer implements IndexerContract {
       // the authoritative InvertedIndex with the latest snapshots.
       const docsToApply = Array.from(this.pendingDocs.values());
       const workerInputs = docsToApply.map(d => ({ id: d.id, text: d.text }));
-      await this.workerPool.process(workerInputs);
 
-      // Apply processed documents to the index. Use updateDocument which
-      // behaves idempotently for new or existing documents (it replaces any
-      // prior term mappings and inserts the new snapshot). This ensures the
-      // index state reflects the latest document snapshots observed on the bus.
+      let workerOk = false;
+      try {
+        await this.workerPool.process(workerInputs);
+        workerOk = true;
+      } catch (err) {
+        // If the worker pool fails (partial or total), fall back to a
+        // synchronous indexing path so the in-memory index remains up-to-date.
+        try { telemetry.emit('indexer_workerpool_failure', { error: String(err), pending: docsToApply.length, timestamp: Date.now() }); } catch (_) {}
+      }
+
+      // Apply processed documents to the index. Prefer the fast path
+      // (after successful worker processing), but always ensure we apply
+      // the latest snapshots even if the worker stage failed.
       try {
         for (const p of docsToApply) {
           try { this.index.updateDocument(p.doc); } catch (_) { try { this.index.indexDocument(p.doc); } catch (_) { /* swallow */ } }
         }
-      } catch (_) { /* swallow overall apply errors */ }
+      } catch (applyErr) {
+        try { telemetry.emit('indexer_apply_error', { error: String(applyErr), timestamp: Date.now() }); } catch (_) {}
+      }
 
+      // Clear pending documents regardless of worker outcome to avoid
+      // repeatedly re-applying the same stale snapshots and to bound memory.
       this.pendingDocs.clear();
-      try { telemetry.emit('indexer_process_complete', { timestamp: Date.now() }); } catch (_) {}
+
+      try { telemetry.emit('indexer_process_complete', { timestamp: Date.now(), workerPathSuccess: workerOk }); } catch (_) {}
       // Emit index stats for observability so operators can monitor index size/terms
       try {
         const stats = (() => { try { return this.index.stats(); } catch (_) { return undefined; } })();
@@ -314,7 +327,11 @@ export class Indexer implements IndexerContract {
       } catch (_) {}
     } catch (err) {
       try { telemetry.emit('indexer_process_error', { error: String(err), timestamp: Date.now() }); } catch (_) {}
-      // Worker error - retry later
+      // If something unexpected blew up, ensure pendingDocs is cleared to
+      // avoid repeated failures. We conservatively clear to favor forward
+      // progress; callers that require durable retries should use an
+      // offline queue in the SyncManager layer.
+      try { this.pendingDocs.clear(); } catch (_) {}
     } finally {
       this.processing = false;
     }
