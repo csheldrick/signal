@@ -9,8 +9,8 @@ import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import type { VectorClock } from '../sync/protocol.js';
 
-import type { DocumentSnapshotServiceOptions as CoreDocumentSnapshotServiceOptions } from '../core/types.js';
-export type DocumentSnapshotServiceOptions = CoreDocumentSnapshotServiceOptions;
+import type { DocumentSnapshotServiceOptions as LocalDocumentSnapshotServiceOptions } from './event-types.js';
+export type DocumentSnapshotServiceOptions = LocalDocumentSnapshotServiceOptions;
 
 export class DocumentSnapshotService {
   private store?: SnapshotStore;

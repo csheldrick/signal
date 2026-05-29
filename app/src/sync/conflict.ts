@@ -6,7 +6,14 @@ import type { Document, DocumentSnapshot, ConflictResolution } from '../core/typ
 import type { ConflictRecord, ConflictStrategy, VectorClock } from './protocol.js';
 import { isConcurrent } from './protocol.js';
 
-import type { ConflictCandidate } from '../core/types.js';
+// Local ConflictCandidate type to avoid coupling to high-centrality core/types for a single use
+type ConflictCandidate = {
+  documentId: string;
+  local: DocumentSnapshot;
+  localClock: any;
+  remote: DocumentSnapshot;
+  remoteClock: any;
+};
 
 export function isConflict(localClock: VectorClock, remoteClock: VectorClock): boolean {
   // Defensive wrapper around isConcurrent to avoid throwing or misclassifying

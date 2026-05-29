@@ -8,9 +8,11 @@ import { telemetry } from '../sync/telemetry.js';
 // centralize the lightweight interfaces and reduce duplication. Keep local
 // aliases so existing imports from './host.js' continue to work while
 // ensuring the host implements the core-defined contract.
-import type { Plugin as CorePlugin, PluginContext as CorePluginContext, SearchQuery as CoreSearchQuery, SearchResult as CoreSearchResult, DocumentSnapshot as CoreDocumentSnapshot, StorageEventType as CoreStorageEventType } from '../core/types.js';
+import type { Plugin as CorePlugin, PluginContext as CorePluginContext, SearchQuery as CoreSearchQuery, SearchResult as CoreSearchResult, DocumentSnapshot as CoreDocumentSnapshot } from '../core/types.js';
+import type { StorageEventType as LocalStorageEventType } from '../storage/event-types.js';
 
-export type StorageEventType = CoreStorageEventType;
+
+export type StorageEventType = LocalStorageEventType;
 export type DocumentSnapshot = CoreDocumentSnapshot;
 export type SearchResultSnapshot = CoreSearchResult;
 export type SearchQuery = CoreSearchQuery;

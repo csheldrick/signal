@@ -29,72 +29,7 @@ export interface AppConfig {
   disableBackgroundSummarize?: boolean;
 }
 
-// Lightweight vector clock used by the sync subsystem and exposed here so
-// multiple modules can agree on the shape without importing the concrete
-// sync/protocol implementation.
-export interface VectorClock {
-  [peerId: string]: number;
-}
-
-export type SyncState = 'idle' | 'syncing' | 'conflicted' | 'resolved';
-
-export type ConflictStrategy = 'last-write-wins' | 'first-write-wins' | 'merge-content';
-
-export interface PeerInfo {
-  peerId: string;
-  /** Last vector clock we received from this peer. */
-  clock: VectorClock;
-  /** Epoch ms of the last successful exchange. */
-  lastSeen: number;
-  state: SyncState;
-}
-
-export interface SyncAck {
-  kind: 'ack';
-  peerId: string;
-  documentId: string;
-  clock: VectorClock;
-  timestamp: number;
-}
-
-export interface ConflictRecord {
-  documentId: string;
-  localClock: VectorClock;
-  remoteClock: VectorClock;
-  localTimestamp: number;
-  remoteTimestamp: number;
-  resolvedBy: ConflictStrategy;
-  resolvedAt: number;
-}
-
-export interface SyncMessage {
-  operation: 'create' | 'update' | 'delete' | 'link';
-  documentId: string;
-  payload: unknown;
-  clock: VectorClock;
-  peerId: string;
-  timestamp: number;
-  messageId?: string;
-}
-
-export interface SyncManagerOptions {
-  /** Local peer identifier. */
-  peerId: string;
-  /** Strategy to use when concurrent writes collide. */
-  conflictStrategy?: ConflictStrategy;
-  /** How often (ms) the flush loop runs. */
-  flushIntervalMs?: number;
-  /** Optional externally-provided SyncEngine instance to avoid duplicate engine creation. */
-  engine?: any;
-  /** Optional external session tracker so PresenceTracker and SyncManager can share authoritative sessions. */
-  sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
-  /** Optional snapshot service to compact vector clocks and expose snapshot hooks. */
-  snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
-  /** Optional durable offline queue to persist outbound messages when enqueue fails */
-  offlineQueue?: OfflineSyncQueue;
-  /** When true, enforce offline-first replay ordering: drain offlineQueue before attaching live store listeners. */
-  offlineFirstMode?: boolean;
-}
+export type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage, SyncManagerOptions, OfflineEntry, OfflineSyncQueueOptions, OfflineSyncQueue, ConflictCandidate, ConflictCandidateRecord } from '../sync/protocol.js';
 
 // Minimal, readonly-friendly snapshot used at subsystem/plugin boundaries.
 // This mirrors the main Document shape but is explicit to signal the
@@ -182,25 +117,6 @@ export interface DocumentChange {
   title?: string;
   content?: string;
   tags?: string[];
-}
-
-// Offline queue entry shape and options centralized so both the concrete
-// OfflineSyncQueue implementation and consumers such as SyncManager can
-// depend on a single authoritative definition.
-export interface OfflineEntry {
-  id: string; // stable id for the queued mutation
-  peerId: string;
-  documentId: string;
-  payload: any;
-  timestamp: number;
-  seq: number;
-}
-
-export interface OfflineSyncQueueOptions {
-  /** Directory where offline files are persisted. Defaults to process.cwd() */
-  dataDir?: string;
-  /** File prefix for per-peer persistent queues */
-  filePrefix?: string;
 }
 
 // DeprecatedDocumentChange removed: use DocumentChange and normalizeDocumentChange; do NOT import this deprecated alias.
@@ -461,17 +377,6 @@ export interface PresenceTracker {
 export type DocumentValidatorAsync = ((id: string) => Promise<boolean>) & { dispose?: () => void };
 export type DocumentValidatorSync = ((id: string) => boolean) & { dispose?: () => void };
 
-// Offline sync queue contract used by SyncManager to persist outbound
-// messages when transports are unavailable. Keeping a minimal interface
-// here avoids importing the concrete class in many places.
-export interface OfflineSyncQueue {
-	  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
-	  size(peerId: string): number;
-	  list(peerId: string): any[];
-	  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
-	  clear(peerId: string): void;
-	  dispose(): void;
-	}
 
 // Cross-cutting observability contract. Declaring a lightweight Observability
 // interface in core types makes the telemetry/metrics/tracing facility visible
@@ -554,18 +459,6 @@ export interface DocumentSnapshotServiceOptions {
   compactionIntervalMs?: number;
   maxClockEntries?: number;
 }
-
-// Conflict candidate shaped into core types so higher-level modules can
-// reason about potential conflicts without importing the sync subsystem.
-export interface ConflictCandidate {
-  documentId: string;
-  local: DocumentSnapshot;
-  localClock: any;
-  remote: DocumentSnapshot;
-  remoteClock: any;
-}
-
-export type ConflictCandidateRecord = ConflictCandidate;
 
 // Plugin contracts: surface lightweight plugin host and sandbox types in
 // core/types so other subsystems can depend on stable, centralized

@@ -1,12 +1,97 @@
 // ── Sync Protocol ───────────────────────────────────────────
 // Types for the eventual-consistency sync layer.
 
-import type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage } from '../core/types.js';
+// Define core sync-related types here to reduce centrality of core/types
+// and to keep the sync protocol self-contained. Other modules may import
+// these types from sync/protocol.js directly.
+export interface VectorClock {
+  [peerId: string]: number;
+}
 
-// Re-export common sync-related types from core/types so callers that import
-// from sync/protocol.js continue to function while the canonical type
-// definitions live in core/types.ts.
-export type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage };
+export type SyncState = 'idle' | 'syncing' | 'conflicted' | 'resolved';
+
+export type ConflictStrategy = 'last-write-wins' | 'first-write-wins' | 'merge-content';
+
+export interface PeerInfo {
+  peerId: string;
+  clock: VectorClock;
+  lastSeen: number;
+  state: SyncState;
+}
+
+export interface SyncAck {
+  kind: 'ack';
+  peerId: string;
+  documentId: string;
+  clock: VectorClock;
+  timestamp: number;
+}
+
+export interface ConflictRecord {
+  documentId: string;
+  localClock: VectorClock;
+  remoteClock: VectorClock;
+  localTimestamp: number;
+  remoteTimestamp: number;
+  resolvedBy: ConflictStrategy;
+  resolvedAt: number;
+}
+
+export interface SyncMessage {
+  operation: 'create' | 'update' | 'delete' | 'link';
+  documentId: string;
+  payload: unknown;
+  clock: VectorClock;
+  peerId: string;
+  timestamp: number;
+  messageId?: string;
+}
+
+// Offline queue types used by SyncManager and OfflineSyncQueue implementation
+export interface OfflineEntry {
+  id: string;
+  peerId: string;
+  documentId: string;
+  payload: any;
+  timestamp: number;
+  seq: number;
+}
+
+export interface OfflineSyncQueueOptions {
+  dataDir?: string;
+  filePrefix?: string;
+}
+
+export interface OfflineSyncQueue {
+  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
+  size(peerId: string): number;
+  list(peerId: string): any[];
+  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
+  clear(peerId: string): void;
+  dispose(): void;
+}
+
+export interface SyncManagerOptions {
+  peerId: string;
+  conflictStrategy?: ConflictStrategy;
+  flushIntervalMs?: number;
+  engine?: any;
+  sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
+  snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
+  offlineQueue?: OfflineSyncQueue;
+  offlineFirstMode?: boolean;
+}
+
+// Conflict candidate shape
+export interface ConflictCandidate {
+  documentId: string;
+  local: any;
+  localClock: any;
+  remote: any;
+  remoteClock: any;
+}
+
+export type ConflictCandidateRecord = ConflictCandidate;
 
 export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   const merged: VectorClock = { ...a };

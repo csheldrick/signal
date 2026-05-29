@@ -2,21 +2,22 @@
 // Event types for storage mutations. Other modules subscribe
 // to these events, creating depends_on edges in the graph.
 
-import type { DocumentSnapshot, DocumentLink, DocumentValidatorAsync, DocumentValidatorSync, StorageEventType as CoreStorageEventType, StorageEvent as CoreStorageEvent, StorageEventListener as CoreStorageEventListener, StorageEventBusContract as CoreStorageEventBusContract } from '../core/types.js';
+import type { DocumentSnapshot, DocumentLink, DocumentValidatorAsync, DocumentValidatorSync } from '../core/types.js';
+import type { StorageEventType as LocalStorageEventType, StorageEvent as LocalStorageEvent, StorageEventListener as LocalStorageEventListener, StorageEventBusContract as LocalStorageEventBusContract } from './event-types.js';
 
-// Use core-defined storage event types to avoid duplication and reduce
-// subsystem centrality. Re-export local aliases for backward compatibility.
-export type StorageEventType = CoreStorageEventType;
-export type StorageEvent = CoreStorageEvent;
+// Use local-specific event types to avoid centralizing high-fanout contracts
+// in core/types. Re-export for backward compatibility when needed.
+export type StorageEventType = LocalStorageEventType;
+export type StorageEvent = LocalStorageEvent;
 
 // Listener receives a readonly snapshot of events to discourage mutation and
 // reduce coupling between event producers and consumers.
 
-type Listener = CoreStorageEventListener;
+type Listener = LocalStorageEventListener;
 
-// Local bus contract extends the core contract to keep the concrete
+// Local bus contract extends the local event-types contract to keep the concrete
 // implementation aligned with the shared type definitions.
-export interface StorageEventBusContract extends CoreStorageEventBusContract {}
+export interface StorageEventBusContract extends LocalStorageEventBusContract {}
 
 // deprecated alias removed to reduce legacy surface area
 
