@@ -43,7 +43,7 @@ export class LocalSummarizer implements Summarizer {
   private readonly maxSentences: number;
 
   private static cache: Map<string, { updatedAt: number; summary: string }> = new Map();
-  private static readonly CACHE_MAX_SIZE = 200;
+  private static readonly CACHE_MAX_SIZE = 1000; // increased cache to reduce repeated compute under bursts
   private static readonly CACHE_TTL_MS = 60_000;
   private static readonly FAILED_CACHE: Map<string, number> = new Map();
   private static readonly FAILED_CACHE_TTL_MS = 300_000;
@@ -54,7 +54,7 @@ export class LocalSummarizer implements Summarizer {
   private static globalActiveRequests: number = 0;
   // Timestamp of the last recorded acquisition; used to recover from leaked slots.
   private static lastAcquireAt: number = 0;
-  static readonly GLOBAL_MAX_CONCURRENT = 2; // increase to allow a small reasonable parallelism while avoiding overload
+  static readonly GLOBAL_MAX_CONCURRENT = 5; // increased parallelism to better absorb concurrent callers without rejecting them
 
   /**
    * Attempt to acquire a global LocalSummarizer request slot.
@@ -89,7 +89,7 @@ export class LocalSummarizer implements Summarizer {
   // Per-document pending tracking to coalesce concurrent requests
   // and avoid duplicate work for the same document.
   private static pending: Map<string, { promise: Promise<string>; ts: number }> = new Map();
-  private static readonly MAX_PENDING_ENTRIES = 100;
+  private static readonly MAX_PENDING_ENTRIES = 500; // allow more coalesced pending entries to avoid duplicate work under bursts
 
   // Global failure tracking to avoid thrashing when remote summarization is flaky.
   // After maxFailures within failureWindowMs, we enter a short cooldown
