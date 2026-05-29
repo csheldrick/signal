@@ -3,7 +3,7 @@
 // provide a lightweight, well-tested concrete plugin implementation for
 // system integration tests and operator tooling.
 
-import type { Plugin, PluginContext } from './host.js';
+import type { Plugin, PluginContext } from '../core/types.js';
 
 export class HealthPlugin implements Plugin {
   readonly id = 'health';

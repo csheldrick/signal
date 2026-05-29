@@ -2,7 +2,7 @@
 // Correct boundary usage — uses only PluginContext, no direct store import.
 // Contrast with SearchPlugin for boundary detection validation.
 
-import type { Plugin, PluginContext } from './host.js';
+import type { Plugin, PluginContext } from '../core/types.js';
 
 export class ExportPlugin implements Plugin {
   readonly id = 'export';
