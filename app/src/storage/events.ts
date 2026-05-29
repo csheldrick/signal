@@ -33,7 +33,7 @@ export class StorageEventBus implements StorageEventBusContract {
       let total = 0;
       for (const [k, s] of this.listeners) { perType[String(k)] = s.size; total += s.size; }
       let asyncTotal = 0;
-      for (const [k, s] of this.asyncListeners) { asyncTotal += s.size; }
+      for (const [, s] of this.asyncListeners) { asyncTotal += s.size; }
       return { total, perType, asyncTotal };
     } catch (_) { return { total: 0, perType: {}, asyncTotal: 0 }; }
   }
@@ -62,7 +62,7 @@ export class StorageEventBus implements StorageEventBusContract {
 
     // Compute current totals conservatively.
     let total = 0;
-    for (const s of this.listeners.values()) total += s.size;
+    for (const s of this.listeners.values()) { total += s.size; }
 
     const set = this.listeners.get(type)!;
     if (set.size >= MAX_PER_TYPE) {
@@ -202,7 +202,7 @@ export class StorageEventBus implements StorageEventBusContract {
         const asyncStar = this.asyncListeners.get('*');
         const directArr = direct ? Array.from(direct) : [];
         const starArr = star ? Array.from(star) : [];
-        const asyncDirectArr = asyncDirect ? Array.from(asyncDirect) : [];
+        const asyncDirectArr = asyncDirect ? [...asyncDirect] : [];
         const asyncStarArr = asyncStar ? Array.from(asyncStar) : [];
         for (const fn of directArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
         for (const fn of starArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
