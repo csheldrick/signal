@@ -129,14 +129,14 @@ export class SignalApp {
         if ((this as any)._invertedIndex) return (this as any)._invertedIndex;
         let idx: any;
         try {
-          const mod = require('../index/inverted.js');
-          const createFn = mod && (mod.createInvertedIndex || (mod.default && mod.default.createInvertedIndex) || mod.default || mod);
-          if (typeof createFn === 'function') idx = createFn();
-          else idx = undefined;
+const mod = require('../indexing/index.js');
+              const createFn = mod && (mod.createInvertedIndex || (mod.default && mod.default.createInvertedIndex) || mod.default || mod);
+              if (typeof createFn === 'function') idx = createFn();
+              else idx = undefined;
         } catch (_) { idx = undefined; }
         if (!idx) return undefined;
         try {
-          const mod = require('../index/inverted.js');
+          const mod = require('../indexing/index.js');
           const IndexerCtor = mod && (mod.Indexer || (mod.default && mod.default.Indexer));
           if (typeof IndexerCtor === 'function') {
             const indexer = new IndexerCtor(this.events, idx);
