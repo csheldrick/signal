@@ -504,6 +504,12 @@ export interface DocumentSnapshotServiceOptions {
 // encourages better modularization and makes the intended sandbox
 // boundary visible to architectural analysis.
 export interface PluginContext {
+  // Marker field used at runtime to assert the object is a sandboxed
+  // PluginContext produced by the PluginHost. Hosts should set this flag
+  // (non-enumerable is preferred) to help runtime checks distinguish
+  // between untrusted objects and the sanctioned sandbox.
+  readonly __isPluginContext?: true;
+
   listDocuments(): ReadonlyArray<Readonly<DocumentSnapshot>>;
   searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResultSnapshot>>;
   getDocument(id: string): Readonly<DocumentSnapshot> | undefined;
@@ -516,7 +522,12 @@ export interface Plugin {
   id: string;
   name: string;
   readonly auditId?: string;
-  readonly usesPluginContext?: boolean;
+  /**
+   * Enforce that plugins opt into the sandboxed PluginContext at the type level.
+   * This helps ensure plugin implementations cannot rely on deprecated legacy
+   * host escapes and makes the intended isolation explicit to consumers.
+   */
+  readonly usesPluginContext: true;
   activate(context: PluginContext): void;
   deactivate(): void;
 }

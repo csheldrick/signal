@@ -28,6 +28,20 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
         await fsPromises.mkdir(bp, { recursive: true });
       } catch (_) { /* swallow */ }
     })();
+
+    // Register canonical disk store on globalThis to reduce accidental
+    // duplicate authoritative stores across differing import paths or
+    // build artifacts. The registry module will prefer the first created
+    // canonical store when queried.
+    try {
+      if (typeof globalThis !== 'undefined') {
+        const g = globalThis as any;
+        const GLOBAL_KEY = '__SIGNAL_CANONICAL_SNAPSHOT_STORE__';
+        const GLOBAL_DISK = '__SIGNAL_DISK_SNAPSHOT_STORE__';
+        if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = this;
+        g[GLOBAL_DISK] = this;
+      }
+    } catch (_) {}
   }
 
   private docDir(documentId: string): string {

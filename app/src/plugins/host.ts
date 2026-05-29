@@ -110,6 +110,13 @@ export class PluginHost {
   }
 
   register(plugin: Plugin): void {
+    // Tighten the runtime check: ensure plugin declares usesPluginContext=true
+    // at runtime as well as at the type level to make the sandbox boundary
+    // explicit and avoid accidental legacy behaviour reaching core services.
+    if ((plugin as any).usesPluginContext !== true) {
+      try { telemetry.emit('plugin_register_denied_missing_sandbox', { id: (plugin as any).id ?? '<unknown>', timestamp: Date.now() }); } catch (_) {}
+      throw new Error(`PluginHost: plugin '${(plugin as any).id ?? '<unknown>'}' must declare usesPluginContext = true to register`);
+    }
     // Wrap the plugin with a thin error-boundary so misbehaving plugins cannot
     // throw uncaught exceptions into the host process. We handle errors from
     // activate/deactivate and emit telemetry while preserving original plugin
@@ -225,6 +232,7 @@ export class PluginHost {
       const CLOCK_CACHE_TTL = 250; // milliseconds (reduced to limit repeated deep clones under load)
 
       const ctx: PluginContext = {
+          __isPluginContext: true as const,
         listDocuments: () => {
           // Validate and provide only well-formed document snapshots to plugins.
           return (this.context.listDocuments().slice(0, 100)).map(d => {

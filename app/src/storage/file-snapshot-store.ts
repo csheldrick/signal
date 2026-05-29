@@ -17,6 +17,20 @@ export class FileSnapshotStore implements SnapshotStore {
   constructor(dir: string) {
     this.dir = dir;
     try { mkdirSync(this.dir, { recursive: true }); } catch (_) {}
+
+    // Register canonical store on globalThis to help avoid accidental
+    // duplicate authoritative stores across differing import paths or
+    // build artifacts. This mirrors the registry behaviour in
+    // snapshot-registry.ts to maintain a single source of truth.
+    try {
+      if (typeof globalThis !== 'undefined') {
+        const g = globalThis as any;
+        const GLOBAL_KEY = '__SIGNAL_CANONICAL_SNAPSHOT_STORE__';
+        const GLOBAL_FILE = '__SIGNAL_FILE_SNAPSHOT_STORE__';
+        if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = this;
+        g[GLOBAL_FILE] = this;
+      }
+    } catch (_) {}
   }
 
   private fileForId(id: string): string {
