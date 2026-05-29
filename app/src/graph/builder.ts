@@ -2,21 +2,7 @@
 // Builds a traversable graph from document links.
 // Imports from core/types and storage — creates cross-module edges.
 
-import type { DocumentSnapshot } from '../core/types.js';
-
-
-export interface GraphNode {
-  readonly id: string;
-  readonly title: string;
-  readonly linkCount: number;
-}
-
-export interface AdjacencyList {
-  readonly nodes: ReadonlyMap<string, GraphNode>;
-  readonly edges: ReadonlyMap<string, ReadonlySet<string>>;
-}
-
-export type GraphAdjacencyList = AdjacencyList;
+import type { DocumentSnapshot, GraphNode, AdjacencyList, GraphAdjacencyList } from '../core/types.js';
 
 export class GraphBuilder {
   private lastSignature: string | undefined;

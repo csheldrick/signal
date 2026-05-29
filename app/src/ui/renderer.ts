@@ -3,7 +3,7 @@
 // Adds another subsystem node and cross-module edges for Loom.
 
 import type { Document } from '../core/types.js';
-import type { AdjacencyList } from '../graph/builder.js';
+import type { AdjacencyList } from '../core/types.js';
 
 export function renderDocument(doc: Document): string {
   const header = `[${doc.id}] ${doc.title}`;

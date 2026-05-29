@@ -15,16 +15,7 @@ import type { Document, DocumentSnapshot, Summarizer, Observability } from '../c
 import type { SyncEngine } from '../sync/engine.js';
 
 
-export interface AppConfig {
-  dataPath: string;
-  peerId: string;
-  /** Allow remote summarization (must be explicitly enabled) */
-  allowNetwork?: boolean;
-  /** Optional network authentication token required to enable remote summarization. */
-  networkAuthToken?: string;
-  /** When true, background summarization timers will be disabled (useful for tests) */
-  disableBackgroundSummarize?: boolean;
-}
+import type { AppConfig } from '../core/types.js';
 
 export class SignalApp {
   readonly store: DocumentStore;

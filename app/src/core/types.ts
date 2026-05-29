@@ -14,6 +14,21 @@ export interface Document {
   version?: number;
 }
 
+// Application configuration contract. Moving AppConfig into core types
+// centralizes the lightweight configuration surface so other modules may
+// depend on a stable, small contract without importing the whole app
+// module which increases subsystem fan-out.
+export interface AppConfig {
+  dataPath: string;
+  peerId: string;
+  /** Allow remote summarization (must be explicitly enabled) */
+  allowNetwork?: boolean;
+  /** Optional network authentication token required to enable remote summarization. */
+  networkAuthToken?: string;
+  /** When true, background summarization timers will be disabled (useful for tests) */
+  disableBackgroundSummarize?: boolean;
+}
+
 // Lightweight vector clock used by the sync subsystem and exposed here so
 // multiple modules can agree on the shape without importing the concrete
 // sync/protocol implementation.
@@ -387,6 +402,23 @@ export interface InvertedIndex {
   // Basic stats for observability
   stats(maxDocs?: number): IndexStats;
 }
+
+// Graph types moved into core types to avoid fragmenting contracts across
+// modules and to reduce fan-out from graph implementations. These lightweight
+// shapes are intended for consumers that need only the readonly view of
+// graph nodes and adjacency lists without importing the full builder.
+export interface GraphNode {
+  readonly id: string;
+  readonly title: string;
+  readonly linkCount: number;
+}
+
+export interface AdjacencyList {
+  readonly nodes: ReadonlyMap<string, GraphNode>;
+  readonly edges: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+export type GraphAdjacencyList = AdjacencyList;
 
 export interface IndexerContract { dispose(): void; }
 
