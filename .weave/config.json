@@ -30,30 +30,23 @@
     }
   },
   "docs": {
-    "root": "workspace",
-    "ingest": [
-      { "glob": "goals/**/*.md", "node": "goal", "edge": "supports" },
-      { "glob": "observations/**/*.md", "node": "observation", "edge": "related_to" },
-      { "glob": "architecture/decisions/**/*.md", "node": "architecture", "edge": "related_to" },
-      { "glob": "architecture/constraints/**/*.md", "node": "constraint", "edge": "blocks" },
-      { "glob": "architecture/experiments/**/*.md", "node": "hypothesis", "edge": "predicts" },
-      { "glob": "tasks/**/*.md", "node": "task", "edge": "related_to" }
+    "sources": [
+      { "root": "workspace", "glob": "goals/**/*.md", "nodeType": "goal", "edgeType": "supports" },
+      { "root": "workspace", "glob": "observations/**/*.md", "nodeType": "observation", "edgeType": "related_to" },
+      { "root": "workspace", "glob": "architecture/decisions/**/*.md", "nodeType": "concept", "edgeType": "related_to" },
+      { "root": "workspace", "glob": "architecture/constraints/**/*.md", "nodeType": "abstraction", "edgeType": "blocks" },
+      { "root": "workspace", "glob": "architecture/experiments/**/*.md", "nodeType": "hypothesis", "edgeType": "predicts" },
+      { "root": "workspace", "glob": "tasks/**/*.md", "nodeType": "task", "edgeType": "related_to" }
     ],
     "output": {
-      "experimentResults": {
-        "target": "architecture/experiments/{id}-*.md",
-        "mode": "append-block",
-        "marker": "weave:results"
-      },
-      "selectionOutcomes": {
-        "target": "architecture/experiments/{id}-*.md",
-        "mode": "append-block",
-        "marker": "weave:selection"
-      },
-      "observations": {
-        "target": "observations/{slug}.md",
-        "mode": "create"
-      }
+      "root": "workspace",
+      "templates": [
+        {
+          "id": "experiment",
+          "file": "architecture/experiments/weave-results.md",
+          "body": "### Cohort {{variantGroupId}}\n\n- **Origin**: {{origin}}\n- **Survivors**: {{survivors}}\n- **Pruned**: {{pruned}}\n- **Fitness**: {{fitness}}\n- **Timestamp**: {{timestamp}}"
+        }
+      ]
     }
   }
 }
