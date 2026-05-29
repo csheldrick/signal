@@ -3,7 +3,7 @@ import { MAX_LENGTH, cloneSafeInterface } from "../constants.js";
 // Wires all subsystems together. High fan-out node importing
 // from every module — gives Loom a central hub in the graph.
 
-import type { StorageEventBus } from '../storage/events.js';
+import type { StorageEventBus, StorageEventType } from '../storage/events.js';
 import type { StorageEventBusContract as LocalStorageEventBusContract } from '../storage/event-types.js';
 import type { DocumentStore } from '../storage/store.js';
 import type { GraphBuilder } from '../graph/builder.js';
@@ -351,7 +351,7 @@ const mod = require('../indexing/index.js');
         // Provide plugins a readonly/frozen snapshot of events and a disposer.
         const wrapper = (ev: any) => {
           try {
-            switch (ev.type) {
+            switch (ev.type as StorageEventType) {
               case 'created': {
                 const d = ev.document;
                 const frozen = Object.freeze({
