@@ -9,79 +9,18 @@ import { telemetry } from '../sync/telemetry.js';
 // centrality of core/types and limits architectural fan-out.
 export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
 
-export interface DocumentSnapshot {
-  readonly id: string;
-  readonly title: string;
-  readonly content: string;
-  readonly tags: readonly string[];
-  readonly links: readonly { sourceId: string; targetId: string; kind: string }[];
-  readonly createdAt: number;
-  readonly updatedAt: number;
-  readonly version?: number;
-}
+// Reuse canonical plugin contracts from core/types to centralize the
+// lightweight interfaces and reduce duplication. Keep local aliases so
+// existing imports from './host.js' continue to work while ensuring the
+// host implements the core-defined contract.
+import type { Plugin as CorePlugin, PluginContext as CorePluginContext, SearchQuery as CoreSearchQuery, SearchResult as CoreSearchResult, DocumentSnapshot as CoreDocumentSnapshot } from '../core/types.js';
 
-export interface SearchResultSnapshot {
-  readonly document: DocumentSnapshot;
-  readonly score: number;
-  readonly highlights: string[];
-}
-
-// Plugin-facing SearchQuery contract: keep a lightweight, intentionally decoupled
-// copy of the core SearchQuery shape so plugins do not directly depend on the
-// full core type. This reduces centrality of the core SearchQuery type and
-// limits fan-out in the dependency graph.
-export interface SearchQuery {
-  text?: string;
-  tags?: string[];
-  dateRange?: { from: number; to: number };
-}
-
-export type SearchResult = SearchResultSnapshot;
-
-export interface Plugin {
-  id: string;
-  name: string;
-  /**
-   * Optional audit identifier (e.g. a signed vendor audit or review id).
-   * When the host is configured to enforce audits this field must be present
-   * to allow enabling the plugin. This lightweight field avoids introducing
-   * a full audit system while making audits explicit at registration time.
-   */
-  readonly auditId?: string;
-  /**
-   * Explicit opt-in flag indicating the plugin uses only the PluginContext
-   * sandbox. Plugins that access other subsystems MUST NOT set this flag.
-   */
-  readonly usesPluginContext?: boolean;
-  activate(context: PluginContext): void;
-  deactivate(): void;
-}
-
-export interface PluginContext {
-  /**
-   * Plugins receive readonly snapshots to prevent accidental mutation of
-   * core application state and to make the sandbox contract explicit.
-   */
-  listDocuments(): ReadonlyArray<Readonly<DocumentSnapshot>>;
-  searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResultSnapshot>>;
-  getDocument(id: string): Readonly<DocumentSnapshot> | undefined;
-  getClock(): { [peerId: string]: number };
-
-  /**
-   * Observe storage events in a readonly, sandboxed way. Returns a dispose
-   * function that removes the listener when called. The event shape is
-   * intentionally typed as 'any' here so plugins cannot rely on internal
-   * concrete StorageEvent types and instead treat events as opaque snapshots.
-   */
-  onStorageEvent(type: StorageEventType | '*', listener: (event: Readonly<any>) => void): () => void;
-
-  /**
-   * Request a readonly summarization for a document id. The host decides
-   * whether network calls are permitted; undefined is returned when the
-   * document is missing or summarization is not available.
-   */
-  summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
-}
+export type DocumentSnapshot = CoreDocumentSnapshot;
+export type SearchResultSnapshot = CoreSearchResult;
+export type SearchQuery = CoreSearchQuery;
+export type SearchResult = CoreSearchResult;
+export type Plugin = CorePlugin;
+export type PluginContext = CorePluginContext;
 
 // Deprecated: 'dire' was previously a shared primitive that encouraged
 // cross-subsystem coupling. The refactor routes document access through

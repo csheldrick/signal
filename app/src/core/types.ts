@@ -281,7 +281,7 @@ export interface PeerPresence {
 }
 
 export interface PresenceTracker {
-  setPluginContext(context?: any): void;
+  setPluginContext(context?: PluginContext): void;
   setSessionTracker(tracker?: any): void;
   setValidator?(validate?: (id: string) => boolean | Promise<boolean>): void;
   setAsyncValidator?(validate?: (id: string) => Promise<boolean>): void;
@@ -318,6 +318,42 @@ export interface Observability {
   emit(type: string, payload: any): void;
   on(listener: (event: { type: string; payload: any }) => void): () => void;
   clear(): void;
+  /**
+   * Optional: return the current number of registered listeners. This helps
+   * tests and diagnostic tools assert telemetry subscription state without
+   * reaching into concrete implementations.
+   */
+  listenerCount?(): number;
+}
+
+// Plugin contracts: surface lightweight plugin host and sandbox types in
+// core/types so other subsystems can depend on stable, centralized
+// interfaces rather than importing concrete host implementations. This
+// encourages better modularization and makes the intended sandbox
+// boundary visible to architectural analysis.
+export interface PluginContext {
+  listDocuments(): ReadonlyArray<Readonly<DocumentSnapshot>>;
+  searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResultSnapshot>>;
+  getDocument(id: string): Readonly<DocumentSnapshot> | undefined;
+  getClock(): { [peerId: string]: number };
+  onStorageEvent(type: string | '*', listener: (event: Readonly<any>) => void): () => void;
+  summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
+}
+
+export interface Plugin {
+  id: string;
+  name: string;
+  readonly auditId?: string;
+  readonly usesPluginContext?: boolean;
+  activate(context: PluginContext): void;
+  deactivate(): void;
+}
+
+export interface PluginHost {
+  register(plugin: Plugin): void;
+  enable(pluginId: string): boolean;
+  disable(pluginId: string): boolean;
+  list(): Array<{ id: string; name: string; enabled: boolean }>;
 }
 
 

@@ -60,6 +60,13 @@ class TelemetryCenter {
   clear(): void {
     this.listeners.clear();
   }
+
+  // Optional diagnostic helper to inspect current listener count without
+  // relying on implementation-specific internals. This aids tests and
+  // monitoring tools in asserting telemetry subscription state.
+  listenerCount(): number {
+    return this.listeners.size;
+  }
 }
 
 import type { Observability } from '../core/types.js';
