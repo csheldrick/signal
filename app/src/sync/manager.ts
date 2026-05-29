@@ -79,6 +79,9 @@ export class SyncManager {
   // Also subscribe to global telemetry center to mirror important events into
   // the manager-level telemetry listeners for consolidated monitoring.
   private globalTelemetryDisposer: (() => void) | undefined = undefined;
+  // When indexer/workerpool reports overload, set this timestamp to back off
+  private indexerOverloadedUntil?: number;
+  private indexerTelemetryDisposer?: () => void;
 
   constructor(
     private readonly store: DocumentStore,
@@ -215,6 +218,19 @@ export class SyncManager {
         this.globalTelemetryDisposer = globalTelemetry.on((ev: any) => {
           try { this.emitTelemetry(ev.type, ev.payload); } catch (_) {}
         });
+
+        // Also listen for indexer/workerpool overload signals to apply backpressure
+        try {
+          this.indexerTelemetryDisposer = globalTelemetry.on((ev: any) => {
+            try {
+              if (ev && (ev.type === 'workerpool_overloaded' || ev.type === 'indexer_pending_overflow')) {
+                // Back off for a short conservative window to let the indexer recover
+                this.indexerOverloadedUntil = Date.now() + 5000; // 5s
+                try { telemetry.emit('syncmanager_indexer_backpressure', { reason: ev.type, until: this.indexerOverloadedUntil, timestamp: Date.now() }); } catch (_) {}
+              }
+            } catch (_) { /* swallow */ }
+          });
+        } catch (_) { /* swallow */ }
       }
     } catch (_) {}
     if (this.offlineQueue) {
@@ -265,6 +281,23 @@ export class SyncManager {
 
         const push = (ev: StorageEvent) => {
           try {
+            // If we've observed the indexer is overloaded recently, apply a
+            // conservative backpressure policy: avoid accepting more than a
+            // small fraction of the normal buffer to prevent unbounded growth.
+            try {
+              const now = Date.now();
+              if (this.indexerOverloadedUntil && now < this.indexerOverloadedUntil) {
+                try { telemetry.emit('syncmanager_dropping_event_due_to_indexer_overload', { eventType: ev && (ev as any).type, timestamp: now }); } catch (_) {}
+                const allowed = Math.max(10, Math.floor(MAX_BUFFERED_EVENTS / 10));
+                if (buffer.length >= allowed) {
+                  // Drop the incoming event to avoid growing memory while the
+                  // indexer is recovering. This is best-effort; prefer dropping
+                  // to unbounded buffering which can lead to OOM.
+                  return;
+                }
+              }
+            } catch (_) { /* swallow backpressure checks */ }
+
             if (buffer.length >= MAX_BUFFERED_EVENTS) buffer.shift();
             buffer.push(ev);
             flush();
