@@ -11,9 +11,23 @@ import { telemetry } from '../sync/telemetry.js';
 
 import type { Summarizer } from '../core/types.js';
 
+// Packaging sentinel constants: expose module-level flags that bundlers or
+// packaging analysis tools can inspect without constructing classes. These
+// explicitly record whether the bundled LocalSummarizer/RemoteSummarizer
+// require on-disk model artifacts to make offline packaging guarantees
+// discoverable at module-load time.
+// Expose module-level packaging sentinels so packaging analysis tools can detect
+// whether the module requires on-disk model artifacts without instantiating
+// classes. These are kept in sync with the static class fields below.
+export const LOCAL_SUMMARIZER_USES_ON_DISK_MODEL = false;
+export const REMOTE_SUMMARIZER_USES_ON_DISK_MODEL = false;
+
 // LocalSummarizer and RemoteSummarizer implement the Summarizer contract declared in core/types.ts.
 
 export class LocalSummarizer implements Summarizer {
+  // Static sentinel so callers can check the packaging contract without
+  // instantiating the class. Mirrors LOCAL_SUMMARIZER_USES_ON_DISK_MODEL.
+  static readonly usesOnDiskModel = LOCAL_SUMMARIZER_USES_ON_DISK_MODEL || false;
   // Local summarizer is explicitly in-memory and does not rely on bundled
   // model artifacts. Declare usesOnDiskModel=false to make the offline-only
   // packaging contract explicit for callers performing packaging analysis.
@@ -282,6 +296,10 @@ export class LocalSummarizer implements Summarizer {
 }
 
 export class RemoteSummarizer implements Summarizer {
+  // Static sentinel so callers can check the packaging contract without
+  // instantiating the class. Mirrors REMOTE_SUMMARIZER_USES_ON_DISK_MODEL.
+  static readonly usesOnDiskModel = REMOTE_SUMMARIZER_USES_ON_DISK_MODEL || false;
+
   // Remote summarizers may rely on remote services and do not ship bundled
   // model artifacts on-disk; declare usesOnDiskModel=false by default but
   // implementations that load local heavyweight models should set true.
