@@ -239,11 +239,32 @@ export class Indexer implements IndexerContract {
     // Reduce per-worker chunk sizes to avoid large synchronous batches that can overload the index.
     this.workerPool = new WorkerPool({ numWorkers: poolWorkers, maxDocsPerWorker: 2 });
     if (!events || !this.index) return;
+
+    // Helper to defensively clone + freeze incoming snapshots before storing
+    // them in the pending queue so external mutation cannot later influence
+    // index state while the doc waits in the queue.
+    const makeSafe = (doc: any) => {
+      try {
+        const s = createDocumentSnapshot(doc);
+        try { if (Array.isArray(s.tags)) Object.freeze(s.tags); } catch (_) {}
+        try {
+          if (Array.isArray(s.links)) {
+            for (const l of s.links) try { Object.freeze(l); } catch (_) {}
+            Object.freeze(s.links);
+          }
+        } catch (_) {}
+        try { Object.freeze(s); } catch (_) {}
+        return s;
+      } catch (_) {
+        return doc;
+      }
+    };
+
     try {
-      const created = (ev: any) => { try { if (ev && ev.document) { this.pendingDocs.push({ doc: ev.document, id: ev.document.id, text: ev.document.content }); try { if (this.pendingDocs.length > 200) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {}
+      const created = (ev: any) => { try { if (ev && ev.document) { const safe = makeSafe(ev.document); this.pendingDocs.push({ doc: safe, id: safe.id, text: safe.content }); try { if (this.pendingDocs.length > 200) { this.pendingDocs.shift(); try { telemetry.emit('indexer_pending_overflow', { pending: this.pendingDocs.length, timestamp: Date.now() }); } catch (_) {} } this.scheduleProcessPending(); } catch (_) {}
       // When pendingDocs grows large, emit a lightweight index_stats event to surface current index sizes
       try { if (this.pendingDocs.length > 100) { const stats = (() => { try { return this.index.stats(); } catch (_) { return undefined; } })(); if (stats) telemetry.emit('index_stats', { stats, pending: this.pendingDocs.length, timestamp: Date.now() }); } } catch (_) {} } } catch (_) {} };
-      const updated = (ev: any) => { try { if (ev && ev.current) { this.pendingDocs.push({ doc: ev.current, id: ev.current.id, text: ev.current.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
+      const updated = (ev: any) => { try { if (ev && ev.current) { const safe = makeSafe(ev.current); this.pendingDocs.push({ doc: safe, id: safe.id, text: safe.content }); try { this.scheduleProcessPending(); } catch (_) {} } } catch (_) {} };
       const deleted = (ev: any) => { try { if (ev && ev.documentId) this.index.removeDocument(ev.documentId); } catch (_) {} };
 
       if (typeof events.onAsync === 'function') {
