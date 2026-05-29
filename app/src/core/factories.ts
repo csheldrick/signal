@@ -2,7 +2,7 @@ import { GraphBuilder } from '../graph/builder.js';
 import type { GraphBuilder as GraphBuilderType } from '../graph/builder.js';
 import { PluginHost } from '../plugins/host.js';
 import { PresenceTracker } from '../collaboration/presence.js';
-import type { PluginContext } from '../plugins/host.js';
+import type { PluginContext } from '../core/types.js';
 
 /**
  * Create a lazy GraphBuilder wrapper. Accepts a store getter callback so

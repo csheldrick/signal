@@ -114,7 +114,16 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
       jsonFiles.sort((a, b) => (a < b ? 1 : -1));
       const latest = jsonFiles[0];
       const content = await fsPromises.readFile(path.join(dir, latest), 'utf8');
-      try { return JSON.parse(content) as DocumentSnapshot; } catch (_) { return undefined; }
+      try {
+        const parsed = JSON.parse(content);
+        try {
+          const { makeSafeSnapshot } = require('../core/types.js');
+          const safe = typeof makeSafeSnapshot === 'function' ? makeSafeSnapshot(parsed) : undefined;
+          return safe as DocumentSnapshot | undefined;
+        } catch (_) {
+          return parsed as DocumentSnapshot;
+        }
+      } catch (_) { return undefined; }
     } catch (_) {
       return undefined;
     }
