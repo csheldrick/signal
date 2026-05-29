@@ -3,7 +3,7 @@
 // This eliminates the bottleneck where all indexing operations flow
 // through a single thread.
 
-import os from 'node:os';
+import { cpus as getCpus } from 'node:os';
 import { telemetry } from '../sync/telemetry.js';
 import type { IndexWorker, WorkerPoolOptions } from '../core/types.js';
 export type { IndexWorker, WorkerPoolOptions };
@@ -19,7 +19,7 @@ export class WorkerPool {
 
   constructor(options: WorkerPoolOptions, onWorkerFinish?: (workerIndex: number) => void) {
     const provided = options && typeof options.numWorkers === 'number' ? Math.max(1, options.numWorkers) : undefined;
-    const cpus = (() => { try { return Math.max(1, (os.cpus() || []).length); } catch (_) { return 2; } })();
+    const cpus = (() => { try { return Math.max(1, (getCpus() || []).length); } catch (_) { return 2; } })();
     // Default worker count derived from CPU count but bounded to avoid
     // excessive parallelism on small hosts. We favor more workers than the
     // previous overly-conservative default to reduce indexing lag under load
