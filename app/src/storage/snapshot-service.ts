@@ -11,21 +11,9 @@ import type { VectorClock } from '../core/types.js';
 
 import type { DocumentSnapshotServiceOptions } from '../core/types.js';
 
-// Attempt to import the registry to provide a canonical store getter when
-// this module is used as a public surface. The registry is optional and
-// may not be present in all build environments; guard the require to avoid
-// hard failures at module-load time.
-try {
-  // re-export registry helpers when available
-  const reg = require('./snapshot-registry.js');
-  if (reg) {
-    try {
-      exports.getOrCreateDiskDocumentSnapshotStore = reg.getOrCreateDiskDocumentSnapshotStore;
-      exports.getOrCreateFileSnapshotStore = reg.getOrCreateFileSnapshotStore;
-      exports.getCanonicalSnapshotStore = reg.getCanonicalSnapshotStore;
-    } catch (_) { /* swallow */ }
-  }
-} catch (_) { /* optional */ }
+// Registry re-exports are handled explicitly at the end of this module
+// via an ES module re-export. Avoid dynamic require-based re-exports which
+// can create confusing CommonJS/ESM interop behaviour.
 
 
 export class DocumentSnapshotService {
@@ -149,3 +137,10 @@ export default DocumentSnapshotService;
 // so callers do not accidentally create multiple store instances and to
 // centralize the authoritative SnapshotStore implementations.
 export { getOrCreateDiskDocumentSnapshotStore, getOrCreateFileSnapshotStore, getCanonicalSnapshotStore } from './snapshot-registry.js';
+
+// Also re-export the DiskDocumentSnapshotStore default (named) class
+// to provide a single authoritative import path for the canonical disk
+// store implementation. This helps callers import the concrete type in a
+// consistent way and reduces accidental duplicate implementations across
+// differing import paths.
+export { default as DiskDocumentSnapshotStore } from './snapshotService.js';
