@@ -5,7 +5,11 @@
 // store or sync engine imports.
 
 import type { PluginContext } from '../core/types.js';
-import type { DocumentSnapshot, PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract, PresenceStatus } from '../core/types.js';
+import type { DocumentSnapshot } from '../core/types.js';
+import type { PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract, PresenceStatus } from './types.js';
+
+// Local concrete PeerPresence shape mirrors the lightweight inline shape defined in core/types
+export type PeerPresence = PeerPresenceContract;
 import { getSignalStorageEventBus } from '../core/globals.js';
 import { telemetry } from '../sync/telemetry.js';
 
@@ -19,8 +23,7 @@ export const PRESENCE_STATUS = {
   OFFLINE: 'offline' as PresenceStatus,
 } as const;
 
-// Local concrete PeerPresence mirrors the lightweight contract exported in core/types
-export type PeerPresence = PeerPresenceContract;
+
 
 
 // Deprecated compatibility shim: removed. Callers should use createValidatorFromPluginContext

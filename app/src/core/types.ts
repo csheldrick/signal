@@ -389,23 +389,18 @@ export interface WorkerPoolOptions {
 // contracts without pulling in the full PresenceTracker implementation.
 export type PresenceStatus = 'active' | 'idle' | 'offline';
 
-export interface PeerPresence {
-  peerId: string;
-  documentId: string | undefined;
-  status: PresenceStatus;
-  lastSeen: number;
-  seq: number;
-}
-
 export interface PresenceTracker {
   setPluginContext(context?: PluginContext): void;
   setSessionTracker(tracker?: any): void;
   setValidator(validate?: (id: string) => boolean | Promise<boolean>): void;
   setAsyncValidator(validate?: (id: string) => Promise<boolean>): void;
-  join(peerId: string, documentId?: string): PeerPresence;
+  // PeerPresence shape returned by join/getActive/getViewers. Keep inline to reduce
+  // coupling on a central PeerPresence symbol and allow the concrete presence
+  // subsystem to evolve independently.
+  join(peerId: string, documentId?: string): { peerId: string; documentId?: string; status: PresenceStatus; lastSeen: number; seq: number };
   leave(peerId: string, awaitCleanup?: boolean): Promise<void>;
-  getActive(): PeerPresence[];
-  getViewers(documentId: string): PeerPresence[];
+  getActive(): { peerId: string; documentId?: string; status: PresenceStatus; lastSeen: number; seq: number }[];
+  getViewers(documentId: string): { peerId: string; documentId?: string; status: PresenceStatus; lastSeen: number; seq: number }[];
   focusDocument(peerId: string, documentId: string): Promise<boolean>;
   summary(): { active: number; idle: number; offline: number };
   stopCleanupTimer?(): void;
