@@ -338,4 +338,18 @@ export class Indexer implements IndexerContract {
     }
     this.disposers = [];
   }
+
+  // Testability helper: drain any pending documents into the worker pool and
+  // apply results to the index. This allows deterministic testing of async
+  // indexing behavior without relying on timers or internal scheduling.
+  async drainNow(): Promise<void> {
+    await this.processPending();
+  }
+
+  // Expose pending count for tests and diagnostics. Not part of the public
+  // IndexerContract to avoid bloating the core interface; present for test
+  // harnesses to assert internal queueing behaviour.
+  getPendingCount(): number {
+    return this.pendingDocs.size;
+  }
 }

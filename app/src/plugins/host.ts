@@ -121,30 +121,32 @@ export class PluginHost {
     // throw uncaught exceptions into the host process. We handle errors from
     // activate/deactivate and emit telemetry while preserving original plugin
     // behaviour. This strengthens the PluginHost isolation boundary.
-    const wrapPluginWithBoundary = (p: Plugin): Plugin => {
-      return {
-        id: p.id,
-        name: p.name,
-        auditId: p.auditId,
-        usesPluginContext: p.usesPluginContext,
-        activate: (ctx: PluginContext) => {
-          try {
-            p.activate(ctx);
-          } catch (err) {
-            try { console.error(`PluginHost: plugin.activate threw for '${p.id}'`, err); } catch (_) {}
-            try { telemetry.emit('plugin_activate_error', { id: p.id, error: String(err), timestamp: Date.now() }); } catch (_) {}
-          }
-        },
-        deactivate: () => {
-          try {
-            p.deactivate();
-          } catch (err) {
-            try { console.error(`PluginHost: plugin.deactivate threw for '${p.id}'`, err); } catch (_) {}
-            try { telemetry.emit('plugin_deactivate_error', { id: p.id, error: String(err), timestamp: Date.now() }); } catch (_) {}
-          }
-        }
-      };
-    };
+const wrapPluginWithBoundary = (p: Plugin): Plugin => {
+          return {
+            id: p.id,
+            name: p.name,
+            auditId: p.auditId,
+            usesPluginContext: p.usesPluginContext,
+            activate: (ctx: PluginContext) => {
+              try {
+                // Call plugin.activate with undefined thisArg to reduce risk of
+                // plugins leveraging 'this' to access host-provided objects.
+                (p.activate as any).call(undefined, ctx);
+              } catch (err) {
+                try { console.error(`PluginHost: plugin.activate threw for '${p.id}'`, err); } catch (_) {}
+                try { telemetry.emit('plugin_activate_error', { id: p.id, error: String(err), timestamp: Date.now() }); } catch (_) {}
+              }
+            },
+            deactivate: () => {
+              try {
+                (p.deactivate as any).call(undefined);
+              } catch (err) {
+                try { console.error(`PluginHost: plugin.deactivate threw for '${p.id}'`, err); } catch (_) {}
+                try { telemetry.emit('plugin_deactivate_error', { id: p.id, error: String(err), timestamp: Date.now() }); } catch (_) {}
+              }
+            }
+          };
+        };
 
     try { telemetry.emit('plugin_registered', { id: plugin.id, name: plugin.name, timestamp: Date.now() }); } catch (_) {}
     // Enforce explicit opt-in for the PluginContext sandbox when enabling.
@@ -231,8 +233,7 @@ export class PluginHost {
       let lastClock: { [peerId: string]: number } = {};
       const CLOCK_CACHE_TTL = 250; // milliseconds (reduced to limit repeated deep clones under load)
 
-      const ctx: PluginContext = {
-          __isPluginContext: true as const,
+      const ctx: any = {
         listDocuments: () => {
           // Validate and provide only well-formed document snapshots to plugins.
           return (this.context.listDocuments().slice(0, 100)).map(d => {
@@ -485,6 +486,9 @@ export class PluginHost {
 
       };
 
+      try {
+        Object.defineProperty(ctx, '__isPluginContext', { value: true, enumerable: false, configurable: false, writable: false });
+      } catch (_) {}
       return Object.freeze(ctx);
     })();
 

@@ -374,7 +374,7 @@ export interface AdjacencyList {
 
 export type GraphAdjacencyList = AdjacencyList;
 
-export interface IndexerContract { dispose(): void; }
+export interface IndexerContract { dispose(): void; /** Optional test helper: when present, drains pending work and resolves when complete. */ drainNow?: () => Promise<void>; /** Optional diagnostics: return pending item count. */ getPendingCount?: () => number; }
 
 // Indexing worker & pool options - centralized contract so other modules
 // can depend on a stable type without importing concrete worker pool impls.
