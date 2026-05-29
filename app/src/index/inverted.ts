@@ -3,7 +3,7 @@
 // is declared in core/types.ts so multiple implementations can coexist.
 
 import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex, IndexerContract, WorkerPoolOptions } from '../core/types.js';
-import { normalizeSearchQuery } from '../core/types.js';
+import { normalizeSearchQuery, createDocumentSnapshot } from '../core/types.js';
 import { WorkerPool } from './workerPool.js';
 import { telemetry } from '../sync/telemetry.js';
 
@@ -48,18 +48,20 @@ class InvertedIndexImpl implements InvertedIndex {
 
   indexDocument(doc: DocumentSnapshot, maxDocs?: number): void {
     if (!doc || typeof doc.id !== 'string') return;
-    if (this.docStore.has(doc.id)) {
-      this.updateDocument(doc, maxDocs);
+    // Defensive: clone and freeze incoming snapshots so the index owns an immutable copy
+    const safe = this.ensureSafeSnapshot(doc);
+    if (this.docStore.has(safe.id)) {
+      this.updateDocument(safe, maxDocs);
       return;
     }
-    this.docStore.set(doc.id, doc);
-    const terms = this.extractTerms(doc);
-    this.docTerms.set(doc.id, terms);
+    this.docStore.set(safe.id, safe);
+    const terms = this.extractTerms(safe);
+    this.docTerms.set(safe.id, terms);
     for (const t of terms) {
       let s = this.termMap.get(t);
       if (!s) { s = new Set(); this.termMap.set(t, s); }
-      if (!s.has(doc.id)) {
-        s.add(doc.id);
+      if (!s.has(safe.id)) {
+        s.add(safe.id);
         this.termCounts.set(t, (this.termCounts.get(t) || 0) + 1);
       }
     }
@@ -70,26 +72,27 @@ class InvertedIndexImpl implements InvertedIndex {
 
   updateDocument(doc: DocumentSnapshot, maxDocs?: number): void {
     if (!doc || typeof doc.id !== 'string') return;
-    const prev = this.docTerms.get(doc.id);
+    const safe = this.ensureSafeSnapshot(doc);
+    const prev = this.docTerms.get(safe.id);
     if (prev) {
       for (const t of prev) {
         const s = this.termMap.get(t);
         if (s) {
-          s.delete(doc.id);
+          s.delete(safe.id);
           if (s.size === 0) this.termMap.delete(t);
         }
         const c = this.termCounts.get(t) ?? 0;
         if (c <= 1) this.termCounts.delete(t); else this.termCounts.set(t, c - 1);
       }
     }
-    this.docStore.set(doc.id, doc);
-    const terms = this.extractTerms(doc);
-    this.docTerms.set(doc.id, terms);
+    this.docStore.set(safe.id, safe);
+    const terms = this.extractTerms(safe);
+    this.docTerms.set(safe.id, terms);
     for (const t of terms) {
       let s = this.termMap.get(t);
       if (!s) { s = new Set(); this.termMap.set(t, s); }
-      if (!s.has(doc.id)) {
-        s.add(doc.id);
+      if (!s.has(safe.id)) {
+        s.add(safe.id);
         this.termCounts.set(t, (this.termCounts.get(t) || 0) + 1);
       }
     }
@@ -153,7 +156,7 @@ class InvertedIndexImpl implements InvertedIndex {
       }
 
       results.sort((a, b) => b.score - a.score);
-      return results.slice(0, 50).map(r => ({ document: r.doc, score: r.score, highlights: r.highlights }));
+      return results.slice(0, 50).map(r => ({ document: createDocumentSnapshot(r.doc as any), score: r.score, highlights: r.highlights }));
     } catch (_) {
       return [];
     }
@@ -169,6 +172,36 @@ class InvertedIndexImpl implements InvertedIndex {
       for (let i = 0; i < Math.min(10, arr.length); i++) top.push({ term: arr[i][0], count: arr[i][1] });
     } catch (_) { }
     return { docCount, termCount, topTerms: Object.freeze(top) };
+  }
+
+  private ensureSafeSnapshot(doc: DocumentSnapshot): DocumentSnapshot {
+    try {
+      // Use core helper to construct a shallow-cloned snapshot and freeze
+      const cloned = createDocumentSnapshot(doc as any);
+      try {
+        if (Array.isArray(cloned.tags)) Object.freeze(cloned.tags);
+      } catch (_) {}
+      try {
+        if (Array.isArray(cloned.links)) {
+          for (const l of cloned.links) try { Object.freeze(l); } catch (_) {}
+          Object.freeze(cloned.links);
+        }
+      } catch (_) {}
+      try { Object.freeze(cloned); } catch (_) {}
+      return cloned;
+    } catch (_) {
+      try {
+        const fallback = Object.assign({}, doc) as DocumentSnapshot;
+        try { if (Array.isArray((fallback as any).tags)) (fallback as any).tags = [...(fallback as any).tags]; } catch (_) {}
+        try { if (Array.isArray((fallback as any).links)) (fallback as any).links = (fallback as any).links.map((l: any) => Object.assign({}, l)); } catch (_) {}
+        try { Object.freeze((fallback as any).tags); } catch (_) {}
+        try { Object.freeze((fallback as any).links); } catch (_) {}
+        try { Object.freeze(fallback); } catch (_) {}
+        return fallback;
+      } catch (_) {
+        return doc;
+      }
+    }
   }
 
   private extractTerms(doc: DocumentSnapshot): Set<string> {
