@@ -9,10 +9,8 @@ import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import type { VectorClock } from '../sync/protocol.js';
 
-export interface DocumentSnapshotServiceOptions {
-  compactionIntervalMs?: number;
-  maxClockEntries?: number;
-}
+import type { DocumentSnapshotServiceOptions as CoreDocumentSnapshotServiceOptions } from '../core/types.js';
+export type DocumentSnapshotServiceOptions = CoreDocumentSnapshotServiceOptions;
 
 export class DocumentSnapshotService {
   private store?: SnapshotStore;

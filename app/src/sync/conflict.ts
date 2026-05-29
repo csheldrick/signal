@@ -6,19 +6,8 @@ import type { Document, DocumentSnapshot, ConflictResolution } from '../core/typ
 import type { ConflictRecord, ConflictStrategy, VectorClock } from './protocol.js';
 import { isConcurrent } from './protocol.js';
 
-export interface ConflictCandidate {
-  documentId: string;
-  local: DocumentSnapshot;
-  localClock: VectorClock;
-  remote: DocumentSnapshot;
-  remoteClock: VectorClock;
-}
-
-
-/**
- * Detect whether a remote document write genuinely conflicts with the local
- * version (concurrent vector clocks) or is simply a causally-later update.
- */
+import type { ConflictCandidate as CoreConflictCandidate } from '../core/types.js';
+export type ConflictCandidate = CoreConflictCandidate;
 export type ConflictCandidateRecord = ConflictCandidate;
 
 export function isConflict(localClock: VectorClock, remoteClock: VectorClock): boolean {

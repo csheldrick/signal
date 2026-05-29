@@ -13,7 +13,7 @@ import type {
 import { createDocumentSnapshot, validateDocumentChange, VALID_LINK_KINDS, normalizeSearchQuery, normalizeDocumentChange } from '../core/types.js';
 import { StorageEventBus } from './events.js';
 export type { StorageEvent } from './events.js';
-import type { StorageEvent } from './events.js';
+import type { StorageEvent } from '../core/types.js';
 
 // Helper clones to prevent leaking internal mutable store objects to callers
 function cloneLink(l: import('../core/types.js').DocumentLink): import('../core/types.js').DocumentLink {

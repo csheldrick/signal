@@ -2,80 +2,21 @@
 // Event types for storage mutations. Other modules subscribe
 // to these events, creating depends_on edges in the graph.
 
-import type { DocumentSnapshot, DocumentLink, DocumentValidatorAsync, DocumentValidatorSync } from '../core/types.js';
+import type { DocumentSnapshot, DocumentLink, DocumentValidatorAsync, DocumentValidatorSync, StorageEventType as CoreStorageEventType, StorageEvent as CoreStorageEvent, StorageEventListener as CoreStorageEventListener, StorageEventBusContract as CoreStorageEventBusContract } from '../core/types.js';
 
-// Event types for storage mutations. Other modules subscribe
-// to these events, creating depends_on edges in the graph.
-
-export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
-
-export interface StorageEventCreated {
-  readonly type: 'created';
-  readonly document: Readonly<DocumentSnapshot>;
-  readonly timestamp: number;
-  // Optional monotonic sequence number assigned by the persistent store when
-  // available. Consumers that depend on ordering should consult this field.
-  readonly seq?: number;
-}
-
-export interface StorageEventUpdated {
-  readonly type: 'updated';
-  readonly documentId: string;
-  readonly previous: Readonly<DocumentSnapshot>;
-  readonly current: Readonly<DocumentSnapshot>;
-  readonly timestamp: number;
-  // Optional monotonic sequence number assigned by the persistent store when
-  // available. Consumers that depend on ordering should consult this field.
-  readonly seq?: number;
-}
-
-export interface StorageEventDeleted {
-  readonly type: 'deleted';
-  readonly documentId: string;
-  readonly timestamp: number;
-  // Optional monotonic sequence number assigned by the persistent store when
-  // available. Consumers that depend on ordering should consult this field.
-  readonly seq?: number;
-}
-
-export interface StorageEventLinked {
-  readonly type: 'linked';
-  readonly link: Readonly<DocumentLink>;
-  readonly timestamp: number;
-  // Optional monotonic sequence number assigned by the persistent store when
-  // available. Consumers that depend on ordering should consult this field.
-  readonly seq?: number;
-}
-
-export type StorageEvent =
-  | StorageEventCreated
-  | StorageEventUpdated
-  | StorageEventDeleted
-  | StorageEventLinked;
+// Use core-defined storage event types to avoid duplication and reduce
+// subsystem centrality. Re-export local aliases for backward compatibility.
+export type StorageEventType = CoreStorageEventType;
+export type StorageEvent = CoreStorageEvent;
 
 // Listener receives a readonly snapshot of events to discourage mutation and
 // reduce coupling between event producers and consumers.
 
-type Listener = (event: Readonly<StorageEvent>) => void;
+type Listener = CoreStorageEventListener;
 
-export interface StorageEventBusContract {
-  on(type: StorageEventType | '*', listener: Listener): void;
-  onAsync(type: StorageEventType | '*', listener: Listener): void;
-  off(type: StorageEventType | '*', listener: Listener): void;
-  offAsync(type: StorageEventType | '*', listener: Listener): void;
-  emit(event: StorageEvent): void;
-  emitAsync(event: StorageEvent): void;
-  attachDocumentValidatorFromEvents(initial?: Iterable<string>): DocumentValidatorAsync;
-  attachDocumentValidatorSnapshot(initial?: Iterable<string>): DocumentValidatorSync;
-  /** Return a snapshot of recently emitted storage events for diagnostics */
-  getTrace(): ReadonlyArray<StorageEvent>;
-  /** Return counts of registered listeners for diagnostics */
-  getListenerCounts(): { total: number; perType: Record<string, number>; asyncTotal: number };
-  /** Clear the internal trace used for diagnostics */
-  clearTrace(): void;
-  /** Remove all registered listeners (useful in tests to avoid leaks) */
-  removeAllListeners(): void;
-}
+// Local bus contract extends the core contract to keep the concrete
+// implementation aligned with the shared type definitions.
+export interface StorageEventBusContract extends CoreStorageEventBusContract {}
 
 // deprecated alias removed to reduce legacy surface area
 

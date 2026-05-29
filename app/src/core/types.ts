@@ -371,6 +371,84 @@ export interface Observability {
   listenerCount?(): number;
 }
 
+// Storage event types and bus contract centralized here to reduce module
+// fan-out and provide a single authoritative contract for other subsystems.
+export type StorageEventType = 'created' | 'updated' | 'deleted' | 'linked';
+
+export interface StorageEventCreated {
+  readonly type: 'created';
+  readonly document: Readonly<DocumentSnapshot>;
+  readonly timestamp: number;
+  readonly seq?: number;
+}
+
+export interface StorageEventUpdated {
+  readonly type: 'updated';
+  readonly documentId: string;
+  readonly previous: Readonly<DocumentSnapshot>;
+  readonly current: Readonly<DocumentSnapshot>;
+  readonly timestamp: number;
+  readonly seq?: number;
+}
+
+export interface StorageEventDeleted {
+  readonly type: 'deleted';
+  readonly documentId: string;
+  readonly timestamp: number;
+  readonly seq?: number;
+}
+
+export interface StorageEventLinked {
+  readonly type: 'linked';
+  readonly link: Readonly<DocumentLink>;
+  readonly timestamp: number;
+  readonly seq?: number;
+}
+
+export type StorageEvent =
+  | StorageEventCreated
+  | StorageEventUpdated
+  | StorageEventDeleted
+  | StorageEventLinked;
+
+// Listener type used by the StorageEventBus
+export type StorageEventListener = (event: Readonly<StorageEvent>) => void;
+
+export interface StorageEventBusContract {
+  on(type: StorageEventType | '*', listener: StorageEventListener): void;
+  onAsync(type: StorageEventType | '*', listener: StorageEventListener): void;
+  off(type: StorageEventType | '*', listener: StorageEventListener): void;
+  offAsync(type: StorageEventType | '*', listener: StorageEventListener): void;
+  emit(event: StorageEvent): void;
+  emitAsync(event: StorageEvent): void;
+  attachDocumentValidatorFromEvents(initial?: Iterable<string>): DocumentValidatorAsync;
+  attachDocumentValidatorSnapshot(initial?: Iterable<string>): DocumentValidatorSync;
+  getTrace(): ReadonlyArray<StorageEvent>;
+  getListenerCounts(): { total: number; perType: Record<string, number>; asyncTotal: number };
+  clearTrace(): void;
+  removeAllListeners(): void;
+}
+
+// DocumentSnapshotService options surfaced here to reduce coupling with
+// storage implementation modules; other subsystems may depend on the
+// compaction options without importing the concrete service.
+export interface DocumentSnapshotServiceOptions {
+  compactionIntervalMs?: number;
+  maxClockEntries?: number;
+}
+
+// Conflict candidate shaped into core types so higher-level modules can
+// reason about potential conflicts without importing the sync subsystem.
+export interface ConflictCandidate {
+  documentId: string;
+  local: DocumentSnapshot;
+  localClock: any;
+  remote: DocumentSnapshot;
+  remoteClock: any;
+}
+
+export type ConflictCandidateRecord = ConflictCandidate;
+
 // Plugin contracts: surface lightweight plugin host and sandbox types in
 // core/types so other subsystems can depend on stable, centralized
 // interfaces rather than importing concrete host implementations. This
@@ -381,7 +459,7 @@ export interface PluginContext {
   searchDocuments(query: SearchQuery): ReadonlyArray<Readonly<SearchResultSnapshot>>;
   getDocument(id: string): Readonly<DocumentSnapshot> | undefined;
   getClock(): { [peerId: string]: number };
-  onStorageEvent(type: string | '*', listener: (event: Readonly<any>) => void): () => void;
+  onStorageEvent(type: StorageEventType | '*', listener: StorageEventListener): () => void;
   summarizeDocument(documentId: string, allowNetwork?: boolean): Promise<string | undefined>;
 }
 

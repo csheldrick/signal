@@ -2,7 +2,8 @@
 // Wires all subsystems together. High fan-out node importing
 // from every module — gives Loom a central hub in the graph.
 
-import type { StorageEventBus, StorageEventBusContract } from '../storage/events.js';
+import type { StorageEventBus } from '../storage/events.js';
+import type { StorageEventBusContract as CoreStorageEventBusContract } from '../core/types.js';
 import type { DocumentStore } from '../storage/store.js';
 import type { GraphBuilder } from '../graph/builder.js';
 import type { PresenceTracker as PresenceTrackerContract, OfflineSyncQueue as OfflineSyncQueueContract, PluginContext, PluginHost } from '../core/types.js';
@@ -28,7 +29,7 @@ export interface AppConfig {
 export class SignalApp {
   readonly store: DocumentStore;
   readonly events: StorageEventBus;
-  readonly eventsContract: StorageEventBusContract;
+  readonly eventsContract: CoreStorageEventBusContract;
   readonly graph: GraphBuilder;
   readonly plugins: PluginHost;
   readonly presence: PresenceTrackerContract; 
@@ -75,7 +76,7 @@ export class SignalApp {
         getListenerCounts: () => ({ total: 0, perType: {}, asyncTotal: 0 }),
         clearTrace: () => {},
         removeAllListeners: () => {},
-      } as unknown as StorageEventBusContract;
+      } as unknown as CoreStorageEventBusContract;
       this.events = noop as any;
     }
     // Provide a contract-typed view over the concrete event bus instance so

@@ -13,7 +13,7 @@ interface DocumentStoreLike {
   events?: import('../storage/events.js').StorageEventBusContract;
 }
 
-import type { StorageEvent } from '../storage/events.js';
+import type { StorageEvent } from '../core/types.js';
 import type { SyncMessage, VectorClock } from './protocol.js';
 import { mergeClocks } from './protocol.js';
 import { telemetry } from './telemetry.js';

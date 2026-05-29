@@ -9,7 +9,7 @@
 //             sync/conflict, sync/protocol.
 
 import type { DocumentStore } from '../storage/store.js';
-import type { StorageEvent } from '../storage/events.js';
+import type { StorageEvent } from '../core/types.js';
 import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
 import { SyncEngine } from './engine.js';
 import { createLazySyncEngine } from './lazyEngine.js';
