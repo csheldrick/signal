@@ -29,7 +29,90 @@ export interface AppConfig {
   disableBackgroundSummarize?: boolean;
 }
 
-export type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage, SyncManagerOptions, OfflineEntry, OfflineSyncQueueOptions, OfflineSyncQueue, ConflictCandidate, ConflictCandidateRecord } from '../sync/protocol.js';
+export interface VectorClock { [peerId: string]: number; }
+
+export type SyncState = 'idle' | 'syncing' | 'conflicted' | 'resolved';
+
+export type ConflictStrategy = 'last-write-wins' | 'first-write-wins' | 'merge-content';
+
+export interface PeerInfo {
+  peerId: string;
+  clock: VectorClock;
+  lastSeen: number;
+  state: SyncState;
+}
+
+export interface SyncAck {
+  kind: 'ack';
+  peerId: string;
+  documentId: string;
+  clock: VectorClock;
+  timestamp: number;
+}
+
+export interface ConflictRecord {
+  documentId: string;
+  localClock: VectorClock;
+  remoteClock: VectorClock;
+  localTimestamp: number;
+  remoteTimestamp: number;
+  resolvedBy: ConflictStrategy;
+  resolvedAt: number;
+}
+
+export interface SyncMessage {
+  operation: 'create' | 'update' | 'delete' | 'link';
+  documentId: string;
+  payload: unknown;
+  clock: VectorClock;
+  peerId: string;
+  timestamp: number;
+  messageId?: string;
+}
+
+export interface OfflineEntry {
+  id: string;
+  peerId: string;
+  documentId: string;
+  payload: any;
+  timestamp: number;
+  seq: number;
+}
+
+export interface OfflineSyncQueueOptions {
+  dataDir?: string;
+  filePrefix?: string;
+}
+
+export interface OfflineSyncQueue {
+  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
+  size(peerId: string): number;
+  list(peerId: string): any[];
+  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
+  clear(peerId: string): void;
+  dispose(): void;
+}
+
+export interface SyncManagerOptions {
+  peerId: string;
+  conflictStrategy?: ConflictStrategy;
+  flushIntervalMs?: number;
+  engine?: any;
+  sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
+  snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
+  offlineQueue?: OfflineSyncQueue;
+  offlineFirstMode?: boolean;
+}
+
+export interface ConflictCandidate {
+  documentId: string;
+  local: any;
+  localClock: any;
+  remote: any;
+  remoteClock: any;
+}
+
+export type ConflictCandidateRecord = ConflictCandidate;
 
 export type { QueueEntry, SyncQueueOptions } from '../sync/queue.js';
 

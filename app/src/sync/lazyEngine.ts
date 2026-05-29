@@ -1,4 +1,4 @@
-import type { SyncMessage, VectorClock } from './protocol.js';
+import type { SyncMessage, VectorClock } from '../core/types.js';
 import { SyncEngine } from './engine.js';
 import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 

@@ -2,8 +2,8 @@
 // Tracks connectivity state and clock knowledge for a single remote peer.
 // Depends on: sync/protocol.
 
-import type { PeerInfo, SyncMessage, SyncState, VectorClock } from './protocol.js';
-import { mergeClocks, clocksEqual } from './protocol.js';
+import type { PeerInfo, SyncMessage, SyncState, VectorClock } from '../core/types.js';
+import { mergeClocks, clocksEqual } from './protocol.js'; // runtime utilities for vector clocks
 
 export class PeerSession {
   private _clock: VectorClock;

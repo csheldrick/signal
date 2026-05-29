@@ -7,7 +7,7 @@
 
 import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
-import type { VectorClock } from '../sync/protocol.js';
+import type { VectorClock } from '../core/types.js';
 
 import type { DocumentSnapshotServiceOptions } from '../core/types.js';
 

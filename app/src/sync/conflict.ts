@@ -2,9 +2,8 @@
 // Detects concurrent writes and applies a configurable merge strategy.
 // Depends on: core/types, sync/protocol.
 
-import type { Document, DocumentSnapshot, ConflictResolution } from '../core/types.js';
-import type { ConflictRecord, ConflictStrategy, VectorClock } from './protocol.js';
-import { isConcurrent } from './protocol.js';
+import type { Document, DocumentSnapshot, ConflictResolution, ConflictRecord, ConflictStrategy, VectorClock } from '../core/types.js';
+import { isConcurrent } from './protocol.js'; // runtime utilities (vector clock comparisons)
 
 // Local ConflictCandidate type to avoid coupling to high-centrality core/types for a single use
 type ConflictCandidate = {

@@ -10,7 +10,7 @@
 
 import type { DocumentStore } from '../storage/store.js';
 import type { StorageEvent } from '../storage/event-types.js';
-import type { ConflictStrategy, SyncMessage, VectorClock } from './protocol.js';
+import type { ConflictStrategy, SyncMessage, VectorClock } from '../core/types.js';
 import { SyncEngine } from './engine.js';
 import { createLazySyncEngine } from './lazyEngine.js';
 import { telemetry } from './telemetry.js';
@@ -20,7 +20,7 @@ import type { OfflineSyncQueue as OfflineSyncQueueContract, SyncManagerOptions }
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
 import { isConflict, resolveConflict } from './conflict.js';
-import type { ConflictRecord } from './protocol.js';
+import type { ConflictRecord } from '../core/types.js';
 
 /** Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc. */
 export interface TransportSend {

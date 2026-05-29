@@ -2,8 +2,8 @@
 // Ordered, deduplicated outbound message queue with exponential-backoff retry.
 // Depends on: sync/protocol.
 
-import type { SyncMessage, VectorClock } from './protocol.js';
-import { clocksEqual } from './protocol.js';
+import type { SyncMessage, VectorClock } from '../core/types.js';
+import { clocksEqual } from './protocol.js'; // runtime utility (equality check)
 
 export interface QueueEntry {
   message: SyncMessage;

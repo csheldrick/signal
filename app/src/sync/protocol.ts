@@ -1,101 +1,13 @@
-// ── Sync Protocol ───────────────────────────────────────────
-// Types for the eventual-consistency sync layer.
+// ── Sync Protocol Runtimes ──────────────────────────────────
+// Lightweight runtime utilities for vector clock operations used by the
+// sync subsystem. Type-level sync contracts (VectorClock, SyncMessage, etc.)
+// have been migrated into core/types to reduce coupling and centrality.
 
-// Define core sync-related types here to reduce centrality of core/types
-// and to keep the sync protocol self-contained. Other modules may import
-// these types from sync/protocol.js directly.
-export interface VectorClock {
-  [peerId: string]: number;
-}
-
-export type SyncState = 'idle' | 'syncing' | 'conflicted' | 'resolved';
-
-export type ConflictStrategy = 'last-write-wins' | 'first-write-wins' | 'merge-content';
-
-export interface PeerInfo {
-  peerId: string;
-  clock: VectorClock;
-  lastSeen: number;
-  state: SyncState;
-}
-
-export interface SyncAck {
-  kind: 'ack';
-  peerId: string;
-  documentId: string;
-  clock: VectorClock;
-  timestamp: number;
-}
-
-export interface ConflictRecord {
-  documentId: string;
-  localClock: VectorClock;
-  remoteClock: VectorClock;
-  localTimestamp: number;
-  remoteTimestamp: number;
-  resolvedBy: ConflictStrategy;
-  resolvedAt: number;
-}
-
-export interface SyncMessage {
-  operation: 'create' | 'update' | 'delete' | 'link';
-  documentId: string;
-  payload: unknown;
-  clock: VectorClock;
-  peerId: string;
-  timestamp: number;
-  messageId?: string;
-}
-
-// Offline queue types used by SyncManager and OfflineSyncQueue implementation
-export interface OfflineEntry {
-  id: string;
-  peerId: string;
-  documentId: string;
-  payload: any;
-  timestamp: number;
-  seq: number;
-}
-
-export interface OfflineSyncQueueOptions {
-  dataDir?: string;
-  filePrefix?: string;
-}
-
-export interface OfflineSyncQueue {
-  enqueue(peerId: string, documentId: string, payload: any): Promise<void>;
-  size(peerId: string): number;
-  list(peerId: string): any[];
-  drain(peerId: string, handler: (entry: any) => Promise<void>): Promise<void>;
-  clear(peerId: string): void;
-  dispose(): void;
-}
-
-export interface SyncManagerOptions {
-  peerId: string;
-  conflictStrategy?: ConflictStrategy;
-  flushIntervalMs?: number;
-  engine?: any;
-  sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
-  snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
-  offlineQueue?: OfflineSyncQueue;
-  offlineFirstMode?: boolean;
-}
-
-// Conflict candidate shape
-export interface ConflictCandidate {
-  documentId: string;
-  local: any;
-  localClock: any;
-  remote: any;
-  remoteClock: any;
-}
-
-export type ConflictCandidateRecord = ConflictCandidate;
+import type { VectorClock } from '../core/types.js';
 
 export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   const merged: VectorClock = { ...a };
-  for (const [peer, tick] of Object.entries(b)) {
+  for (const [peer, tick] of Object.entries(b as VectorClock)) {
     // Coerce to finite non-negative numbers; guard against malformed input
     const safeTick = Number.isFinite(tick as number) ? Math.max(0, tick as number) : 0;
     merged[peer] = Math.max(merged[peer] ?? 0, safeTick);
@@ -107,9 +19,7 @@ export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   }
 
   // Bound size to prevent unbounded growth in large deployments.
-  // Use a generous limit to reduce frequent truncation which can cause
-  // unnecessary synchronization churn (restore previous safe default).
-  const MAX_CLOCK_ENTRIES = 50; // tightened to limit vector clock growth and memory pressure (reduced further to lower memory and comparison cost)
+  const MAX_CLOCK_ENTRIES = 50;
   const entries = Object.entries(merged);
   if (entries.length > MAX_CLOCK_ENTRIES) {
     entries.sort(([, aTick], [, bTick]) => (bTick as number) - (aTick as number));

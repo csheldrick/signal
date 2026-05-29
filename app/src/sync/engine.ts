@@ -14,8 +14,8 @@ interface DocumentStoreLike {
 }
 
 import type { StorageEvent } from '../storage/event-types.js';
-import type { SyncMessage, VectorClock } from './protocol.js';
-import { mergeClocks } from './protocol.js';
+import type { SyncMessage, VectorClock } from '../core/types.js';
+import { mergeClocks } from './protocol.js'; // runtime utilities; types imported from core/types
 import { telemetry } from './telemetry.js';
 import { isValidDocumentSnapshot } from '../core/types.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
