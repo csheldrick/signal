@@ -4,7 +4,7 @@
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 36 source file(s).
+Module boundary at app containing 39 source file(s).
 _Path: `app`_
 Confidence: 95%
 
@@ -19,13 +19,13 @@ Confidence: 85%
 ### Contract: PresenceTracker
 Confidence: 85%
 
-### Contract: AppConfig
-Confidence: 85%
-
 ### Contract: SignalApp
 Confidence: 85%
 
 ### Contract: Document
+Confidence: 85%
+
+### Contract: AppConfig
 Confidence: 85%
 
 ### Contract: DocumentSnapshot
@@ -47,27 +47,6 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: DocumentChange
-Confidence: 85%
-
-### Contract: SearchHit
-Confidence: 85%
-
-### Contract: InvertedIndexSearchHit
-Confidence: 85%
-
-### Contract: IndexStats
-Confidence: 85%
-
-### Contract: Summarizer
-Confidence: 85%
-
-### Contract: GraphNode
-Confidence: 85%
-
-### Contract: AdjacencyList
-Confidence: 85%
-
-### Contract: GraphAdjacencyList
 Confidence: 85%
 
 ### Contract: GraphBuilder
@@ -115,34 +94,25 @@ Confidence: 85%
 ### Contract: StorageEvent
 Confidence: 85%
 
-### Contract: StorageEventBusContract
+### Contract: StorageEventListener
 Confidence: 85%
 
-### Contract: StorageEventBus
+### Contract: StorageEventBusContract
 Confidence: 85%
 
 ### Contract: DocumentSnapshotServiceOptions
 Confidence: 85%
 
-### Contract: ConflictCandidate
-Confidence: 85%
-
-### Contract: ConflictCandidateRecord
+### Contract: StorageEventBus
 Confidence: 85%
 
 ### Contract: TransportSend
 Confidence: 85%
 
-### Contract: SyncManagerOptions
-Confidence: 85%
-
-### Contract: OfflineEntry
-Confidence: 85%
-
-### Contract: OfflineSyncQueueOptions
-Confidence: 85%
-
 ### Contract: OfflineSyncQueue
+Confidence: 85%
+
+### Contract: VectorClock
 Confidence: 85%
 
 ### Contract: SyncState
@@ -160,10 +130,22 @@ Confidence: 85%
 ### Contract: ConflictRecord
 Confidence: 85%
 
-### Contract: VectorClock
+### Contract: SyncMessage
 Confidence: 85%
 
-### Contract: SyncMessage
+### Contract: OfflineEntry
+Confidence: 85%
+
+### Contract: OfflineSyncQueueOptions
+Confidence: 85%
+
+### Contract: SyncManagerOptions
+Confidence: 85%
+
+### Contract: ConflictCandidate
+Confidence: 85%
+
+### Contract: ConflictCandidateRecord
 Confidence: 85%
 
 ### Contract: QueueEntry
@@ -210,16 +192,44 @@ Confidence: 88%
 Exported function `LocalSummarizer.summarize(document: Document | DocumentSnapshot): Promise<string>` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
 Confidence: 95%
 
+### LocalSummarizer.isAvailable
+Exported function `LocalSummarizer.isAvailable(): boolean` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### LocalSummarizer.getGlobalActiveRequests
+Exported function `LocalSummarizer.getGlobalActiveRequests(): number` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### LocalSummarizer.tryRecordRequest
+Exported function `LocalSummarizer.tryRecordRequest(): boolean` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### LocalSummarizer.recordRequest
+Exported function `LocalSummarizer.recordRequest(): void` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 70%
+
+### LocalSummarizer.releaseRequest
+Exported function `LocalSummarizer.releaseRequest(): void` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 70%
+
+### LocalSummarizer.safeRelease
+Exported function `LocalSummarizer.safeRelease(): void` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 70%
+
 ### RemoteSummarizer
 Exported function `RemoteSummarizer` in app/src/ai/summarizer.ts. Side effects: io, async.
 Confidence: 88%
+
+### RemoteSummarizer.isAvailable
+Exported function `RemoteSummarizer.isAvailable(): boolean` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
+Confidence: 95%
 
 ### RemoteSummarizer.summarize
 Exported function `RemoteSummarizer.summarize(document: Document | DocumentSnapshot): Promise<string>` in app/src/ai/summarizer.ts. Side effects: async.
 Confidence: 95%
 
 ### createValidatorFromStore
-Exported function `createValidatorFromStore(_store: any): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
+Exported function `createValidatorFromStore(_store: any): (id: string) => Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: io.
 Confidence: 95%
 
 ### createValidatorFromPluginContext
@@ -258,59 +268,33 @@ Confidence: 95%
 Exported function `PresenceTracker.getActive(): PeerPresence[]` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
 Confidence: 95%
 
-### PresenceTracker.getViewers
-Exported function `PresenceTracker.getViewers(documentId: string): PeerPresence[]` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
-Confidence: 95%
-
-### PresenceTracker.focusDocument
-Exported function `PresenceTracker.focusDocument(peerId: string, documentId: string): Promise<boolean>` in app/src/collaboration/presence.ts. Side effects: async.
-Confidence: 95%
-
-### PresenceTracker.setValidator
-Exported function `PresenceTracker.setValidator(validate?: (id: string) => boolean | Promise<boolean>): void` in app/src/collaboration/presence.ts. Side effects: io.
-Confidence: 70%
-
-### PresenceTracker.setAsyncValidator
-Exported function `PresenceTracker.setAsyncValidator(validate?: (id: string) => Promise<boolean>): void` in app/src/collaboration/presence.ts. Side effects: async.
-Confidence: 70%
-
-### PresenceTracker.summary
-Exported function `PresenceTracker.summary(): {
-    active: number;
-    idle: number;
-    offline: number;
-}` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
-Confidence: 95%
-
-### SignalApp
-Exported function `SignalApp` in app/src/core/app.ts. Side effects: database, io, async.
-Confidence: 88%
-
-### SignalApp.enableRemoteSummarizer
-Exported function `SignalApp.enableRemoteSummarizer(fetcher: (document: Document, opts?: {
-    authToken?: string;
-}) => Promise<string>, options?: {
-    allowNetwork?: boolean;
-    maxSentences?: number;
-}): boolean` in app/src/core/app.ts. Pure function (no detected side effects).
-Confidence: 95%
-
 ## Detected Invariants
 
-- **error-boundary: Defensive counter decrement - ensures LocalSummarizer.globalActiveRequests is decremented even if release fails**: Detected 242 occurrence(s) of error-boundary pattern across 24 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
-- **guard: Standard null-safety guard - prevents accessing properties on potentially undefined entry**: Detected 27 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **error-boundary: Error boundary (try/catch)**: Detected 252 occurrence(s) of error-boundary pattern across 25 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Guard clause (null/undefined check)**: Detected 27 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 15 occurrence(s) of validation pattern across 6 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
 - **sanitization: Input sanitization**: Detected 5 occurrence(s) of sanitization pattern across 4 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
 - **rate-limit: Rate limiting enforcement**: Detected 2 occurrence(s) of rate-limit pattern across 2 file(s) in module 'signal-app'. Example: "const debounceMs = 200; // increased debounce to group bursts and reduce IO pressure" _(78%)_
+
+## Architectural Decisions (Lineage)
+
+- **[MIGRATION] feat: flip Signal to generative bootstrap + fitness selection** `1cc3ad2` 2026-05-29
+  feat: flip Signal to generative bootstrap + fitness selection
+
+Implements plan 001 (workspace/plans/001-generative-fitne
+- **[MIGRATION] docs(plans): add generative bootstrap + fitness selection migration plan** `248a72b` 2026-05-29
+  docs(plans): add generative bootstrap + fitness selection migration plan
+
+ 
 
 ## Entities
 
 - **LocalSummarizer**: class in app/src/ai/summarizer.ts
 - **PeerPresence**: type in app/src/collaboration/presence.ts
 - **PresenceTracker**: class in app/src/collaboration/presence.ts
-- **AppConfig**: interface in app/src/core/app.ts
 - **SignalApp**: class in app/src/core/app.ts
 - **Document**: interface in app/src/core/types.ts
+- **AppConfig**: interface in app/src/core/types.ts
 - **DocumentSnapshot**: interface in app/src/core/types.ts
 - **DocumentLink**: interface in app/src/core/types.ts
 - **LinkKind**: type in app/src/core/types.ts
@@ -318,45 +302,39 @@ Confidence: 95%
 - **SearchResult**: interface in app/src/core/types.ts
 - **SearchResultSnapshot**: interface in app/src/core/types.ts
 - **DocumentChange**: interface in app/src/core/types.ts
-- **SearchHit**: interface in app/src/core/types.ts
-- **InvertedIndexSearchHit**: interface in app/src/core/types.ts
-- **IndexStats**: interface in app/src/core/types.ts
-- **Summarizer**: interface in app/src/core/types.ts
-- **GraphNode**: interface in app/src/graph/builder.ts
-- **AdjacencyList**: interface in app/src/graph/builder.ts
-- **GraphAdjacencyList**: type in app/src/graph/builder.ts
 - **GraphBuilder**: class in app/src/graph/builder.ts
 - **Indexer**: class in app/src/index/inverted.ts
 - **WorkerPool**: class in app/src/index/workerPool.ts
 - **InvertedIndex**: class in app/src/indexing/index.ts
 - **ExportPlugin**: class in app/src/plugins/export.ts
 - **StorageEventType**: type in app/src/plugins/host.ts
-- **Plugin**: interface in app/src/plugins/host.ts
-- **PluginContext**: interface in app/src/plugins/host.ts
+- **Plugin**: type in app/src/plugins/host.ts
+- **PluginContext**: type in app/src/plugins/host.ts
 - **PluginHost**: class in app/src/plugins/host.ts
 - **SearchPlugin**: class in app/src/plugins/search.ts
-- **StorageEventCreated**: interface in app/src/storage/events.ts
-- **StorageEventUpdated**: interface in app/src/storage/events.ts
-- **StorageEventDeleted**: interface in app/src/storage/events.ts
-- **StorageEventLinked**: interface in app/src/storage/events.ts
-- **StorageEvent**: type in app/src/storage/events.ts
-- **StorageEventBusContract**: interface in app/src/storage/events.ts
+- **StorageEventCreated**: interface in app/src/storage/event-types.ts
+- **StorageEventUpdated**: interface in app/src/storage/event-types.ts
+- **StorageEventDeleted**: interface in app/src/storage/event-types.ts
+- **StorageEventLinked**: interface in app/src/storage/event-types.ts
+- **StorageEvent**: type in app/src/storage/event-types.ts
+- **StorageEventListener**: type in app/src/storage/event-types.ts
+- **StorageEventBusContract**: interface in app/src/storage/event-types.ts
+- **DocumentSnapshotServiceOptions**: interface in app/src/storage/event-types.ts
 - **StorageEventBus**: class in app/src/storage/events.ts
-- **DocumentSnapshotServiceOptions**: interface in app/src/storage/snapshot-service.ts
-- **ConflictCandidate**: interface in app/src/sync/conflict.ts
-- **ConflictCandidateRecord**: Detect whether a remote document write genuinely conflicts with the local version (concurrent vector clocks) or is simply a causally-later update.
 - **TransportSend**: Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc.
-- **SyncManagerOptions**: interface in app/src/sync/manager.ts
-- **OfflineEntry**: interface in app/src/sync/offline-queue.ts
-- **OfflineSyncQueueOptions**: interface in app/src/sync/offline-queue.ts
 - **OfflineSyncQueue**: OfflineSyncQueue Durable, per-peer queue that persists opaque payloads to disk when network transport is unavailable. Ensures causal (timestamp/seq) ordering when draining and provides robust rewrite behaviour so partially applied drains do not lose remaining entries.
+- **VectorClock**: interface in app/src/sync/protocol.ts
 - **SyncState**: type in app/src/sync/protocol.ts
 - **ConflictStrategy**: type in app/src/sync/protocol.ts
 - **PeerInfo**: interface in app/src/sync/protocol.ts
 - **SyncAck**: interface in app/src/sync/protocol.ts
 - **ConflictRecord**: interface in app/src/sync/protocol.ts
-- **VectorClock**: interface in app/src/sync/protocol.ts
 - **SyncMessage**: interface in app/src/sync/protocol.ts
+- **OfflineEntry**: interface in app/src/sync/protocol.ts
+- **OfflineSyncQueueOptions**: interface in app/src/sync/protocol.ts
+- **SyncManagerOptions**: interface in app/src/sync/protocol.ts
+- **ConflictCandidate**: interface in app/src/sync/protocol.ts
+- **ConflictCandidateRecord**: type in app/src/sync/protocol.ts
 - **QueueEntry**: interface in app/src/sync/queue.ts
 - **SyncQueueOptions**: interface in app/src/sync/queue.ts
 - **SyncQueue**: class in app/src/sync/queue.ts
@@ -372,19 +350,19 @@ Confidence: 95%
 
 ## Services
 
-- **DeprecatedDocumentStore**: DeprecatedDocumentStore: removed. Legacy code should migrate to importing concrete store types from the storage module. Using this alias will now produce a type error to surface migration sites and encourage updating imports instead of relying on a deprecated global alias.
+- **DeprecatedDocumentStore**: DeprecatedDocumentStore: removed. This alias has been intentionally set to `never` to cause a compile-time error at any remaining call-sites. The presence of a permissive type here previously prolonged migration and allowed duplicate legacy stores to coexist with the new storage surface. Forcing a type error makes remaining usages explicit and prevents accidental runtime compatibility shims which increase maintenance burden and the risk of divergent state. Migration guidance: - Replace imports of DeprecatedDocumentStore with concrete types from the storage/ module (e.g. DocumentStore or getOrCreateDocumentStore). - If you relied on a runtime legacy API, update the caller to use the storage module helpers instead of a global/deprecated abstraction.
+- **SnapshotStore**: interface in app/src/core/types.ts
 - **FileSnapshotStore**: Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
-- **SnapshotStore**: interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
-- **DiskDocumentSnapshotStore**: class in app/src/storage/snapshotService.ts
+- **DiskDocumentSnapshotStore**: DocumentSnapshotService - Writes snapshots atomically using write-then-rename (tmp -> final) - Retains at least two most-recent snapshots per document (prunes older) - Performs all work asynchronously so live document writes are not blocked
 - **DocumentStore**: class in app/src/storage/store.ts
 - **SyncEngine**: class in app/src/sync/engine.ts
 - **SyncManager**: class in app/src/sync/manager.ts
-- **DeprecatedDocumentStore**: Service inferred from DeprecatedDocumentStore: removed. Legacy code should migrate to importing concrete store types from the storage module. Using this alias will now produce a type error to surface migration sites and encourage updating imports instead of relying on a deprecated global alias.
+- **DeprecatedDocumentStore**: Service inferred from DeprecatedDocumentStore: removed. This alias has been intentionally set to `never` to cause a compile-time error at any remaining call-sites. The presence of a permissive type here previously prolonged migration and allowed duplicate legacy stores to coexist with the new storage surface. Forcing a type error makes remaining usages explicit and prevents accidental runtime compatibility shims which increase maintenance burden and the risk of divergent state. Migration guidance: - Replace imports of DeprecatedDocumentStore with concrete types from the storage/ module (e.g. DocumentStore or getOrCreateDocumentStore). - If you relied on a runtime legacy API, update the caller to use the storage module helpers instead of a global/deprecated abstraction.
+- **SnapshotStore**: Service inferred from interface in app/src/core/types.ts
 - **FileSnapshotStore**: Service inferred from Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
-- **SnapshotStore**: Service inferred from interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts
-- **DiskDocumentSnapshotStore**: Service inferred from class in app/src/storage/snapshotService.ts
+- **DiskDocumentSnapshotStore**: Service inferred from DocumentSnapshotService - Writes snapshots atomically using write-then-rename (tmp -> final) - Retains at least two most-recent snapshots per document (prunes older) - Performs all work asynchronously so live document writes are not blocked
 - **DocumentStore**: Service inferred from class in app/src/storage/store.ts
 - **SyncEngine**: Service inferred from class in app/src/sync/engine.ts
 - **SyncManager**: Service inferred from class in app/src/sync/manager.ts
