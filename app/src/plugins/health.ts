@@ -4,6 +4,7 @@
 // system integration tests and operator tooling.
 
 import type { Plugin, PluginContext } from '../core/types.js';
+import { telemetry } from '../sync/telemetry.js';
 
 export class HealthPlugin implements Plugin {
   readonly id = 'health';
@@ -26,14 +27,19 @@ export class HealthPlugin implements Plugin {
    */
   check(): { ok: boolean; docs: number; ts: number } {
     try {
-      if (!this.context) return { ok: false, docs: 0, ts: Date.now() };
+      if (!this.context) {
+        try { telemetry.emit('health_check_failed', { reason: 'no_context', timestamp: Date.now() }); } catch (_) {}
+        return { ok: false, docs: 0, ts: Date.now() };
+      }
       // Avoid listing full document set on each health check; prefer a cheap
       // capped probe to reduce load on the document store when checks are frequent.
       const docs = this.context.listDocuments();
       const count = Array.isArray(docs) ? Math.min(docs.length, 20) : 0;
       this.lastStatus = { docs: count, lastChecked: Date.now() };
+      try { telemetry.emit('health_check_success', { docs: count, timestamp: Date.now() }); } catch (_) {}
       return { ok: true, docs: count, ts: Date.now() };
-    } catch (_) {
+    } catch (err) {
+      try { telemetry.emit('health_check_failed', { reason: String(err), timestamp: Date.now() }); } catch (_) {}
       return { ok: false, docs: 0, ts: Date.now() };
     }
   }

@@ -304,6 +304,9 @@ export class SyncEngine {
 
     if (message) {
       try { telemetry.emit('engine_outbound_update', { operation: message.operation, documentId: message.documentId, outboundLength: this.outbound.length, clockSize: Object.keys(this.clock).length, timestamp: Date.now() }); } catch (_) {}
+      // Also emit a success metric for the engine processing of the storage event
+      // to help observability detect regressions in outbound message generation.
+      try { telemetry.emit('engine_event_processed', { operation: message.operation, documentId: message.documentId, timestamp: Date.now() }); } catch (_) {}
       // Persistence of outbound messages is a responsibility of the SyncManager
       // or an explicitly provided OfflineSyncQueue. The engine must avoid
       // durably persisting outbound messages to prevent duplicated writes and

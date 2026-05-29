@@ -3,4 +3,4 @@
 // authoritative type surface and prevents accidental divergence between the
 // storage/ module and core/types.ts.
 
-export type { StorageEventType, StorageEvent, StorageEventListener, StorageEventBusContract, DocumentSnapshotServiceOptions } from '../core/types.js';
+export type { StorageEventType, StorageEvent, StorageEventListener, StorageEventBusContract, DocumentSnapshot, DocumentSnapshotServiceOptions } from '../core/types.js';

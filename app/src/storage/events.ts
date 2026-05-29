@@ -138,6 +138,12 @@ export class StorageEventBus implements StorageEventBusContract {
       const starArr = star ? Array.from(star) : [];
       for (const fn of directArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
       for (const fn of starArr) { try { fn(event); } catch (_) { /* swallow listener errors */ } }
+
+      // Emit observability telemetry for synchronous emits so operators can
+      // detect when many listeners are executed synchronously which may indicate
+      // plugin-induced blocking. Keep this lightweight and debounced via
+      // TelemetryCenter.MACROTASK_THRESHOLD to avoid emitting on hot paths.
+      try { const { telemetry } = require('../sync/telemetry.js'); telemetry.emit('storage_emit_sync', { eventType: event.type, listeners: totalListeners, timestamp: Date.now() }); } catch (_) {}
     };
 
     // If many listeners are registered, yield to the event loop to avoid
@@ -200,8 +206,12 @@ export class StorageEventBus implements StorageEventBusContract {
         const asyncStarArr = asyncStar ? Array.from(asyncStar) : [];
         for (const fn of directArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
         for (const fn of starArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
-        for (const fn of asyncDirectArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
-        for (const fn of asyncStarArr) { try { fn(ev); } catch (_) { /* swallow listener errors */ } }
+        // Run async listeners in a separate microtask to avoid blocking the
+        // macrotask used for emitAsync flushing while preserving delivery.
+        const asyncToRun = [...asyncDirectArr, ...asyncStarArr];
+        if (asyncToRun.length > 0) Promise.resolve().then(() => { for (const fn of asyncToRun) { try { fn(ev); } catch (_) { /* swallow */ } } });
+        // Emit lightweight telemetry for async dispatches to help detect background congestion
+        try { const { telemetry } = require('../sync/telemetry.js'); telemetry.emit('storage_emit_async_queued', { eventType: ev.type, asyncListeners: asyncToRun.length, timestamp: Date.now() }); } catch (_) {}
       }
     }, 0);
   }

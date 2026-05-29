@@ -397,9 +397,15 @@ const wrapPluginWithBoundary = (p: Plugin): Plugin => {
                       }
                     } catch (_) { toSend = Object.freeze(ev as any); }
 
-                    for (const fn of Array.from(mgr!.listeners)) {
-                      try { fn(toSend); } catch (_) { /* swallow */ }
-                    }
+                    // Deliver plugin listeners asynchronously to avoid blocking the upstream
+                      // StorageEventBus. Schedule via microtask to preserve ordering while
+                      // preventing misbehaving plugins from slowing down the emitter.
+                      const toInvoke = Array.from(mgr!.listeners);
+                      Promise.resolve().then(() => {
+                        for (const fn of toInvoke) {
+                          try { fn(toSend); } catch (_) { /* swallow */ }
+                        }
+                      });
                   } catch (_) { /* swallow */ }
                 };
 
