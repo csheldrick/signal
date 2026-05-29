@@ -1,146 +1,130 @@
 [
   {
     "type": "goal",
-    "description": "Enable robust offline-first collaborative editing with deterministic conflict resolution using SyncEngine, SyncManager, SyncQueue and ConflictStrategy."
+    "description": "Provide a reliable web-api for collaborative document editing and search (module: signal-app / app) that supports offline-first sync, indexing, and plugin extensibility."
   },
   {
     "type": "goal",
-    "description": "Provide durable point-in-time snapshots and fast recovery via SnapshotStore abstractions (SnapshotStore, DiskDocumentSnapshotStore, FileSnapshotStore) and DocumentSnapshotService."
+    "description": "Keep document snapshots durable and recoverable via SnapshotStore and DiskDocumentSnapshotStore so users can restore state and resume sync sessions."
   },
   {
     "type": "goal",
-    "description": "Support fast full-text search across documents using InvertedIndex, Indexer and SearchPlugin with IndexStats for monitoring."
+    "description": "Maintain accurate presence and session tracking using PeerPresence and PresenceTracker so peers see timely presence updates."
   },
   {
     "type": "goal",
-    "description": "Offer real-time peer presence and session tracking through PresenceTracker and PeerPresence to enable collaborative UX features."
-  },
-  {
-    "type": "goal",
-    "description": "Expose extensibility for import/export and custom features through PluginHost, PluginContext, Plugin, ExportPlugin and SearchPlugin."
-  },
-  {
-    "type": "goal",
-    "description": "Provide summarization capabilities that can run locally (LocalSummarizer) and remotely (RemoteSummarizer) while minimizing user-perceived latency."
+    "description": "Support summarization and AI features via LocalSummarizer and RemoteSummarizer while allowing fallbacks for offline operation."
   },
   {
     "type": "architecture",
-    "description": "The codebase is organized under a single module boundary 'signal-app' (app/), with ~36 files forming the application surface."
+    "description": "Single module boundary 'signal-app' hosts most services (app/*) — the system is organized as a monolithic application boundary containing stores, sync, indexer, and plugins."
   },
   {
     "type": "architecture",
-    "description": "Persistence is abstracted behind SnapshotStore; concrete implementations include DiskDocumentSnapshotStore and FileSnapshotStore, allowing pluggable storage backends."
+    "description": "Pluggable indexing/search architecture: InvertedIndex, Indexer, WorkerPool, and SearchPlugin form a pipeline for text indexing and query processing."
   },
   {
     "type": "architecture",
-    "description": "Synchronization is implemented as a layered engine: SyncEngine for protocol semantics and SyncManager/SyncQueue for delivery, ack tracking and retry."
+    "description": "Sync layer split into SyncEngine and SyncManager with explicit contracts for SyncQueue, SyncSessionTracker, VectorClock, and ConflictResolution to manage offline/online state."
   },
   {
     "type": "architecture",
-    "description": "Search is separated into indexing and query components: Indexer and WorkerPool build an InvertedIndex; SearchPlugin and SearchQuery provide extensible query handling."
-  },
-  {
-    "type": "architecture",
-    "description": "PluginHost centralizes plugin lifecycle and context (PluginContext) allowing plugins (Plugin, ExportPlugin, SearchPlugin) to produce storage events and augment behavior."
-  },
-  {
-    "type": "architecture",
-    "description": "Presence and session concerns are decoupled: PeerPresence models peer state while PresenceTracker aggregates and exposes presence events for the app."
+    "description": "Extensibility through Plugin/PluginHost and ExportPlugin/SearchPlugin contracts; PluginContext mediates plugin interactions with core services (storage, telemetry, events)."
   },
   {
     "type": "observation",
-    "description": "LocalSummarizer.summarize is detected as a pure function (no side effects), whereas RemoteSummarizer.summarize performs network IO and is asynchronous."
+    "description": "LocalSummarizer is exported in app/src/ai/summarizer.ts and its summarize(document) is detected as a pure function (no IO), while RemoteSummarizer.summarize has async/io side effects."
   },
   {
     "type": "observation",
-    "description": "There is an explicit refactor history replacing Document with DocumentSnapshot to enforce readonly semantics, but both types still exist (Document, DocumentSnapshot)."
+    "description": "There are duplicated service nodes in the topology: DeprecatedDocumentStore, FileSnapshotStore, SnapshotStore, DocumentSnapshotService, DiskDocumentSnapshotStore, DocumentStore, SyncEngine, SyncManager appear multiple times indicating either parallel implementations or model duplication."
   },
   {
     "type": "observation",
-    "description": "Multiple storage service variants appear: DocumentStore and DeprecatedDocumentStore co-exist in the graph, suggesting incomplete migration or compatibility layers."
+    "description": "Contracts enumerate many domain types (Document, DocumentSnapshot, DocumentLink, LinkKind, SearchQuery, SearchResult, StorageEvent types), suggesting a well-specified domain model and an event-driven storage bus (StorageEventBus)."
   },
   {
     "type": "observation",
-    "description": "Storage event contracts are explicit (StorageEventCreated, StorageEventUpdated, StorageEventDeleted, StorageEventLinked, StorageEvent) and used by the StorageEventBus contract."
+    "description": "An invariant 'error-boundary: Defensive counter decrement' exists ensuring LocalSummarizer.globalActiveRequests is decremented even if release fails—code includes defensive guards for resource accounting."
   },
   {
     "type": "observation",
-    "description": "There are explicit contracts for asynchronous validation (DocumentValidatorAsync) and synchronous validation (DocumentValidatorSync), but no central enforcement node visible."
+    "description": "Presence and session-related contracts (PeerPresence, PresenceTracker, PeerSession, SyncSessionTracker) are present, implying explicit handling of online peers and session lifecycle."
   },
   {
     "type": "observation",
-    "description": "Topology shows duplicated service names (two sets of DocumentSnapshotService, DiskDocumentSnapshotStore, SnapshotStore, DocumentStore, SyncEngine, SyncManager) which may indicate test fixtures vs runtime variants or accidental duplication."
+    "description": "There are many contract-only nodes (84 contracts) such as SearchPlugin, ExportPlugin, TransportSend, OfflineSyncQueue — some contracts may lack concrete implementations or have thin/unstable implementations."
   },
   {
     "type": "observation",
-    "description": "The graph lists IndexStats and InvertedIndexSearchHit contracts indicating operational metrics and search result shaping are first-class concepts."
+    "description": "Topology shows Indexer, InvertedIndex, WorkerPool and InvertedIndexSearchHit types; a focused inverted-index search pipeline exists but its runtime scaling characteristics are not captured."
   },
   {
     "type": "observation",
-    "description": "Decisions for TypeScript adoption and Testing adoption are recorded as decision nodes, implying those are active cross-cutting concerns but their current adoption level is uncertain."
+    "description": "A 'TypeScript adoption' decision node exists; codebase likely mixes strict typing with possible legacy JS/TS interop, which could hide runtime type gaps."
   },
   {
     "type": "observation",
-    "description": "Invariant nodes include error-boundary, guard clauses, input validation, sanitization and rate-limit enforcement, but rate-limit and observability constraints may not be uniformly wired into services like RemoteSummarizer or Indexer."
+    "description": "Constraint nodes include 'Authentication required', 'Async job processing', 'Observability', 'Persistent storage', and 'Test coverage required'—non-functional requirements are explicit in the model."
+  },
+  {
+    "type": "observation",
+    "description": "TelemetryEvent and SearchResultSnapshot contracts are present; the system captures telemetry and snapshot-level search results for observability and reproducibility."
   },
   {
     "type": "constraint",
-    "description": "Authentication required: all operations that mutate or read user-scoped documents must enforce authentication (AppConfig, SignalApp-level policy)."
+    "description": "Authentication required: All peer-facing actions (presence, sync, plugin access) must be gated by authenticated PeerInfo/TransportSend to prevent unauthorized mutation."
   },
   {
     "type": "constraint",
-    "description": "Persistent storage: SnapshotStore-backed snapshots (DiskDocumentSnapshotStore/FileSnapshotStore) are the ground truth and must be durable across restarts."
+    "description": "Persistent storage: SnapshotStore/DiskDocumentSnapshotStore must persist a consistent sequence of DocumentSnapshot and VersionHistory updates to avoid data loss during sync."
   },
   {
     "type": "constraint",
-    "description": "Observability: Indexer, SyncEngine and SyncManager must emit IndexStats/TelemetryEvent metrics for monitoring and alerting."
+    "description": "Async job processing: WorkerPool and Indexer must process indexing jobs in bounded time and surface backpressure to SyncManager to avoid unbounded memory growth."
   },
   {
     "type": "constraint",
-    "description": "Async job processing: WorkerPool and Indexer must respect backpressure and rate-limit invariants to avoid I/O saturation or CPU exhaustion."
+    "description": "Observability: TelemetryEvent and StorageEventBus must capture enough signals (index stats, sync ack/failures, conflict records) to detect and triage divergence between peers."
   },
   {
     "type": "constraint",
-    "description": "Test coverage required: critical protocols (SyncEngine, ConflictStrategy, Snapshot persistence, InvertedIndex) must have regression tests per the 'Test coverage required' constraint."
+    "description": "Test coverage required: Key contracts (SyncEngine, ConflictResolution, OfflineSyncQueue, PresenceTracker) must be covered by automated tests to prevent regressions in core distributed behaviors."
   },
   {
     "type": "hypothesis",
-    "description": "Under high concurrency the SyncManager's queuing and ConflictStrategy will produce frequent conflict candidates and may reveal missing conflict resolution tests."
+    "description": "Race conditions will surface under concurrent sync and indexing: SyncEngine/SyncManager interacting with Indexer/WorkerPool may produce inconsistent index states when concurrent writes and snapshotting occur."
   },
   {
     "type": "hypothesis",
-    "description": "DiskDocumentSnapshotStore will become an I/O bottleneck for large-scale indexing or many concurrent snapshot writes unless SnapshotStore implementations batch or offload writes."
+    "description": "Legacy/deprecated stores (DeprecatedDocumentStore) coexistence may cause behavioral inconsistencies—some code paths may still write to deprecated stores leading to lost or divergent snapshots."
   },
   {
     "type": "hypothesis",
-    "description": "Indexer + WorkerPool will show increased latency and high memory use as corpus size grows, potentially causing degraded responsiveness for SearchQuery handling."
+    "description": "RemoteSummarizer usage will cause tail latency spikes and retries if network IO is not rate-limited; LocalSummarizer alone may be insufficient for long or complex documents."
   },
   {
     "type": "hypothesis",
-    "description": "RemoteSummarizer will introduce availability and latency variability into summarization features; absent robust timeouts and fallback to LocalSummarizer, UX will degrade."
+    "description": "PluginHost exposes surface area for misbehaving plugins: a buggy SearchPlugin or ExportPlugin could block WorkerPool threads or leak resources if PluginContext lacks strict quotas."
   },
   {
     "type": "hypothesis",
-    "description": "PluginHost currently lacks strong isolation: a misbehaving plugin (Plugin/ExportPlugin/SearchPlugin) could throw unhandled errors that violate the error-boundary invariant."
-  },
-  {
-    "type": "hypothesis",
-    "description": "Co-existence of DeprecatedDocumentStore and DocumentStore may mask edge cases where older code paths bypass new validation or sanitization rules (DocumentValidatorSync/Async)."
+    "description": "Partial TypeScript adoption will let subtle runtime type errors slip through at boundaries (e.g., StorageEvent handling or TransportSend payloads), causing uncaught exceptions in production flows."
   },
   {
     "type": "tension",
-    "description": "Offline-first intent (SyncEngine/OfflineSyncQueue) conflicts with reliance on RemoteSummarizer for key UX: offline mode requires LocalSummarizer fallback yet both implementations differ in side effects."
+    "description": "Intent: offline-first syncing (OfflineSyncQueue, SyncQueue). Reality: presence of RemoteSummarizer and explicit Remote IO suggests dependence on network services, creating a tension between offline capability and remote features."
   },
   {
     "type": "tension",
-    "description": "Desire for a single source-of-truth SnapshotStore contrasts with duplicated service instances (two DocumentSnapshotService/DiskDocumentSnapshotStore entries) suggesting fragmentation or unfinished migration."
+    "description": "Intent: modular plugin system (Plugin, PluginHost). Reality: single module 'signal-app' monolith and many contract-only nodes indicates plugins may be poorly isolated or under-implemented, risking core stability."
   },
   {
     "type": "tension",
-    "description": "Project-level decisions record TypeScript adoption but presence of deprecated entities (DeprecatedDocumentStore) and duplicated services suggests incomplete modernization and mixed paradigms."
+    "description": "Intent: evolve APIs (contracts for many domain types). Reality: duplicated legacy services (DeprecatedDocumentStore alongside new stores) create friction in migration, increasing complexity and potential for inconsistencies."
   },
   {
     "type": "tension",
-    "description": "Extensibility via PluginHost conflicts with safety requirements (rate-limit, sanitization, error-boundary) because plugins have broad access to StorageEvent and Document contracts and may bypass invariants."
+    "description": "Intent: strong observability and defensive invariants (error-boundary, telemetry). Reality: inferred gaps in test coverage and duplicated service nodes increase the risk that invariants are not enforced under complex failure modes."
   }
 ]

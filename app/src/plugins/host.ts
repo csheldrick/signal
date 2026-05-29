@@ -133,9 +133,13 @@ export const dire: any = ((): any => {
 })();
 
 export class PluginHost {
-  private static readonly MAX_REGISTERED_PLUGINS = 1; // tightened to reduce plugin subsystem fan-out and resource pressure
+  // Allow a modest number of plugins to support a modular ecosystem while
+  // still bounding fan-out and resource pressure. Increasing these caps
+  // resolves the monolithic 'single plugin' restriction while retaining
+  // conservative safety limits for low-resource environments.
+  private static readonly MAX_REGISTERED_PLUGINS = 8; // previously 1
   private plugins: Map<string, Plugin> = new Map();
-  private static readonly MAX_ENABLED_PLUGINS = 1;
+  private static readonly MAX_ENABLED_PLUGINS = 4; // previously 1
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
   // listener per plugin. This consolidates upstream listeners and

@@ -28,9 +28,6 @@ Confidence: 85%
 ### Contract: Document
 Confidence: 85%
 
-### Contract: DeprecatedDocumentChange
-Confidence: 85%
-
 ### Contract: DocumentSnapshot
 Confidence: 85%
 
@@ -88,6 +85,9 @@ Confidence: 85%
 ### Contract: ExportPlugin
 Confidence: 85%
 
+### Contract: StorageEventType
+Confidence: 85%
+
 ### Contract: Plugin
 Confidence: 85%
 
@@ -98,9 +98,6 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: SearchPlugin
-Confidence: 85%
-
-### Contract: StorageEventType
 Confidence: 85%
 
 ### Contract: StorageEventCreated
@@ -116,12 +113,6 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: StorageEvent
-Confidence: 85%
-
-### Contract: DocumentValidatorAsync
-Confidence: 85%
-
-### Contract: DocumentValidatorSync
 Confidence: 85%
 
 ### Contract: StorageEventBusContract
@@ -306,18 +297,11 @@ Confidence: 95%
 
 ## Detected Invariants
 
-- **error-boundary: Error boundary (try/catch)**: Detected 228 occurrence(s) of error-boundary pattern across 24 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
-- **guard: Guard clause (null/undefined check)**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **error-boundary: Defensive counter decrement - ensures LocalSummarizer.globalActiveRequests is decremented even if release fails**: Detected 242 occurrence(s) of error-boundary pattern across 24 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Standard null-safety guard - prevents accessing properties on potentially undefined entry**: Detected 27 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 15 occurrence(s) of validation pattern across 6 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
 - **sanitization: Input sanitization**: Detected 5 occurrence(s) of sanitization pattern across 4 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
-- **rate-limit: Rate limiting enforcement**: Detected 2 occurrence(s) of rate-limit pattern across 2 file(s) in module 'signal-app'. Example: "const debounceMs = 50; // short debounce to group bursts" _(78%)_
-
-## Architectural Decisions (Lineage)
-
-- **[REFACTOR] refactor: replace Document type with DocumentSnapshot for improved readonly cont** `20ae1ff` 2026-05-26
-  refactor: replace Document type with DocumentSnapshot for improved readonly contract
-
-- Updated presence.ts to use Docum
+- **rate-limit: Rate limiting enforcement**: Detected 2 occurrence(s) of rate-limit pattern across 2 file(s) in module 'signal-app'. Example: "const debounceMs = 200; // increased debounce to group bursts and reduce IO pressure" _(78%)_
 
 ## Entities
 
@@ -327,7 +311,6 @@ Confidence: 95%
 - **AppConfig**: interface in app/src/core/app.ts
 - **SignalApp**: class in app/src/core/app.ts
 - **Document**: interface in app/src/core/types.ts
-- **DeprecatedDocumentChange**: Deprecated alias: use DocumentChange instead.
 - **DocumentSnapshot**: interface in app/src/core/types.ts
 - **DocumentLink**: interface in app/src/core/types.ts
 - **LinkKind**: type in app/src/core/types.ts
@@ -347,18 +330,16 @@ Confidence: 95%
 - **WorkerPool**: class in app/src/index/workerPool.ts
 - **InvertedIndex**: class in app/src/indexing/index.ts
 - **ExportPlugin**: class in app/src/plugins/export.ts
+- **StorageEventType**: type in app/src/plugins/host.ts
 - **Plugin**: interface in app/src/plugins/host.ts
 - **PluginContext**: interface in app/src/plugins/host.ts
 - **PluginHost**: class in app/src/plugins/host.ts
 - **SearchPlugin**: class in app/src/plugins/search.ts
-- **StorageEventType**: type in app/src/storage/events.ts
 - **StorageEventCreated**: interface in app/src/storage/events.ts
 - **StorageEventUpdated**: interface in app/src/storage/events.ts
 - **StorageEventDeleted**: interface in app/src/storage/events.ts
 - **StorageEventLinked**: interface in app/src/storage/events.ts
 - **StorageEvent**: type in app/src/storage/events.ts
-- **DocumentValidatorAsync**: type in app/src/storage/events.ts
-- **DocumentValidatorSync**: type in app/src/storage/events.ts
 - **StorageEventBusContract**: interface in app/src/storage/events.ts
 - **StorageEventBus**: class in app/src/storage/events.ts
 - **DocumentSnapshotServiceOptions**: interface in app/src/storage/snapshot-service.ts
@@ -391,19 +372,19 @@ Confidence: 95%
 
 ## Services
 
-- **DeprecatedDocumentStore**: DeprecatedDocumentStore: legacy alias used by older code that imported a concrete store type from core. Kept as `any` to avoid introducing a hard dependency on the storage module in core types and to ease gradual migration. New code should import the concrete DocumentStore from storage/store.ts instead of relying on this alias.
+- **DeprecatedDocumentStore**: DeprecatedDocumentStore: removed. Legacy code should migrate to importing concrete store types from the storage module. Using this alias will now produce a type error to surface migration sites and encourage updating imports instead of relying on a deprecated global alias.
 - **FileSnapshotStore**: Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
 - **SnapshotStore**: interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
-- **DiskDocumentSnapshotStore**: DocumentSnapshotService - Writes snapshots atomically using write-then-rename (tmp -> final) - Retains at least two most-recent snapshots per document (prunes older) - Performs all work asynchronously so live document writes are not blocked
+- **DiskDocumentSnapshotStore**: class in app/src/storage/snapshotService.ts
 - **DocumentStore**: class in app/src/storage/store.ts
 - **SyncEngine**: class in app/src/sync/engine.ts
 - **SyncManager**: class in app/src/sync/manager.ts
-- **DeprecatedDocumentStore**: Service inferred from DeprecatedDocumentStore: legacy alias used by older code that imported a concrete store type from core. Kept as `any` to avoid introducing a hard dependency on the storage module in core types and to ease gradual migration. New code should import the concrete DocumentStore from storage/store.ts instead of relying on this alias.
+- **DeprecatedDocumentStore**: Service inferred from DeprecatedDocumentStore: removed. Legacy code should migrate to importing concrete store types from the storage module. Using this alias will now produce a type error to surface migration sites and encourage updating imports instead of relying on a deprecated global alias.
 - **FileSnapshotStore**: Service inferred from Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
 - **SnapshotStore**: Service inferred from interface in app/src/storage/snapshot-service.ts
 - **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts
-- **DiskDocumentSnapshotStore**: Service inferred from DocumentSnapshotService - Writes snapshots atomically using write-then-rename (tmp -> final) - Retains at least two most-recent snapshots per document (prunes older) - Performs all work asynchronously so live document writes are not blocked
+- **DiskDocumentSnapshotStore**: Service inferred from class in app/src/storage/snapshotService.ts
 - **DocumentStore**: Service inferred from class in app/src/storage/store.ts
 - **SyncEngine**: Service inferred from class in app/src/sync/engine.ts
 - **SyncManager**: Service inferred from class in app/src/sync/manager.ts

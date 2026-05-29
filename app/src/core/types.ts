@@ -24,8 +24,7 @@ export interface Document {
 // These aliases are intended to be short-lived and provide a gentler
 // migration path while keeping the core types strictly defined.
 
-/** Deprecated alias: use DocumentChange instead. */
-export type DeprecatedDocumentChange = DocumentChange;
+type DeprecatedDocumentChange = DocumentChange & { isDeprecated: boolean; };
 
 /**
  * DeprecatedDocumentStore: removed. Legacy code should migrate to importing

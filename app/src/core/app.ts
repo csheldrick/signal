@@ -511,11 +511,16 @@ export class SignalApp {
               const doc = this.store.read(id);
               if (doc) {
                 try {
-                  // Use the configured summarizer (may be remote) instead of always using local.
-                  // This allows background work to benefit from remote summarization when available.
-                  if (!this._summarizer && !this._localSummarizer) { const Lc = getLocalSummarizerClass(); if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } } }
-                  const summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
-                  if (summarizer && typeof summarizer.summarize === 'function') await summarizer.summarize(doc);
+// Use LOCAL summarizer for background jobs to preserve offline-first guarantees.
+                        // Background summarization must not trigger network IO even if a remote
+                        // summarizer is enabled for on-demand plugin or user requests. This
+                        // ensures background tasks remain offline-first and deterministic.
+                        if (!this._localSummarizer) {
+                          const Lc = getLocalSummarizerClass();
+                          if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } }
+                        }
+                        const summarizer: Summarizer | any = this._localSummarizer;
+                        if (summarizer && typeof summarizer.summarize === 'function') await summarizer.summarize(doc);
                   try { lastMap.set(id, Date.now()); } catch (_) {}
                   try { console.debug && console.debug(`background summarization completed for ${id}`); } catch (_) {}
                 } catch (_) {
