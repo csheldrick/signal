@@ -45,11 +45,19 @@ rediscovered*, and derived entries that match nothing count as *emergent*.
   read), and the generative pass is exploring elsewhere.
 - **Both high:** the ideal — the system recovers known insight *and* extends it.
 
-## Open question
+## Curiosity term (enabled)
 
-Does the generative pass need a curiosity term (rewarding under-activated regions) to
-keep emergence > 0 as the project matures, or does the graph stay rich enough on its own?
-This ties to the convergence-guard decision deferred in ADR-004.
+The curiosity / convergence guard is **enabled** in ADR-004 (`evolve.curiosity` in
+`.weave/config.json`, `weight: 0.2`, tied to the `exploration_needed` signal). This
+experiment now also measures its effect:
+
+- **With curiosity on (default):** track emergent count across successive runs — does it
+  stay > 0 as the project matures, i.e. does exploration keep finding new signal?
+- **With curiosity off (`weight: 0`):** does emergence decay toward 0 as the loop settles
+  into the curated answer key?
+
+If emergence holds up only with curiosity on, the guard is doing its job; if it holds up
+either way, the graph is rich enough on its own and the weight can be lowered.
 
 ## Exit criteria
 

@@ -63,12 +63,23 @@ variants or corrupt the working tree if a candidate misbehaves — the safer def
 an automated loop that spawns and discards many candidates. Snapshot/restore in-place
 remains a future optimisation if worktree creation dominates runtime.
 
-### Convergence guard (deferred)
+This is **enabled** via `evolve.isolation: "worktree"` in `.weave/config.json`.
 
-`weave evolve` may later carry a curiosity term that rewards exploring under-activated
-regions (tied to the `exploration_needed` field-dynamics signal) so the project never
-fully settles into the curated answer key. Not enabled in this ADR; tracked as an open
-question on EXP-006.
+### Convergence guard (enabled)
+
+`weave evolve` carries a **curiosity term** that rewards exploring under-activated regions
+of the graph, tied to the `exploration_needed` field-dynamics signal, so the project never
+fully settles into the curated answer key. A variant's score is therefore:
+
+```
+score = fitness + curiosity.weight * exploration_needed(region)
+```
+
+where `fitness` is the grounding-test pass rate (in `[0,1]`) and the curiosity bonus is a
+modest fraction of that — `curiosity.weight: 0.2` in `.weave/config.json` — so exploration
+biases ties and breaks stalemates without ever letting a failing variant outrank a passing
+one. **Enabled** via `evolve.curiosity.enabled: true`. EXP-006 measures whether this keeps
+emergence > 0 as the project matures.
 
 ## Consequences
 

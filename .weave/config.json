@@ -11,6 +11,24 @@
   "confidencePropagationEveryNTicks": 5,
   "evolutionRecordEveryNTicks": 10,
   "maintenanceEveryNTicks": 50,
+  "evolve": {
+    "dir": "app",
+    "variants": 4,
+    "isolation": "worktree",
+    "fitness": {
+      "probe": "test",
+      "command": "npm test",
+      "perCapabilityCommand": "npx vitest run tests/{capability}.test.ts",
+      "score": "passRate",
+      "tieBreaker": "activationCost"
+    },
+    "curiosity": {
+      "enabled": true,
+      "weight": 0.2,
+      "signal": "exploration_needed",
+      "rewards": "underActivatedRegions"
+    }
+  },
   "docs": {
     "root": "workspace",
     "ingest": [

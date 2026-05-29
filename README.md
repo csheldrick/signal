@@ -122,9 +122,13 @@ weave evolve --variants 4 --dir app   # spawn 4 variants, score by app tests, re
 
 Each generative goal carries a *targeted* grounding test (e.g.
 `app/tests/summarizer.test.ts` for the `Summarizer` capability), so a variant is scored
-only against the tests that ground its goal. See
+only against the tests that ground its goal. A **curiosity term** (`evolve.curiosity` in
+`.weave/config.json`) adds a modest exploration bonus for under-activated regions so the
+loop never fully settles into the curated answer key — fitness still dominates, so a
+failing variant can never outrank a passing one. See
 [ADR-004](workspace/architecture/decisions/004-generative-fitness-model.md) for the
-fitness-probe and worktree-isolation contract, and EXP-006 / EXP-007 for the experiments.
+fitness-probe, worktree-isolation, and curiosity contract, and EXP-006 / EXP-007 for the
+experiments.
 
 ### 6. Inspect results
 
