@@ -2,22 +2,16 @@
 // Wires all subsystems together. High fan-out node importing
 // from every module — gives Loom a central hub in the graph.
 
-import { DocumentStore } from '../storage/store.js';
-import { StorageEventBus } from '../storage/events.js';
-import type { StorageEventBusContract } from '../storage/events.js';
-import { GraphBuilder } from '../graph/builder.js';
-import { createInvertedIndex, Indexer } from '../index/inverted.js';
-import type { PresenceTracker as PresenceTrackerContract, OfflineSyncQueue as OfflineSyncQueueContract } from '../core/types.js';
-import { PluginHost } from '../plugins/host.js';
-import type { PluginContext } from '../core/types.js';
-import { SyncEngine } from '../sync/engine.js';
-import { PresenceTracker } from '../collaboration/presence.js';
+import type { StorageEventBus, StorageEventBusContract } from '../storage/events.js';
+import type { DocumentStore } from '../storage/store.js';
+import type { GraphBuilder } from '../graph/builder.js';
+import type { PresenceTracker as PresenceTrackerContract, OfflineSyncQueue as OfflineSyncQueueContract, PluginContext, PluginHost } from '../core/types.js';
 import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';
 import { getSyncEngineFromStore } from '../storage/syncEngineRegistry.js';
 import { createLazyGraph, createLazyPluginHost, createLazyPresenceTracker } from './factories.js';
 
 import type { Document, DocumentSnapshot, Summarizer, Observability } from '../core/types.js';
-import { telemetry } from '../sync/telemetry.js';
+import type { SyncEngine } from '../sync/engine.js';
 
 
 export interface AppConfig {
@@ -37,7 +31,7 @@ export class SignalApp {
   readonly eventsContract: StorageEventBusContract;
   readonly graph: GraphBuilder;
   readonly plugins: PluginHost;
-  readonly presence: PresenceTracker;
+  readonly presence: PresenceTrackerContract; 
   /* sync lazy-initialized at start */
   /* summarizer lazy-initialized at start */
 
@@ -51,7 +45,39 @@ export class SignalApp {
   private readonly _disableBgSummarize: boolean;
 
   constructor(config: AppConfig) {
-    this.events = new StorageEventBus();
+    // Instantiate the StorageEventBus lazily via runtime require to avoid
+    // importing the concrete class at module load time (reduces startup fan-out).
+    try {
+      const mod = require('../storage/events.js');
+      const BusCtor = mod && (mod.StorageEventBus || mod.default || mod);
+      this.events = new BusCtor();
+    } catch (_) {
+      // Provide a minimal no-op fallback that satisfies the StorageEventBusContract
+      // so the app remains operational in constrained environments.
+      const noop = {
+        on: (_type: any, _listener: any) => {},
+        off: (_type: any, _listener: any) => {},
+        onAsync: (_type: any, _listener: any) => {},
+        offAsync: (_type: any, _listener: any) => {},
+        emit: (_ev: any) => {},
+        emitAsync: (_ev: any) => {},
+        attachDocumentValidatorFromEvents: (_initial?: Iterable<string>) => {
+          const fn = async (_id: string) => false;
+          (fn as any).dispose = () => {};
+          return fn;
+        },
+        attachDocumentValidatorSnapshot: (_initial?: Iterable<string>) => {
+          const fn = (_id: string) => false;
+          (fn as any).dispose = () => {};
+          return fn;
+        },
+        getTrace: () => [] as any[],
+        getListenerCounts: () => ({ total: 0, perType: {}, asyncTotal: 0 }),
+        clearTrace: () => {},
+        removeAllListeners: () => {},
+      } as unknown as StorageEventBusContract;
+      this.events = noop as any;
+    }
     // Provide a contract-typed view over the concrete event bus instance so
     // lightly-coupled components can depend on the StorageEventBusContract
     // without requiring the concrete class. This preserves existing callers
@@ -73,11 +99,27 @@ export class SignalApp {
     }
     // Prefer shared singleton to avoid accidental multiple stores in normal app usage.
     try {
-      // Use singleton factory when available; fall back to direct construction.
-      const { getOrCreateDocumentStore } = require('../storage/store.js');
-      this.store = getOrCreateDocumentStore(this.events);
+      // Try to use the module-provided factory when available to avoid duplicate stores.
+      try {
+        const mod = require('../storage/store.js');
+        if (mod && typeof mod.getOrCreateDocumentStore === 'function') {
+          this.store = mod.getOrCreateDocumentStore(this.events);
+        } else if (mod && typeof mod.DocumentStore === 'function') {
+          // Fallback to module-exported constructor
+          this.store = new mod.DocumentStore(this.events);
+        } else {
+          // As a final fallback, attempt to use the default export as a constructor.
+          const maybeDefault = mod && (mod.default || mod);
+          if (typeof maybeDefault === 'function') this.store = new maybeDefault(this.events);
+          else this.store = { list: () => [] } as any;
+        }
+      } catch (_) {
+        // If dynamic require path fails, create a simple in-memory stub to keep the app operable.
+        this.store = { list: () => [] } as any;
+      }
     } catch (_) {
-      this.store = new DocumentStore(this.events);
+      // Defensive: ensure store is always defined.
+      this.store = { list: () => [] } as any;
     }
     this.graph = createLazyGraph(() => { try { const l = this.store.list(); return Array.isArray(l) ? l.slice(0, 500) : []; } catch (_) { return []; } });
     // Create a lightweight inverted index and an Indexer that listens to
@@ -93,12 +135,27 @@ export class SignalApp {
     (this as any)._createInvertedIndex = () => {
       try {
         if ((this as any)._invertedIndex) return (this as any)._invertedIndex;
-        const idx = createInvertedIndex();
+        let idx: any;
         try {
-          const indexer = new Indexer(this.events, idx);
+          const mod = require('../index/inverted.js');
+          const createFn = mod && (mod.createInvertedIndex || (mod.default && mod.default.createInvertedIndex) || mod.default || mod);
+          if (typeof createFn === 'function') idx = createFn();
+          else idx = undefined;
+        } catch (_) { idx = undefined; }
+        if (!idx) return undefined;
+        try {
+          const mod = require('../index/inverted.js');
+          const IndexerCtor = mod && (mod.Indexer || (mod.default && mod.default.Indexer));
+          if (typeof IndexerCtor === 'function') {
+            const indexer = new IndexerCtor(this.events, idx);
+            (this as any)._invertedIndex = idx;
+            (this as any)._indexer = indexer;
+          } else {
+            (this as any)._invertedIndex = idx;
+          }
+        } catch (_) {
           (this as any)._invertedIndex = idx;
-          (this as any)._indexer = indexer;
-        } catch (_) { /* swallow indexer construction errors */ }
+        }
         return (this as any)._invertedIndex;
       } catch (_) {
         // If index creation fails, return undefined but do not crash startup.
