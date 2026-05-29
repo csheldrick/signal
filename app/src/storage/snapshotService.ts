@@ -13,6 +13,9 @@ import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 export class DiskDocumentSnapshotStore implements SnapshotStore {
   private readonly basePath: string;
   private _pending: Map<string, { snapshot: DocumentSnapshot; timer: ReturnType<typeof setTimeout>; resolvers: Array<() => void> }> = new Map();
+  // Optional in-memory cache of known document ids to reduce expensive directory scans
+  // on heavily-loaded systems. Invalidated on writes.
+  private _idCache?: { ids: string[]; ts: number };
 
   constructor(basePath = '.snapshots') {
     // Assign before any closure captures to satisfy strict-initialization
@@ -83,7 +86,7 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
       }
 
       const resolvers: Array<() => void> = [];
-      const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesystem IO)
+      const debounceMs = 2000; // debounce to group bursts and reduce IO pressure (longer coalescing to cut filesystem IO) // kept longer for disk store
       const timer = setTimeout(async () => {
         try {
           const state = this._pending.get(documentId);
@@ -112,6 +115,7 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
           try { for (const r of state.resolvers) { try { r(); } catch (_) {} } } catch (_) {}
         } finally {
           this._pending.delete(documentId);
+          this._idCache = undefined;
         }
       }, debounceMs);
 
@@ -173,10 +177,15 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
   /** List known document ids (best-effort). Implements SnapshotStore.listDocumentIds. */
   async listDocumentIds(): Promise<string[]> {
     try {
+      const now = Date.now();
+      if (this._idCache && (now - this._idCache.ts) < 30_000) return this._idCache.ids.slice();
+
       const entries = await fsPromises.readdir(this.basePath, { withFileTypes: true });
       const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
       // decode identifier to match docDir encoding
-      return dirs.map(d => DiskDocumentSnapshotStore.decodeId(d));
+      const ids = dirs.map(d => DiskDocumentSnapshotStore.decodeId(d));
+      this._idCache = { ids: ids.slice(), ts: Date.now() };
+      return ids;
     } catch (_) {
       return [];
     }

@@ -67,7 +67,7 @@ export class DocumentStore {
   // flush them in bounded-size batches using the macrotask queue.
   private _eventQueue: any[] = [];
   private _eventFlushScheduled: boolean = false;
-  private static readonly _EVENT_MAX_FLUSH = 2; // max events per flush (smaller batch to reduce per-tick work)
+  private static readonly _EVENT_MAX_FLUSH = 1; // max events per flush (smaller batch to reduce per-tick work)
   private static readonly _EVENT_MAX_QUEUE = 20; // max queued events (drop oldest beyond this to bound memory) (increased slightly to tolerate bursts)
 
   private emitAsyncEvent(ev: any): void {
@@ -647,7 +647,7 @@ export class DocumentStore {
     if (createdEvents.length > 0) {
       try {
         // Limit the number of events we actually emit during load to a conservative cap.
-        const MAX_LOAD_EMIT = 50;
+        const MAX_LOAD_EMIT = 20;
         const toEmit = createdEvents.slice(0, MAX_LOAD_EMIT);
         setTimeout(() => {
           for (const ev of toEmit) {
@@ -658,7 +658,7 @@ export class DocumentStore {
         // Timers may be unavailable in some environments; fall back to emitting
         // using the existing emitAsync to preserve behavior while avoiding a
         // synchronous flood inside the load loop.
-        const MAX_LOAD_EMIT = 50;
+        const MAX_LOAD_EMIT = 20;
         const toEmit = createdEvents.slice(0, MAX_LOAD_EMIT);
         for (const ev of toEmit) {
           try { this.emitAsyncEvent(ev); } catch (_) { /* swallow */ }

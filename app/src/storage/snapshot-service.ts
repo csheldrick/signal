@@ -40,8 +40,9 @@ export class DocumentSnapshotService {
     this.store = store;
     const defaultInterval = 12 * 60 * 60 * 1000; // 12 hours (less frequent compaction to reduce SnapshotStore pressure)
     const requested = opts && typeof opts.compactionIntervalMs === 'number' ? opts.compactionIntervalMs : defaultInterval;
-    // minimum 30 minutes
-    this.compactionIntervalMs = Math.max(30 * 60 * 1000, requested);
+    // minimum enforced interval to reduce IO pressure on disk-backed stores
+    const MIN_INTERVAL = 60 * 60 * 1000; // 1 hour
+    this.compactionIntervalMs = Math.max(MIN_INTERVAL, requested);
     this.maxClockEntries = opts && typeof opts.maxClockEntries === 'number' ? Math.max(4, opts.maxClockEntries) : 8;
 
     if (this.store && this.compactionIntervalMs > 0) {
@@ -99,7 +100,7 @@ export class DocumentSnapshotService {
     try {
       const ids = await Promise.resolve(store.listDocumentIds()).catch(() => [] as string[]);
       if (!Array.isArray(ids) || ids.length === 0) return;
-      const MAX_PER_PASS = 2; // reduce per-pass work to avoid IO spikes
+      const MAX_PER_PASS = 1; // reduce per-pass work to avoid IO spikes (process only one snapshot per pass)
       let count = 0;
       for (const id of ids) {
         if (this.stopped) break;

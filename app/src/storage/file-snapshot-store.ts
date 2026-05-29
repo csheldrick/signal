@@ -14,6 +14,9 @@ export class FileSnapshotStore implements SnapshotStore {
   private dir: string;
   // pending writes are coalesced per-document to reduce IO pressure
   private _pending: Map<string, { snapshot: DocumentSnapshot; timer: ReturnType<typeof setTimeout>; resolvers: Array<() => void> }> = new Map();
+  // In-memory cache of known document ids to reduce frequent directory scans.
+  // Cached ids are invalidated after a short TTL or on write operations.
+  private _idCache?: { ids: string[]; ts: number };
 
   constructor(dir: string) {
     this.dir = dir;
@@ -66,6 +69,9 @@ export class FileSnapshotStore implements SnapshotStore {
 
   async listDocumentIds(): Promise<string[]> {
     try {
+      const now = Date.now();
+      if (this._idCache && (now - this._idCache.ts) < 30_000) return this._idCache.ids.slice();
+
       // Prefer async filesystem ops to avoid blocking the event loop under load.
       try {
         await fsPromises.access(this.dir).catch(() => { throw new Error('no-dir'); });
@@ -74,12 +80,15 @@ export class FileSnapshotStore implements SnapshotStore {
       }
 
       const files = await fsPromises.readdir(this.dir).catch(() => [] as string[]);
-      return files
+      const ids = files
         .filter(f => f.endsWith('.json'))
         .map(f => f.replace(/\.json$/, ''))
         .map(name => {
           try { return FileSnapshotStore.decodeId(name); } catch (_) { return name; }
         });
+
+      this._idCache = { ids: ids.slice(), ts: Date.now() };
+      return ids;
     } catch (_) {
       return [];
     }
@@ -119,7 +128,7 @@ export class FileSnapshotStore implements SnapshotStore {
       }
 
       const resolvers: Array<() => void> = [];
-      const debounceMs = 500; // shorter debounce to flush writes faster while still coalescing bursts
+      const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesystem IO)
       const timer = setTimeout(() => {
         (async () => {
           try {
@@ -132,7 +141,7 @@ export class FileSnapshotStore implements SnapshotStore {
             // resolve all awaiting promises
             try { for (const r of state.resolvers) { try { r(); } catch (_) {} } } catch (_) {}
           } finally {
-            this._pending.delete(documentId);
+            this._pending.delete(documentId); this._idCache = undefined;
           }
         })();
       }, debounceMs);
