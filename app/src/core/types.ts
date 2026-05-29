@@ -31,6 +31,12 @@ export interface AppConfig {
 
 export type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage, SyncManagerOptions, OfflineEntry, OfflineSyncQueueOptions, OfflineSyncQueue, ConflictCandidate, ConflictCandidateRecord } from '../sync/protocol.js';
 
+export type { QueueEntry, SyncQueueOptions } from '../sync/queue.js';
+
+export type { SyncSessionState, SyncSessionEvent, SyncSessionTrackerOptions } from '../sync/session-tracker.js';
+
+export type { DocumentVersion, VersionDiff } from '../versioning/history.js';
+
 // Minimal, readonly-friendly snapshot used at subsystem/plugin boundaries.
 // This mirrors the main Document shape but is explicit to signal the
 // lightweight, readonly contract for external consumers such as plugins.
