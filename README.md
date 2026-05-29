@@ -4,9 +4,16 @@ A local-first collaborative knowledge workspace, developed under continuous obse
 by Loom, Weave, and Utilis.
 
 Signal is not just an application. It is the living demonstration of the framework's
-ability to crystallize architectural intent, detect drift, accumulate tensions from
-real boundary violations, and dispatch AI execution in response — all from the command
-line, with no custom harness code.
+ability to crystallize architectural intent, **grow new capability in response to
+pressure**, and **select competing approaches by externally-grounded fitness** (Signal's
+own test suite) — all from the command line, with no custom harness code.
+
+Signal used to be a *fixture*: a curated inject list was replayed and the framework
+"discovered" exactly what a human had planted. It is now **generative-first** (see
+[ADR-004](workspace/architecture/decisions/004-generative-fitness-model.md)). Context is
+re-derived from the live graph and the `workspace/` docs; the curated list survives only
+as a regression baseline, and the headline metric is the **rediscovery rate** — how much
+hand-authored insight the system re-derives on its own.
 
 ---
 
@@ -58,7 +65,31 @@ No arguments needed. Weave reads `.loom/config.json` and `.loom/loom.db` automat
 calls `LoomExporter.buildExport()`, and merges the result into `.weave/substrate.db`.
 Node activation is preserved across reimports.
 
-### 3. Run the framework loop
+### 3. Bootstrap context (generative by default)
+
+Seed the substrate with semantic context. The default is **generative**: an LLM
+re-derives goals/observations/tensions from the live graph and the `workspace/` docs.
+
+```bash
+weave bootstrap --utilis            # derive context from the graph + workspace/ docs
+```
+
+The `--curated` mode of `scripts/framework_bootstrap.sh` instead replays the
+hand-authored baseline at `scripts/baselines/signal_bootstrap.curated.json`, which is
+kept as a **regression baseline**, not the source of truth:
+
+```bash
+./framework_bootstrap.sh            # generative (default)
+./framework_bootstrap.sh --curated  # replay the curated baseline
+```
+
+Compare the two — the demo's real headline metric is *rediscovery rate*, not patch count:
+
+```bash
+scripts/check_bootstrap_drift.sh    # how much curated insight the system re-derives
+```
+
+### 4. Run the framework loop
 
 **With Utilis (full loop — operators + AI execution):**
 
@@ -78,7 +109,28 @@ activation exceeds 0.3.
 weave run --ticks 30
 ```
 
-### 4. Inspect results
+### 5. Evolve: grow and select capability
+
+Where `weave run` propagates activation and `weave resolve` repairs tensions, `weave
+evolve` **generates** candidate implementations for active goals, runs each one, and
+**selects** the fittest by Signal's own test suite (`TestFitnessProbe`), pruning the
+rest. Each variant is evaluated in its own git worktree for isolation.
+
+```bash
+weave evolve --variants 4 --dir app   # spawn 4 variants, score by app tests, retain fittest
+```
+
+Each generative goal carries a *targeted* grounding test (e.g.
+`app/tests/summarizer.test.ts` for the `Summarizer` capability), so a variant is scored
+only against the tests that ground its goal. A **curiosity term** (`evolve.curiosity` in
+`.weave/config.json`) adds a modest exploration bonus for under-activated regions so the
+loop never fully settles into the curated answer key — fitness still dominates, so a
+failing variant can never outrank a passing one. See
+[ADR-004](workspace/architecture/decisions/004-generative-fitness-model.md) for the
+fitness-probe, worktree-isolation, and curiosity contract, and EXP-006 / EXP-007 for the
+experiments.
+
+### 6. Inspect results
 
 ```bash
 weave status                 # overview: node count, total activation, pressure, tensions
@@ -87,7 +139,7 @@ weave observe tensions       # unresolved tensions sorted by pressure
 weave observe clusters       # detected subsystem clusters and their members
 ```
 
-### 5. Inject semantic observations
+### 7. Inject semantic observations
 
 The `weave inject --type <type> "<description>"` command creates an observation node
 and auto-wires it to structurally relevant Loom-imported nodes via fuzzy label matching.
@@ -147,9 +199,9 @@ weave restore <snapshot-id>
 
 ## Architecture
 
-Signal's 20 source files across 8 subsystems are structured to produce a rich Loom
-graph (≥20 nodes, ≥15 edges) with deliberate boundary violations that Weave detects
-as architectural tensions.
+Signal's source files across 8 subsystems produce a rich Loom graph (≥20 nodes,
+≥15 edges). Tensions are no longer pre-seeded — they surface from **emergent** structure
+as the generated code grows.
 
 ```text
 app/src/
@@ -157,23 +209,23 @@ app/src/
 ├─ storage/       DocumentStore (CRUD + JSON persistence) + StorageEventBus
 ├─ sync/          VectorClock eventual-consistency: protocol, engine, conflict, queue, session, manager
 ├─ graph/         GraphBuilder — clustering and hub detection from document links
-├─ plugins/       PluginHost sandbox + SearchPlugin (⚠ boundary violation) + ExportPlugin
-├─ ai/            Summarizer interface + LocalSummarizer (extractive)
+├─ plugins/       PluginHost sandbox + SearchPlugin + ExportPlugin (PluginContext-only)
+├─ ai/            Summarizer interface + LocalSummarizer (extractive) + RemoteSummarizer (opt-in)
 ├─ editor/        High-level CRUD operations
 ├─ ui/            Text rendering
 ├─ indexing/      InvertedIndex full-text search (IDF scoring)
-├─ collaboration/ PresenceTracker (⚠ compound boundary violation)
+├─ collaboration/ PresenceTracker (PluginContext-sandboxed)
 └─ versioning/    Immutable VersionHistory with lineage chains
 ```
 
-**Deliberate boundary violations** — these are structural flaws seeded for Weave to detect:
-
-- `plugins/search.ts` imports `DocumentStore` directly, bypassing the `PluginContext` sandbox
-- `collaboration/presence.ts` imports both `DocumentStore` and `SyncEngine` directly (two violations)
-
-When Weave's `ContradictionDetectionOperator` runs, these direct imports appear as
-`contradicts` edges between plugin nodes and storage/sync nodes, generating
-`contradiction` tensions.
+**No seeded boundary violations.** Earlier revisions hand-planted direct cross-subsystem
+imports (`SearchPlugin` → `DocumentStore`, `PresenceTracker` → `DocumentStore` + `SyncEngine`)
+for Weave to detect. Those have been refactored onto the `PluginContext` sandbox, so the
+demo no longer tests recall of its own answer key — Weave's operators must find tensions
+from structure that genuinely emerges. The curated baseline that described those
+violations is retained at `scripts/baselines/signal_bootstrap.curated.json` only as a
+rediscovery yardstick. See
+[ADR-004](workspace/architecture/decisions/004-generative-fitness-model.md).
 
 ---
 
@@ -181,12 +233,20 @@ When Weave's `ContradictionDetectionOperator` runs, these direct imports appear 
 
 ```text
 app/src/ + git history
-  → loom onboard .           crystallize into .loom/loom.db
-  → weave import             build LoomExport, merge into .weave/substrate.db
-  → weave inject --type ...  create wired observations (goals, tensions, hypotheses, etc.)
-  → weave run --ticks N      activation propagates, operators detect tensions
-  → ExecutionIntent          fires when node activation > 0.3 (with --utilis)
-  → Utilis                   routes to configured provider, runs code_review
-  → IntentResult             success/error/partial fed back into substrate
-  → graph state updated      execution_result node created, tensions resolved or created
+  → loom onboard .              crystallize into .loom/loom.db
+  → weave import                build LoomExport, merge into .weave/substrate.db
+  → weave bootstrap --utilis    DERIVE seed from graph + READ workspace/ docs (no JSON replay)
+  → weave run --ticks N         activation propagates; generative operators emit goals/hypotheses/capabilities
+  → weave evolve --dir app      spawn variants → run → score by app tests → retain fittest, prune rest
+                                └─ WRITE-BACK: results appended to workspace/ experiments & observations
+  → ExecutionIntent             fires when node activation > 0.3 (with --utilis)
+  → Utilis                      routes to configured provider, runs code_review
+  → IntentResult                success/error/partial fed back into substrate
+  → graph state updated         execution_result node created, tensions resolved or created
+  → check_bootstrap_drift.sh    report rediscovery rate vs the curated baseline
 ```
+
+The `workspace/` docs are part of the loop, not orphaned inputs: the `docs` bridge in
+`.weave/config.json` ingests `workspace/goals|observations|architecture|tasks` as seed
+context and writes experiment/selection outcomes back into the matching files (see
+ADR-004 and the `docs.output` config).

@@ -2,6 +2,16 @@
 
 Full framework use cases, including integration with Utilis for intent handling and execution.
 
+**Generative-first (2026-05-29):** Signal now bootstraps **generatively** by default —
+`weave bootstrap --utilis` re-derives context from the live graph + `workspace/` docs
+instead of replaying a curated inject list. The loop runs `weave run --generative` →
+`weave evolve` (generation + fitness selection against the app test suite), with `weave
+resolve` reserved for pure tension repair. The curated inject list below is retained as a
+**regression baseline** at `scripts/baselines/signal_bootstrap.curated.json`; the headline
+metric is the *rediscovery rate* reported by `scripts/check_bootstrap_drift.sh`, not the
+patch count. See ADR-004 and EXP-006 / EXP-007 in `workspace/architecture/`. The block
+below documents the curated baseline and the inject vocabulary it uses.
+
 **Key behaviour (2026-05-22):** `weave inject --type` auto-wires observations to Loom-imported
 structural nodes via fuzzy label matching. Each injection type creates a typed edge:
 `goal→supports`, `architecture/observation→related_to`, `constraint→blocks`, `hypothesis→predicts`,
@@ -18,11 +28,15 @@ weave — Continuity Runtime CLI
 Usage:
   weave inject --type <type> "<description>"   Inject an observation (auto-wires to structural nodes)
   weave inject <nodeId> <amount>               Inject activation directly at a node (legacy)
+  weave bootstrap --utilis [--dry-run] [--save <f>]  DERIVE seed context from the graph + workspace/ docs
+  weave bootstrap --from <file>                Replay a curated inject list (regression baseline)
   weave observe activation                     Show activation field — nodes sorted by activation
   weave observe tensions                       Show inferred and manual tensions by pressure (with IDs)
   weave observe clusters                       Show detected subsystem clusters and their members
   weave status                                 Show runtime state summary
-  weave run [--ticks <n>] [--utilis]           Run N ticks; inference operators derive tensions automatically
+  weave run [--ticks <n>] [--utilis] [--generative]  Run N ticks; operators derive tensions / emit goals
+  weave evolve [--variants <k>] [--dir <path>] Spawn K variants per goal, score by tests, retain fittest
+  weave resolve [--loop]                       Repair tensions (pure tension repair, no generation)
   weave import [source]                        Import Loom graph (default: .loom/ database, or JSON file)
   weave tension <kind> <node1,node2> <pressure>  Manually author a tension (use when inference is insufficient)
   weave delete tension <id>                    Hard-delete a tension by ID
