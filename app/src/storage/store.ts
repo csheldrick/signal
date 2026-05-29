@@ -67,8 +67,8 @@ export class DocumentStore {
   // flush them in bounded-size batches using the macrotask queue.
   private _eventQueue: any[] = [];
   private _eventFlushScheduled: boolean = false;
-  private static readonly _EVENT_MAX_FLUSH = 3; // max events per flush (smaller batch to reduce per-tick work)
-  private static readonly _EVENT_MAX_QUEUE = 10; // max queued events (drop oldest beyond this to bound memory) 
+  private static readonly _EVENT_MAX_FLUSH = 2; // max events per flush (smaller batch to reduce per-tick work)
+  private static readonly _EVENT_MAX_QUEUE = 20; // max queued events (drop oldest beyond this to bound memory) (increased slightly to tolerate bursts)
 
   private emitAsyncEvent(ev: any): void {
     try {

@@ -93,7 +93,7 @@ export class SyncEngine {
     peerId: string,
     options?: { internal?: boolean; maxOutbound?: number },
   ) {
-    this.maxOutbound = options?.maxOutbound ?? 500; // hard cap to avoid unbounded outbound growth
+    this.maxOutbound = options?.maxOutbound ?? 50; // reduced hard cap to avoid unbounded outbound growth and lower memory pressure
 
     this.peerId = peerId;
     this.clock[peerId] = 0;

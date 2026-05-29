@@ -40,7 +40,7 @@ export class SyncQueue {
   private readonly overflowStrategy: 'reject' | 'drop_oldest';
 
   constructor(opts: SyncQueueOptions = {}) {
-    this.maxQueueSize = opts.maxQueueSize ?? 200; // reduced default to apply backpressure earlier and bound memory under load
+    this.maxQueueSize = opts.maxQueueSize ?? 100; // reduced default to apply backpressure earlier and bound memory under load
     this.maxAttempts = opts.maxAttempts ?? 5;
     this.baseDelayMs = opts.baseDelayMs ?? 500;
     this.maxDelayMs = opts.maxDelayMs ?? 30_000;

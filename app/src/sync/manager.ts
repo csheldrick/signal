@@ -87,7 +87,7 @@ export class SyncManager {
         this.engine = SyncEngine.getOrCreate(store as any, opts.peerId);
       }
     }
-    this.queue = new SyncQueue();
+    this.queue = new SyncQueue({ maxQueueSize: 100 }); // configure queue to limit memory and apply backpressure earlier
 
     // Session lifecycle observability: emit lifecycle events on the store's
     // event bus so downstream consumers (PresenceTracker, SyncManager internals,
@@ -99,7 +99,7 @@ export class SyncManager {
       // initialize timers/maps
       this.sessionLastSeen = new Map<string, number>();
       this.sessionStale = new Map<string, boolean>();
-      const HEARTBEAT_INTERVAL_MS = 120_000; // heartbeat cadence (increased to reduce timer churn and timers under load) (raised to further reduce timer pressure)
+      const HEARTBEAT_INTERVAL_MS = 180_000; // heartbeat cadence (increased to reduce timer churn and timers under load) (raised to further reduce timer pressure)
       const STALE_MS = 180_000; // consider a session stale after 180s of inactivity to reduce churn
 
       this.heartbeatTimer = setInterval(() => {
@@ -247,7 +247,7 @@ export class SyncManager {
       const busAny: any = (this.store as any).events;
       if (busAny && (typeof busAny.on === 'function' || typeof busAny.onAsync === 'function')) {
         const buffer: StorageEvent[] = [];
-        const MAX_BUFFERED_EVENTS = 200; // reduced to bound memory and downstream fan-out
+        const MAX_BUFFERED_EVENTS = 100; // reduced to bound memory and downstream fan-out (lowered to reduce stress)
         let scheduled = false;
         const flush = () => {
           if (scheduled) return;
@@ -564,7 +564,7 @@ export class SyncManager {
       // Batch enqueue outbound messages to avoid long synchronous bursts. Yield
       // to the event loop every BATCH_SIZE messages so the flush loop doesn't
       // monopolize the host when many outbound messages are present.
-      const BATCH_SIZE = 10; // smaller batch size to yield more frequently and avoid long sync bursts (lowered to increase yielding)
+      const BATCH_SIZE = 5; // smaller batch size to yield more frequently and avoid long sync bursts (lowered to increase yielding)
       const enqPromises: Promise<void>[] = [];
 
       for (let i = 0; i < outbound.length; i++) {
