@@ -156,7 +156,18 @@ class InvertedIndexImpl implements InvertedIndex {
       }
 
       results.sort((a, b) => b.score - a.score);
-      return results.slice(0, 50).map(r => ({ document: createDocumentSnapshot(r.doc as any), score: r.score, highlights: r.highlights }));
+      return results.slice(0, 50).map(r => {
+        const s = createDocumentSnapshot(r.doc as any);
+        try { if (Array.isArray(s.tags)) Object.freeze(s.tags); } catch (_) {}
+        try {
+          if (Array.isArray(s.links)) {
+            for (const l of s.links) try { Object.freeze(l); } catch (_) {}
+            Object.freeze(s.links);
+          }
+        } catch (_) {}
+        try { Object.freeze(s); } catch (_) {}
+        return { document: s, score: r.score, highlights: r.highlights };
+      });
     } catch (_) {
       return [];
     }
