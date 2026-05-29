@@ -27,7 +27,15 @@ export type PeerPresence = PeerPresenceContract;
 // or PresenceTracker.setPluginContext to provide a PluginContext-based validator.
 // keep a stub to preserve exports for older callers but throw to force migration.
 export function createValidatorFromStore(_store: any): (id: string) => Promise<boolean> {
-  throw new Error('createValidatorFromStore removed: use createValidatorFromPluginContext or PresenceTracker.setPluginContext');
+  try {
+    console.warn('createValidatorFromStore: legacy helper called. Prefer createValidatorFromPluginContext or PresenceTracker.setPluginContext. Falling back to a conservative async validator that rejects unknown ids.');
+  } catch (_) {}
+  // Provide a conservative fallback that always rejects to avoid accidental
+  // coupling to the store in new code. This helps surface migration sites
+  // at runtime while keeping behaviour deterministic.
+  const fn = async (_id: string) => false;
+  (fn as any).dispose = () => {};
+  return fn;
 }
 
 /**

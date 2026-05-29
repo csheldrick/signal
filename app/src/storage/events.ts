@@ -148,8 +148,31 @@ export class StorageEventBus implements StorageEventBusContract {
 
     const set = this.asyncListeners.get(type)!;
 
-    // No strict global caps for async listeners here; async listeners are
-    // intentionally lighter-weight. Consumers should still avoid '*' abuse.
+    // Enforce soft caps for async listeners to avoid unbounded fan-out while
+    // still allowing async handlers for background work. This prevents
+    // accidental registration storms (e.g. plugins registering '*' listeners)
+    // that can degrade runtime performance and observability.
+    try {
+      const MAX_TOTAL_ASYNC = 200;
+      const MAX_PER_TYPE_ASYNC = 50;
+
+      // Compute current async totals conservatively
+      let total = 0;
+      for (const s of this.asyncListeners.values()) total += s.size;
+
+      if (set.size >= MAX_PER_TYPE_ASYNC) {
+        try { console.warn(`StorageEventBus: async listener limit reached for type '${String(type)}' — ignoring new listener`); } catch (_) {}
+        return;
+      }
+
+      if (total >= MAX_TOTAL_ASYNC) {
+        try { console.warn('StorageEventBus: global async listener limit reached — ignoring new listener'); } catch (_) {}
+        return;
+      }
+    } catch (_) {
+      // If anything goes wrong computing limits, fall back to permissive add
+    }
+
     set.add(listener);
   }
 

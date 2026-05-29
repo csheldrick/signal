@@ -27,19 +27,24 @@ export interface Document {
 type DeprecatedDocumentChange = DocumentChange & { isDeprecated: boolean; };
 
 /**
- * DeprecatedDocumentStore: removed. Legacy code should migrate to importing
- * concrete store types from the storage module. Using this alias will now
- * produce a type error to surface migration sites and encourage updating
- * imports instead of relying on a deprecated global alias.
+ * DeprecatedDocumentStore: removed.
+ *
+ * This alias has been intentionally set to `never` to cause a compile-time
+ * error at any remaining call-sites. The presence of a permissive type here
+ * previously prolonged migration and allowed duplicate legacy stores to
+ * coexist with the new storage surface. Forcing a type error makes remaining
+ * usages explicit and prevents accidental runtime compatibility shims which
+ * increase maintenance burden and the risk of divergent state.
+ *
+ * Migration guidance:
+ * - Replace imports of DeprecatedDocumentStore with concrete types from
+ *   the storage/ module (e.g. DocumentStore or getOrCreateDocumentStore).
+ * - If you relied on a runtime legacy API, update the caller to use the
+ *   storage module helpers instead of a global/deprecated abstraction.
+ *
+ * @deprecated Removed from the public API. Use concrete storage/ module types.
  */
-/**
- * @deprecated DeprecatedDocumentStore has been removed from the public API.
- * Previous callers should migrate to the concrete storage types in the
- * storage/ module. Exporting as `unknown` preserves the symbol for legacy
- * import sites while avoiding accidental usage; treat this as a transitional
- * shim that should be removed once callers have migrated.
- */
-export type DeprecatedDocumentStore = unknown;
+export type DeprecatedDocumentStore = never;
 
 export interface DocumentSnapshot {
   readonly id: string;
