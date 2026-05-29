@@ -110,24 +110,48 @@ export class LocalSummarizer implements Summarizer {
     const updatedAt = (document as any)?.updatedAt ?? 0;
 
     // Fast-path: return cached summary when document hasn't changed.
-    if (id) {
-      const cached = LocalSummarizer.cache.get(id);
-      if (cached && cached.updatedAt === updatedAt) {
-        return cached.summary;
-      }
+if (id) {
+          const cached = LocalSummarizer.cache.get(id);
+          if (cached && cached.updatedAt === updatedAt) {
+            return cached.summary;
+          }
 
-      // Coalesce concurrent local summarization requests per-document to
-      // avoid duplicate CPU work when many callers summarize the same doc.
-      const pendingEntry = LocalSummarizer.pending.get(id);
-      if (pendingEntry) {
-        // If the pending entry is stale, evict it and continue.
-        if (Date.now() - pendingEntry.ts > 30_000) {
-          LocalSummarizer.pending.delete(id);
-        } else {
-          return pendingEntry.promise;
+          // If not present in the in-memory cache, attempt to read a persisted
+          // summary from the on-disk FileSnapshotStore. This enables summaries
+          // to survive process restarts and supports offline summarization.
+          try {
+            const reg = require('../storage/snapshot-registry.js');
+            const fileStore = reg && typeof reg.getOrCreateFileSnapshotStore === 'function' ? reg.getOrCreateFileSnapshotStore() : undefined;
+            if (fileStore) {
+              const summaryKey = `__summary__${id}`;
+              const diskSnap = await Promise.resolve(fileStore.getLatestSnapshot(summaryKey)).catch(() => undefined);
+              if (diskSnap && typeof (diskSnap as any).content === 'string') {
+                const diskSummary = (diskSnap as any).content as string;
+                const diskUpdatedAt = (diskSnap as any).updatedAt ?? 0;
+                if (diskUpdatedAt === updatedAt) {
+                  LocalSummarizer.cache.set(id, { updatedAt: diskUpdatedAt, summary: diskSummary });
+                  return diskSummary;
+                } else {
+                  // Populate in-memory cache with the on-disk summary to avoid
+                  // repeated disk reads even if it's slightly stale.
+                  LocalSummarizer.cache.set(id, { updatedAt: diskUpdatedAt, summary: diskSummary });
+                }
+              }
+            }
+          } catch (_) { /* ignore disk cache errors */ }
+
+          // Coalesce concurrent local summarization requests per-document to
+          // avoid duplicate CPU work when many callers summarize the same doc.
+          const pendingEntry = LocalSummarizer.pending.get(id);
+          if (pendingEntry) {
+            // If the pending entry is stale, evict it and continue.
+            if (Date.now() - pendingEntry.ts > 30_000) {
+              LocalSummarizer.pending.delete(id);
+            } else {
+              return pendingEntry.promise;
+            }
+          }
         }
-      }
-    }
 
     // Attempt to acquire a global LocalSummarizer request slot. If the slot
     // cannot be acquired we still compute and return a local summary, but we
@@ -173,6 +197,27 @@ export class LocalSummarizer implements Summarizer {
         }
       } catch (_) { /* swallow */ }
       op.finally(() => { try { LocalSummarizer.pending.delete(id); } catch (_) {} });
+
+      // Persist the computed summary to the FileSnapshotStore for offline reuse.
+      op.then(async (summary) => {
+        try {
+          const reg = require('../storage/snapshot-registry.js');
+          const fileStore = reg && typeof reg.getOrCreateFileSnapshotStore === 'function' ? reg.getOrCreateFileSnapshotStore() : undefined;
+          if (fileStore) {
+            const summaryKey = `__summary__${id}`;
+            const snap: DocumentSnapshot = {
+              id: summaryKey,
+              title: `summary:${id}`,
+              content: summary,
+              tags: [],
+              links: [],
+              createdAt: Date.now(),
+              updatedAt: updatedAt,
+            } as any;
+            await Promise.resolve(fileStore.putSnapshot(summaryKey, snap)).catch(() => {});
+          }
+        } catch (_) { /* swallow */ }
+      }).catch(() => {});
     }
 
     return op;
