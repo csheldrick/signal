@@ -4,3 +4,4 @@
 
 export { ExportPlugin } from './export.js';
 export { SearchPlugin } from './search.js';
+export { HealthPlugin } from './health.js';

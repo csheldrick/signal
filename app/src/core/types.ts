@@ -49,25 +49,12 @@ export type { DocumentVersion, VersionDiff } from '../versioning/history.js';
 
 type DeprecatedDocumentChange = DocumentChange & { isDeprecated: boolean; };
 
-/**
- * DeprecatedDocumentStore: removed.
- *
- * This alias has been intentionally set to `never` to cause a compile-time
- * error at any remaining call-sites. The presence of a permissive type here
- * previously prolonged migration and allowed duplicate legacy stores to
- * coexist with the new storage surface. Forcing a type error makes remaining
- * usages explicit and prevents accidental runtime compatibility shims which
- * increase maintenance burden and the risk of divergent state.
- *
- * Migration guidance:
- * - Replace imports of DeprecatedDocumentStore with concrete types from
- *   the storage/ module (e.g. DocumentStore or getOrCreateDocumentStore).
- * - If you relied on a runtime legacy API, update the caller to use the
- *   storage module helpers instead of a global/deprecated abstraction.
- *
- * @deprecated Removed from the public API. Use concrete storage/ module types.
- */
-export type DeprecatedDocumentStore = never;
+/* DeprecatedDocumentStore removed from the public API.
+   The migration to the SnapshotStore/DiskDocumentSnapshotStore is complete;
+   no runtime or type-level sentinel is exported here to avoid accidental
+   retention of legacy symbols. Callers should import concrete storage
+   primitives from the storage/ module (e.g. DocumentStore or helper
+   factories) instead of relying on a deprecated global alias. */
 
 export interface DocumentSnapshot {
   readonly id: string;
