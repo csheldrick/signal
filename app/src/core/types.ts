@@ -232,6 +232,10 @@ export interface Summarizer {
   // Accept either a live Document or a readonly DocumentSnapshot so callers
   // can pass snapshots across subsystem boundaries without forcing a copy.
   summarize(document: Document | DocumentSnapshot): Promise<string>;
+  /** Optional: indicate whether the summarizer is currently overloaded and
+   * callers should avoid invoking heavy requests. Implementations may provide
+   * a cheap synchronous check to allow callers to prefer lightweight paths. */
+  isAvailable?(): boolean;
 }
 
 // Conflict resolution contract is surfaced here in the core types so higher-level

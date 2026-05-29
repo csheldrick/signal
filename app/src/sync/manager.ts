@@ -23,7 +23,11 @@ import { isConflict, resolveConflict } from './conflict.js';
 import type { ConflictRecord } from './protocol.js';
 
 /** Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc. */
-export type TransportSend = (peerId: string, message: SyncMessage) => Promise<void>;
+export interface TransportSend {
+  (peerId: string, message: SyncMessage): Promise<void>;
+  /** Optional: quick availability check to let callers avoid invoking sends when the transport is overloaded. */
+  isAvailable?: (peerId?: string, message?: SyncMessage) => boolean;
+}
 
 export interface SyncManagerOptions {
   /** Local peer identifier. */
@@ -310,6 +314,20 @@ export class SyncManager {
         return Promise.reject(err);
       }
     };
+    // Preserve/compose the optional isAvailable check so callers can quickly
+    // avoid sending when the underlying transport reports it's overloaded.
+    try {
+      const underlyingIsAvailable = (send as any).isAvailable;
+      if (typeof underlyingIsAvailable === 'function') {
+        (this.transport as any).isAvailable = (peerId?: string, message?: SyncMessage) => {
+          try {
+            // If the manager has many sessions, consider it unavailable to avoid spikes
+            if (this.sessions.size > WRAP_SESSION_THRESHOLD) return false;
+            return underlyingIsAvailable(peerId, message);
+          } catch (_) { return false; }
+        };
+      }
+    } catch (_) {}
 
     // If an OfflineSyncQueue was provided, attempt an asynchronous best-effort
     // replay of persisted entries into the in-memory queue so normal flush

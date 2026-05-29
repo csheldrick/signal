@@ -24,6 +24,20 @@ export class GraphBuilder {
 
   constructor(private readonly listDocuments: () => Array<DocumentSnapshot>) {}
 
+  /**
+   * Lightweight availability check to allow callers to avoid triggering a
+   * costly build when a build is already in-flight or we've recently built
+   * and are still within the throttle window.
+   */
+  isAvailable(): boolean {
+    try {
+      if (this.building) return false;
+      if (!this.cachedGraph) return true;
+      if (Date.now() - this.lastBuildTs > GraphBuilder.BUILD_THROTTLE_MS) return true;
+      return false;
+    } catch (_) { return false; }
+  }
+
   private computeSignature(docs: Array<DocumentSnapshot>): string {
     // Fast, lightweight signature computation to reduce CPU pressure.
     // Instead of hashing every id string, sample a bounded prefix of

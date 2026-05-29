@@ -191,6 +191,19 @@ export class LocalSummarizer implements Summarizer {
     return Date.now() < LocalSummarizer.cooldownUntil;
   }
 
+  /**
+   * Lightweight availability check to allow callers to avoid invoking heavy
+   * local summarization when the summarizer is saturated or in cooldown.
+   */
+  isAvailable(): boolean {
+    try {
+      if (LocalSummarizer.isInCooldown()) return false;
+      if (LocalSummarizer.globalActiveRequests >= LocalSummarizer.GLOBAL_MAX_CONCURRENT) return false;
+      if (LocalSummarizer.pending.size >= LocalSummarizer.MAX_PENDING_ENTRIES) return false;
+      return true;
+    } catch (_) { return false; }
+  }
+
   // Internal aliases: prefer these within the app to reduce coupling to the
   // public Summarizer contract. External callers should use the Summarizer
   // interface only. These alias methods delegate to the public implementations
@@ -254,6 +267,21 @@ export class RemoteSummarizer implements Summarizer {
 
   static isInRateLimitWindow(): boolean {
     return Date.now() < RemoteSummarizer.lastAttemptWindowAt + RemoteSummarizer.RATE_LIMIT_WINDOW_MS;
+  }
+
+  /**
+   * Lightweight availability check to let callers decide whether to attempt
+   * a remote summarization. Returns false when we're in cooldown, rate-limited
+   * or when global concurrency is exhausted.
+   */
+  isAvailable(): boolean {
+    try {
+      if (!this.allowNetwork) return false;
+      if (Date.now() < this.cooldownUntil) return false;
+      if (RemoteSummarizer.globalActiveRequests >= RemoteSummarizer.GLOBAL_MAX_CONCURRENT) return false;
+      if (RemoteSummarizer.totalAttemptsInWindow >= RemoteSummarizer.RATE_LIMIT_MAX_ATTEMPTS && RemoteSummarizer.isInRateLimitWindow()) return false;
+      return true;
+    } catch (_) { return false; }
   }
 
   private static getPending(id: string): Promise<string> | undefined {
