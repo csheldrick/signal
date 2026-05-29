@@ -105,6 +105,8 @@ export class WorkerPool {
     return new Promise<void>((resolve) => {
       let idx = 0;
       let active = 0;
+      // Mirror local active count to the instance for observability and testing.
+      this.activeWorkers = 0;
 
       const scheduleNext = () => {
         if (this.stopped) {
@@ -124,6 +126,7 @@ export class WorkerPool {
         while (active < Math.min(this.numWorkers, chunks.length) && idx < chunks.length) {
           const { workerIndex, docs } = chunks[idx++];
           active++;
+          this.activeWorkers = active;
 
           // Run chunk asynchronously so we yield to the event loop between chunks.
           // Schedule chunk processing with a short macrotask yield to avoid
@@ -144,6 +147,7 @@ export class WorkerPool {
               // Swallow per-chunk errors to avoid leaving the pool unresolved.
             } finally {
               active--;
+              this.activeWorkers = active;
               if (this.onWorkerFinish) {
                 try { this.onWorkerFinish(workerIndex); } catch (_) { /* ignore */ }
               }
@@ -166,4 +170,31 @@ export class WorkerPool {
     this.activeWorkers = 0;
   }
 
+  /**
+   * Wait until the pool has drained all queued work and no active workers remain.
+   * Tests may call this to deterministically await background processing.
+   * A timeout may be provided to avoid flakiness in case of ordering issues.
+   */
+  async drain(timeoutMs: number = 5000): Promise<void> {
+    const start = Date.now();
+    return new Promise<void>((resolve, reject) => {
+      const check = () => {
+        try {
+          // If stopped, consider drained.
+          if (this.stopped) return resolve();
+          // No active workers and nothing scheduled -> drained
+          if (this.activeWorkers === 0) return resolve();
+          if (Date.now() - start > timeoutMs) return reject(new Error('timeout waiting for WorkerPool to drain'));
+          setTimeout(check, 10);
+        } catch (err) { return reject(err); }
+      };
+      setTimeout(check, 0);
+    });
+  }
+
 }
+
+// Test helpers exported for unit tests to observe or manipulate the pool.
+export const __TEST__ = {
+  waitForIdle(pool: WorkerPool, timeoutMs?: number) { return pool.drain(timeoutMs); },
+};
