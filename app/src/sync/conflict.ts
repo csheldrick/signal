@@ -6,9 +6,7 @@ import type { Document, DocumentSnapshot, ConflictResolution } from '../core/typ
 import type { ConflictRecord, ConflictStrategy, VectorClock } from './protocol.js';
 import { isConcurrent } from './protocol.js';
 
-import type { ConflictCandidate as CoreConflictCandidate } from '../core/types.js';
-export type ConflictCandidate = CoreConflictCandidate;
-export type ConflictCandidateRecord = ConflictCandidate;
+import type { ConflictCandidate } from '../core/types.js';
 
 export function isConflict(localClock: VectorClock, remoteClock: VectorClock): boolean {
   // Defensive wrapper around isConcurrent to avoid throwing or misclassifying

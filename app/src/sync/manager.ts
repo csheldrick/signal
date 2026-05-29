@@ -16,7 +16,7 @@ import { createLazySyncEngine } from './lazyEngine.js';
 import { telemetry } from './telemetry.js';
 
 import { SyncQueue } from './queue.js';
-import type { OfflineSyncQueue as OfflineSyncQueueContract } from '../core/types.js';
+import type { OfflineSyncQueue as OfflineSyncQueueContract, SyncManagerOptions } from '../core/types.js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { PeerSession } from './session.js';
 import { isConflict, resolveConflict } from './conflict.js';
@@ -29,24 +29,6 @@ export interface TransportSend {
   isAvailable?: (peerId?: string, message?: SyncMessage) => boolean;
 }
 
-export interface SyncManagerOptions {
-  /** Local peer identifier. */
-  peerId: string;
-  /** Strategy to use when concurrent writes collide. Default 'last-write-wins'. */
-  conflictStrategy?: ConflictStrategy;
-  /** How often (ms) the flush loop runs. Default 200. */
-  flushIntervalMs?: number;
-  /** Optional externally-provided SyncEngine instance to avoid duplicate engine creation. */
-  engine?: SyncEngine;
-  /** Optional external session tracker so PresenceTracker and SyncManager can share authoritative sessions. */
-  sessionTracker?: { openSession(peerId: string, initialClock?: VectorClock): void; closeSession(peerId: string): void; updateHeartbeat?(peerId: string): void };
-  /** Optional snapshot service to compact vector clocks and expose snapshot hooks. */
-  snapshotService?: { compactClock?: (clock: VectorClock) => VectorClock };
-  /** Optional durable offline queue to persist outbound messages when enqueue fails */
-  offlineQueue?: OfflineSyncQueueContract;
-  /** When true, enforce offline-first replay ordering: drain offlineQueue before attaching live store listeners. Defaults to false (favor realtime). */
-  offlineFirstMode?: boolean;
-}
 
 export class SyncManager {
   private readonly engine: SyncEngine;

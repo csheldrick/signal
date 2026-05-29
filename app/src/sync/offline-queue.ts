@@ -2,23 +2,11 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync, unlinkSync, mk
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 
+import type { OfflineEntry, OfflineSyncQueueOptions } from '../core/types.js';
 // OfflineSyncQueue stores an opaque payload (any) so it can be used to
 // persist SyncManager outbound messages or DocumentChange mutations.
-export interface OfflineEntry {
-  id: string; // stable id for the queued mutation
-  peerId: string;
-  documentId: string;
-  payload: any;
-  timestamp: number;
-  seq: number;
-}
-
-export interface OfflineSyncQueueOptions {
-  /** Directory where offline files are persisted. Defaults to process.cwd() */
-  dataDir?: string;
-  /** File prefix for per-peer persistent queues */
-  filePrefix?: string;
-}
+// Concrete types (OfflineEntry, OfflineSyncQueueOptions) are defined in
+// core/types to avoid duplicated definitions across modules.
 
 /**
  * OfflineSyncQueue

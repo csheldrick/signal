@@ -1,53 +1,12 @@
 // ── Sync Protocol ───────────────────────────────────────────
 // Types for the eventual-consistency sync layer.
 
-export type SyncState = 'idle' | 'syncing' | 'conflicted' | 'resolved';
+import type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage } from '../core/types.js';
 
-export type ConflictStrategy = 'last-write-wins' | 'first-write-wins' | 'merge-content';
-
-export interface PeerInfo {
-  peerId: string;
-  /** Last vector clock we received from this peer. */
-  clock: VectorClock;
-  /** Epoch ms of the last successful exchange. */
-  lastSeen: number;
-  state: SyncState;
-}
-
-export interface SyncAck {
-  kind: 'ack';
-  peerId: string;
-  documentId: string;
-  clock: VectorClock;
-  timestamp: number;
-}
-
-export interface ConflictRecord {
-  documentId: string;
-  localClock: VectorClock;
-  remoteClock: VectorClock;
-  localTimestamp: number;
-  remoteTimestamp: number;
-  resolvedBy: ConflictStrategy;
-  resolvedAt: number;
-}
-
-export interface VectorClock {
-  [peerId: string]: number;
-}
-
-export interface SyncMessage {
-  operation: 'create' | 'update' | 'delete' | 'link';
-  documentId: string;
-  payload: unknown;
-  clock: VectorClock;
-  peerId: string;
-  timestamp: number;
-  // Optional stable identifier for delivery/queued-message identity.
-  // Producers such as SyncEngine may attach this to allow queues and
-  // transports to match entries without relying on object identity.
-  messageId?: string;
-}
+// Re-export common sync-related types from core/types so callers that import
+// from sync/protocol.js continue to function while the canonical type
+// definitions live in core/types.ts.
+export type { VectorClock, SyncState, ConflictStrategy, PeerInfo, SyncAck, ConflictRecord, SyncMessage };
 
 export function mergeClocks(a: VectorClock, b: VectorClock): VectorClock {
   const merged: VectorClock = { ...a };
