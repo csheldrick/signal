@@ -21,8 +21,8 @@ export class ExportPlugin implements Plugin {
   private lastExportTs = 0;
   private cachedExport: string | undefined;
   // Increase min interval and cache TTL to reduce repeated export load under high call rates.
-  private static readonly MIN_EXPORT_INTERVAL_MS = 2000;
-  private static readonly EXPORT_CACHE_TTL_MS = 30000;
+  private static readonly MIN_EXPORT_INTERVAL_MS = 4000;
+  private static readonly EXPORT_CACHE_TTL_MS = 60000;
 
   exportToMarkdown(): string {
     if (!this.context) return '';
