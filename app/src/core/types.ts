@@ -489,6 +489,8 @@ export interface PresenceTracker {
   stopCleanupTimer?(): void;
 }
 
+export type PeerPresence = { peerId: string; documentId?: string; status: PresenceStatus; lastSeen: number; seq: number };
+
 // Document validator types used by PresenceTracker and the StorageEventBus
 export type DocumentValidatorAsync = ((id: string) => Promise<boolean>) & { dispose?: () => void };
 export type DocumentValidatorSync = ((id: string) => boolean) & { dispose?: () => void };
