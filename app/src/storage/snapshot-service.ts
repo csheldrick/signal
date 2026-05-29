@@ -5,15 +5,9 @@
  * compactClock utility to bound VectorClock size.
  */
 
-import type { DocumentSnapshot } from '../core/types.js';
+import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 import { telemetry } from '../sync/telemetry.js';
 import type { VectorClock } from '../sync/protocol.js';
-
-export interface SnapshotStore {
-  listDocumentIds(): Promise<string[]>;
-  getLatestSnapshot(documentId: string): Promise<DocumentSnapshot | undefined>;
-  putSnapshot(documentId: string, snapshot: DocumentSnapshot): Promise<void>;
-}
 
 export interface DocumentSnapshotServiceOptions {
   compactionIntervalMs?: number;

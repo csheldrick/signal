@@ -1,6 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import path from 'node:path';
-import type { DocumentSnapshot } from '../core/types.js';
+import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 
 /**
  * DocumentSnapshotService
@@ -8,7 +8,7 @@ import type { DocumentSnapshot } from '../core/types.js';
  * - Retains at least two most-recent snapshots per document (prunes older)
  * - Performs all work asynchronously so live document writes are not blocked
  */
-import type { SnapshotStore } from './snapshot-service.js';
+// SnapshotStore contract imported from core/types.ts to avoid circular imports.
 
 export class DiskDocumentSnapshotStore implements SnapshotStore {
   private readonly basePath: string;

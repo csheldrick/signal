@@ -9,7 +9,7 @@ import { GraphBuilder } from '../graph/builder.js';
 import { createInvertedIndex, Indexer } from '../index/inverted.js';
 import type { PresenceTracker as PresenceTrackerContract, OfflineSyncQueue as OfflineSyncQueueContract } from '../core/types.js';
 import { PluginHost } from '../plugins/host.js';
-import type { PluginContext } from '../plugins/host.js';
+import type { PluginContext } from '../core/types.js';
 import { SyncEngine } from '../sync/engine.js';
 import { PresenceTracker } from '../collaboration/presence.js';
 import { setSignalStorageEventBus, getDisableBgSummarize } from './globals.js';

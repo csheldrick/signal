@@ -4,7 +4,7 @@
 // PluginContext that provides readonly access to documents without direct
 // store or sync engine imports.
 
-import type { Plugin, PluginContext } from '../plugins/host.js';
+import type { PluginContext } from '../core/types.js';
 import type { DocumentSnapshot, PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract, PresenceStatus } from '../core/types.js';
 import { getSignalStorageEventBus } from '../core/globals.js';
 import { telemetry } from '../sync/telemetry.js';

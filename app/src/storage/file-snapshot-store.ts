@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SnapshotStore } from './snapshot-service.js';
+import type { SnapshotStore } from '../core/types.js';
 import type { DocumentSnapshot } from '../core/types.js';
 
 /**

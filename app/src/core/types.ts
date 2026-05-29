@@ -46,6 +46,15 @@ export interface DocumentSnapshot {
   readonly version?: number;
 }
 
+// SnapshotStore contract: lightweight interface used by snapshot services.
+// Centralizing this contract in core/types reduces cross-module coupling and
+// avoids cyclical imports between storage implementations.
+export interface SnapshotStore {
+  listDocumentIds(): Promise<string[]>;
+  getLatestSnapshot(documentId: string): Promise<DocumentSnapshot | undefined>;
+  putSnapshot(documentId: string, snapshot: DocumentSnapshot): Promise<void>;
+}
+
 export interface DocumentLink {
   sourceId: string;
   targetId: string;
