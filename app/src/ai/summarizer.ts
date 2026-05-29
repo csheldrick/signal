@@ -14,8 +14,14 @@ import type { Summarizer } from '../core/types.js';
 // LocalSummarizer and RemoteSummarizer implement the Summarizer contract declared in core/types.ts.
 
 export class LocalSummarizer implements Summarizer {
-  readonly isRemote = false; readonly isPure = true;
+  // LocalSummarizer is explicitly offline-first: it performs no network IO
+  // and is safe to run in background jobs. Expose allowBackgroundNetwork so
+  // callers can rely on this contract rather than probing implementation
+  // details at runtime.
+  readonly isRemote = false;
+  readonly isPure = true;
   readonly allowsNetwork = false;
+  readonly allowBackgroundNetwork = true;
   private readonly maxSentences: number;
 
   private static cache: Map<string, { updatedAt: number; summary: string }> = new Map();
