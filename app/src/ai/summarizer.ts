@@ -14,6 +14,10 @@ import type { Summarizer } from '../core/types.js';
 // LocalSummarizer and RemoteSummarizer implement the Summarizer contract declared in core/types.ts.
 
 export class LocalSummarizer implements Summarizer {
+  // Local summarizer is explicitly in-memory and does not rely on bundled
+  // model artifacts. Declare usesOnDiskModel=false to make the offline-only
+  // packaging contract explicit for callers performing packaging analysis.
+  readonly usesOnDiskModel = false;
   // LocalSummarizer is explicitly offline-first: it performs no network IO
   // and is safe to run in background jobs. Expose allowBackgroundNetwork so
   // callers can rely on this contract rather than probing implementation
@@ -278,6 +282,10 @@ export class LocalSummarizer implements Summarizer {
 }
 
 export class RemoteSummarizer implements Summarizer {
+  // Remote summarizers may rely on remote services and do not ship bundled
+  // model artifacts on-disk; declare usesOnDiskModel=false by default but
+  // implementations that load local heavyweight models should set true.
+  readonly usesOnDiskModel = false;
   readonly isRemote = true; readonly isPure = false;
   readonly allowsNetwork: boolean;
   readonly allowBackgroundNetwork = false; // Remote summarizers must not be used by background jobs

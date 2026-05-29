@@ -4,7 +4,7 @@
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 39 source file(s).
+Module boundary at app containing 41 source file(s).
 _Path: `app`_
 Confidence: 95%
 
@@ -62,6 +62,9 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: ExportPlugin
+Confidence: 85%
+
+### Contract: HealthPlugin
 Confidence: 85%
 
 ### Contract: StorageEventType
@@ -307,6 +310,7 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **WorkerPool**: class in app/src/index/workerPool.ts
 - **InvertedIndex**: class in app/src/indexing/index.ts
 - **ExportPlugin**: class in app/src/plugins/export.ts
+- **HealthPlugin**: class in app/src/plugins/health.ts
 - **StorageEventType**: type in app/src/plugins/host.ts
 - **Plugin**: type in app/src/plugins/host.ts
 - **PluginContext**: type in app/src/plugins/host.ts
@@ -350,7 +354,6 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 
 ## Services
 
-- **DeprecatedDocumentStore**: DeprecatedDocumentStore: removed. This alias has been intentionally set to `never` to cause a compile-time error at any remaining call-sites. The presence of a permissive type here previously prolonged migration and allowed duplicate legacy stores to coexist with the new storage surface. Forcing a type error makes remaining usages explicit and prevents accidental runtime compatibility shims which increase maintenance burden and the risk of divergent state. Migration guidance: - Replace imports of DeprecatedDocumentStore with concrete types from the storage/ module (e.g. DocumentStore or getOrCreateDocumentStore). - If you relied on a runtime legacy API, update the caller to use the storage module helpers instead of a global/deprecated abstraction.
 - **SnapshotStore**: interface in app/src/core/types.ts
 - **FileSnapshotStore**: Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
 - **DocumentSnapshotService**: class in app/src/storage/snapshot-service.ts
@@ -358,7 +361,6 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **DocumentStore**: class in app/src/storage/store.ts
 - **SyncEngine**: class in app/src/sync/engine.ts
 - **SyncManager**: class in app/src/sync/manager.ts
-- **DeprecatedDocumentStore**: Service inferred from DeprecatedDocumentStore: removed. This alias has been intentionally set to `never` to cause a compile-time error at any remaining call-sites. The presence of a permissive type here previously prolonged migration and allowed duplicate legacy stores to coexist with the new storage surface. Forcing a type error makes remaining usages explicit and prevents accidental runtime compatibility shims which increase maintenance burden and the risk of divergent state. Migration guidance: - Replace imports of DeprecatedDocumentStore with concrete types from the storage/ module (e.g. DocumentStore or getOrCreateDocumentStore). - If you relied on a runtime legacy API, update the caller to use the storage module helpers instead of a global/deprecated abstraction.
 - **SnapshotStore**: Service inferred from interface in app/src/core/types.ts
 - **FileSnapshotStore**: Service inferred from Simple on-disk per-document snapshot store. Each document snapshot is persisted as an individual JSON file under the provided directory. This implementation is best-effort and swallows IO errors to avoid crashing the host process.
 - **DocumentSnapshotService**: Service inferred from class in app/src/storage/snapshot-service.ts

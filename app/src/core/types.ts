@@ -308,6 +308,11 @@ export interface Summarizer {
    * this summarizer. Remote summarizers MUST set this to false to ensure
    * offline-first background processing remains deterministic and network-free. */
   readonly allowBackgroundNetwork?: boolean;
+  /** Whether the summarizer requires or loads on-disk model artifacts (e.g. bundled weights).
+   * Local/offline implementations MUST set this to false to make packaging guarantees explicit.
+   * Declare this field as required so implementations cannot omit the packaging contract.
+   */
+  readonly usesOnDiskModel: boolean;
   // Accept either a live Document or a readonly DocumentSnapshot so callers
   // can pass snapshots across subsystem boundaries without forcing a copy.
   summarize(document: Document | DocumentSnapshot): Promise<string>;
