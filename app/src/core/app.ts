@@ -630,8 +630,8 @@ export class SignalApp {
     (syncValidator as any).dispose = () => { try { (snapshotValidator as any).dispose && (snapshotValidator as any).dispose(); } catch (_) {} };
     (asyncValidator as any).dispose = () => { try { (snapshotValidator as any).dispose && (snapshotValidator as any).dispose(); } catch (_) {} };
 
-    this.presence.setValidator(syncValidator);
-    this.presence.setAsyncValidator(asyncValidator);
+    try { if (typeof (this.presence as any).setValidator === 'function') (this.presence as any).setValidator(syncValidator); } catch (_) {}
+    try { if (typeof (this.presence as any).setAsyncValidator === 'function') (this.presence as any).setAsyncValidator(asyncValidator); } catch (_) {}
 
     // The SyncManager is responsible for forwarding storage events to the
     // sync subsystem (SyncEngine). Do not register direct store→engine
@@ -691,9 +691,14 @@ export class SignalApp {
         // imported symbol when present, otherwise attempt a runtime require
         // to obtain the constructor. This avoids missing-runtime-symbol TS
         // errors in environments that elide imports.
-        const SE: any = (typeof SyncEngine !== 'undefined' && (SyncEngine as any).getOrCreate)
-          ? SyncEngine
-          : (() => { try { const m = require('../sync/engine.js'); return m && (m.SyncEngine || m.default || m); } catch (_) { return undefined; } })();
+        const SE: any = (() => {
+          try {
+            const m = require('../sync/engine.js');
+            return m && (m.SyncEngine || m.default || m);
+          } catch (_) {
+            try { return (globalThis as any).SyncEngine; } catch (_) { return undefined; }
+          }
+        })();
         if (SE && typeof SE.getOrCreate === 'function') {
           this._sync = SE.getOrCreate(this.store as any, this._peerId);
         } else {
