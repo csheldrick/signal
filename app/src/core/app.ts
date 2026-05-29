@@ -481,7 +481,7 @@ export class SignalApp {
         // Attempt to acquire a LocalSummarizer slot; if we cannot, re-enqueue
         // the job with a short backoff to avoid over-subscribing the local summarizer.
         const Lclass2 = getLocalSummarizerClass();
-          const acquired = Lclass2 ? (typeof (Lclass2 as any)._tryRecordRequest === 'function' ? (Lclass2 as any)._tryRecordRequest() : (typeof (Lclass2 as any).tryRecordRequest === 'function' ? (Lclass2 as any).tryRecordRequest() : (typeof (Lclass2 as any).recordRequest === 'function' ? ((Lclass2 as any).recordRequest(), true) : true))) : true;
+          const acquired = Lclass2 ? (typeof (Lclass2 as any).tryRecordRequest === 'function' ? (Lclass2 as any).tryRecordRequest() : (typeof (Lclass2 as any)._tryRecordRequest === 'function' ? (Lclass2 as any)._tryRecordRequest() : (typeof (Lclass2 as any).recordRequest === 'function' ? ((Lclass2 as any).recordRequest(), true) : true))) : true;
         if (!acquired) {
           // Couldn't acquire: attempt to enqueue for later. If the queue is full
           // set a short placeholder timer and drop the heavy work.
@@ -530,7 +530,7 @@ export class SignalApp {
             } catch (_) { /* swallow background errors */ }
             // Mark job finished and try to drain a queued job.
             try {
-              try { const Lr = getLocalSummarizerClass(); if (Lr) { if (typeof (Lr as any)._releaseRequest === 'function') (Lr as any)._releaseRequest(); else if (typeof (Lr as any).releaseRequest === 'function') (Lr as any).releaseRequest(); } } catch (_) {}
+              try { const Lr = getLocalSummarizerClass(); if (Lr) { if (typeof (Lr as any).safeRelease === 'function') (Lr as any).safeRelease(); else if (typeof (Lr as any)._releaseRequest === 'function') (Lr as any)._releaseRequest(); else if (typeof (Lr as any).releaseRequest === 'function') (Lr as any).releaseRequest(); } } catch (_) {}
               const next = (this as any)._bgSummarizeQueue.shift();
               if (next) {
                 // Use a short defer to avoid deep synchronous recursion and to

@@ -32,7 +32,14 @@ type DeprecatedDocumentChange = DocumentChange & { isDeprecated: boolean; };
  * produce a type error to surface migration sites and encourage updating
  * imports instead of relying on a deprecated global alias.
  */
-export type DeprecatedDocumentStore = never;
+/**
+ * @deprecated DeprecatedDocumentStore has been removed from the public API.
+ * Previous callers should migrate to the concrete storage types in the
+ * storage/ module. Exporting as `unknown` preserves the symbol for legacy
+ * import sites while avoiding accidental usage; treat this as a transitional
+ * shim that should be removed once callers have migrated.
+ */
+export type DeprecatedDocumentStore = unknown;
 
 export interface DocumentSnapshot {
   readonly id: string;
@@ -245,6 +252,18 @@ export interface Summarizer {
    * callers should avoid invoking heavy requests. Implementations may provide
    * a cheap synchronous check to allow callers to prefer lightweight paths. */
   isAvailable?(): boolean;
+
+  /** Optional runtime helpers to expose summarizer-level concurrency
+   * accounting and acquisition APIs. These instance methods allow callers to
+   * coordinate with implementations (without performing reflective access to
+   * constructor statics) and reduce subsystem coupling/overload. */
+  getGlobalActiveRequests?(): number;
+  tryRecordRequest?(): boolean;
+  recordRequest?(): void;
+  releaseRequest?(): void;
+  /** A defensive release which guarantees the global counter is decremented
+   * (bounded at zero) even if a normal release call throws for some reason. */
+  safeRelease?(): void;
 }
 
 // Conflict resolution contract is surfaced here in the core types so higher-level

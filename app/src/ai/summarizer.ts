@@ -204,6 +204,39 @@ export class LocalSummarizer implements Summarizer {
     } catch (_) { return false; }
   }
 
+  // Instance runtime helpers: expose concurrency accounting at the instance
+  // level to reduce callers' reliance on reflective static access. These are
+  // optional on the Summarizer contract but help callers (e.g. schedulers)
+  // coordinate safely with implementations.
+  getGlobalActiveRequests(): number {
+    return LocalSummarizer.globalActiveRequests;
+  }
+
+  tryRecordRequest(): boolean {
+    return LocalSummarizer.tryRecordRequest();
+  }
+
+  recordRequest(): void {
+    LocalSummarizer.recordRequest();
+  }
+
+  releaseRequest(): void {
+    LocalSummarizer.releaseRequest();
+  }
+
+  /** Defensive release: guarantee the global counter is decremented even if
+   * the standard release method throws. This avoids permanent saturation
+   * due to unexpected errors in teardown paths. */
+  safeRelease(): void {
+    try {
+      LocalSummarizer.releaseRequest();
+    } catch (_) {
+      try {
+        LocalSummarizer.globalActiveRequests = Math.max(0, (LocalSummarizer.globalActiveRequests || 0) - 1);
+      } catch (_) { /* swallow */ }
+    }
+  }
+
   // Internal aliases: prefer these within the app to reduce coupling to the
   // public Summarizer contract. External callers should use the Summarizer
   // interface only. These alias methods delegate to the public implementations
@@ -222,6 +255,19 @@ export class LocalSummarizer implements Summarizer {
 
   static _releaseRequest(): void {
     LocalSummarizer.releaseRequest();
+  }
+
+  /** Static defensive release for callers that access the class directly.
+   * Mirrors the instance-level safeRelease to provide a safe static API
+   * for legacy callers that perform reflective access to the constructor. */
+  static safeRelease(): void {
+    try {
+      LocalSummarizer.releaseRequest();
+    } catch (_) {
+      try {
+        LocalSummarizer.globalActiveRequests = Math.max(0, (LocalSummarizer.globalActiveRequests || 0) - 1);
+      } catch (_) { /* swallow */ }
+    }
   }
 }
 
