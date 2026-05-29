@@ -6,6 +6,7 @@ import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedI
 import { normalizeSearchQuery, createDocumentSnapshot } from '../core/types.js';
 import { WorkerPool } from './workerPool.js';
 import { telemetry } from '../sync/telemetry.js';
+import { createSafeSnapshot } from './snapshotHelper.js';
 
 // Basic tokenizer: split on non-alphanumerics and lowercase
 function tokenize(text: string | undefined): Set<string> {
@@ -185,34 +186,13 @@ class InvertedIndexImpl implements InvertedIndex {
     return { docCount, termCount, topTerms: Object.freeze(top) };
   }
 
+  // Build a robust, defensive clone of an incoming Document-like object and
+  // ensure we never return the original reference. This prevents external
+  // mutation from affecting index state and preserves the readonly contract
+  // expressed by core/types.DocumentSnapshot.
   private ensureSafeSnapshot(doc: DocumentSnapshot): DocumentSnapshot {
-    try {
-      // Use core helper to construct a shallow-cloned snapshot and freeze
-      const cloned = createDocumentSnapshot(doc as any);
-      try {
-        if (Array.isArray(cloned.tags)) Object.freeze(cloned.tags);
-      } catch (_) {}
-      try {
-        if (Array.isArray(cloned.links)) {
-          for (const l of cloned.links) try { Object.freeze(l); } catch (_) {}
-          Object.freeze(cloned.links);
-        }
-      } catch (_) {}
-      try { Object.freeze(cloned); } catch (_) {}
-      return cloned;
-    } catch (_) {
-      try {
-        const fallback = Object.assign({}, doc) as DocumentSnapshot;
-        try { if (Array.isArray((fallback as any).tags)) (fallback as any).tags = [...(fallback as any).tags]; } catch (_) {}
-        try { if (Array.isArray((fallback as any).links)) (fallback as any).links = (fallback as any).links.map((l: any) => Object.assign({}, l)); } catch (_) {}
-        try { Object.freeze((fallback as any).tags); } catch (_) {}
-        try { Object.freeze((fallback as any).links); } catch (_) {}
-        try { Object.freeze(fallback); } catch (_) {}
-        return fallback;
-      } catch (_) {
-        return doc;
-      }
-    }
+    // Delegate to module-level helper implemented above.
+    return createSafeSnapshot(doc as any);
   }
 
   private extractTerms(doc: DocumentSnapshot): Set<string> {
