@@ -31,6 +31,7 @@ export class WorkerPool {
     // explicitly set numWorkers in options we allow a modest increase but cap
     // the maximum to avoid runaway parallelism.
     if (options && typeof options.numWorkers === 'number') {
+      // Allow caller to request workers but cap more aggressively to avoid subsystem overload
       this.numWorkers = Math.max(1, Math.min(2, options.numWorkers));
     } else {
       this.numWorkers = 1; // default to single-worker to apply backpressure conservatively
@@ -39,7 +40,7 @@ export class WorkerPool {
     // Tune chunk size to balance throughput and latency. Increase default
     // chunk size slightly to reduce the number of chunks produced for large
     // document batches which helps avoid large scheduling queues.
-    const defaultMax = 4;
+    const defaultMax = 16; // increase chunk size to reduce number of chunks and scheduling overhead
     this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
       ? Math.max(1, options.maxDocsPerWorker)
       : defaultMax;

@@ -421,8 +421,8 @@ const mod = require('../indexing/index.js');
     // Global resonance loop protection: prevent cascading summarization triggers
     // by limiting total background summarization activity and adding a global cooldown.
     let globalSummarizeActive = 0;
-    const GLOBAL_MAX_ACTIVE = 2; // increase slightly to allow controlled parallelism
-    const GLOBAL_COOLDOWN_MS = 5000;
+    const GLOBAL_MAX_ACTIVE = 1; // reduce global concurrency to limit pressure
+    const GLOBAL_COOLDOWN_MS = 10000; // longer cooldown to avoid resonance under overload
     let globalCooldownUntil = 0;
     const scheduleSummarize = (docId: string) => {
       const disabled = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') ||
@@ -475,7 +475,7 @@ const mod = require('../indexing/index.js');
 
       // Concurrency & queueing: bound concurrent background summarization jobs
       // to avoid unbounded CPU/network pressure from many timers firing.
-      const MAX_CONCURRENT_BG = 1; // allow a very small amount of concurrency to improve throughput while still limiting pressure
+      const MAX_CONCURRENT_BG = 1; // single concurrent background summarizer to avoid overload
       const MAX_QUEUE = 200; // reduced queue size to limit memory growth under bursts
 
       // Initialize shared counters/queue on the app instance if absent.

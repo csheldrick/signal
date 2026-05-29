@@ -122,7 +122,22 @@ export class OfflineSyncQueue extends EventEmitter {
     const doAppend = () => {
       try {
         const line = JSON.stringify(entry) + '\n';
-        appendFileSync(path, line, { encoding: 'utf-8' });
+        try {
+          // Prefer non-blocking append where possible to avoid blocking the event loop
+          const fsAsync = require('node:fs');
+          if (fsAsync && typeof fsAsync.appendFile === 'function') {
+            fsAsync.appendFile(path, line, { encoding: 'utf-8' }, (err: any) => {
+              if (err) {
+                try { this.emit('persist_error', { peerId, entry, error: err }); } catch (_) {}
+              }
+            });
+          } else {
+            // Fallback to sync append if async is unavailable
+            appendFileSync(path, line, { encoding: 'utf-8' });
+          }
+        } catch (err) {
+          try { this.emit('persist_error', { peerId, entry, error: err }); } catch (_) {}
+        }
         // Update short-lived cache to include appended entry so subsequent
         // reads within the TTL avoid another file read.
         try {

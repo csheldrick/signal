@@ -5,15 +5,16 @@ export type TelemetryEvent = { type: string; payload: any };
 
 class TelemetryCenter {
   private listeners: Set<(event: { type: string; payload: any }) => void> = new Set();
-  private static readonly MAX_LISTENERS = 16; // cap to avoid unbounded observability fan-out (reduced)
+  // Tighter caps to reduce observability-induced fan-out in large deployments.
+  private static readonly MAX_LISTENERS = 8; // lower cap to limit global telemetry subscribers
   // When many listeners are registered, prefer async delivery to avoid
   // synchronous fan-out that can block emitters. Keep small thresholds so
   // most telemetry remains synchronous for low-listener-count environments.
-  private static readonly SYNC_THRESHOLD = 4;
-  private static readonly MACROTASK_THRESHOLD = 32;
+  private static readonly SYNC_THRESHOLD = 2; // lower threshold to yield earlier
+  private static readonly MACROTASK_THRESHOLD = 8; // schedule macrotasks sooner for very large listener counts
   // Simple per-event-type debounce to avoid tight emit storms for hot events.
   private lastEmit: Map<string, number> = new Map();
-  private static readonly MIN_EMIT_MS = 10; // minimum ms between emits of same type
+  private static readonly MIN_EMIT_MS = 50; // increase debounce to reduce hot-event pressure
 
   emit(type: string, payload: any): void {
     const ev = { type, payload };
