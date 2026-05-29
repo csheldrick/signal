@@ -171,14 +171,14 @@ export class SignalApp {
     };
 
 
-    // Provide safe, defensive clones to plugins so they cannot mutate internal store state.
+    // Provide safe, defensive snapshots to plugins so they cannot mutate internal store state.
+    // Prefer makeSafeSnapshot to produce frozen, readonly-friendly snapshots at the boundary.
+    const { makeSafeSnapshot } = require('../core/types.js');
     const cloneDoc = (d: any) => {
-      if (!d) return d;
-      return {
-        ...d,
-        links: Array.isArray(d.links) ? d.links.map((l: any) => ({ ...l })) : [],
-        tags: Array.isArray(d.tags) ? [...d.tags] : [],
-      };
+      try {
+        const s = makeSafeSnapshot ? makeSafeSnapshot(d) : undefined;
+        return s ?? undefined;
+      } catch (_) { return undefined; }
     };
 
     let remoteSummarizeInFlight = 0;

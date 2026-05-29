@@ -210,7 +210,7 @@ export function normalizeDocumentChange(ch?: DocumentChange): DocumentChange | u
 }
 
 export function createDocumentSnapshot(doc: Document): DocumentSnapshot {
-  return {
+  const snap: DocumentSnapshot = {
     id: doc.id,
     title: doc.title,
     content: doc.content,
@@ -220,6 +220,46 @@ export function createDocumentSnapshot(doc: Document): DocumentSnapshot {
     updatedAt: doc.updatedAt,
     version: typeof doc.version === 'number' ? doc.version : undefined,
   };
+
+  // Freeze nested structures to uphold the readonly snapshot contract and
+  // prevent external mutation from affecting internal state when snapshots
+  // are passed across subsystem boundaries.
+  try {
+    for (let i = 0; i < (snap.links as any).length; i++) { (snap.links as any)[i] = Object.freeze({ ...(snap.links as any)[i] }); }
+    (snap.links as any) = Object.freeze((snap.links as any).slice());
+    (snap.tags as any) = Object.freeze((snap.tags as any).slice());
+    return Object.freeze(snap);
+  } catch (_) {
+    return snap;
+  }
+}
+
+/**
+ * create a safe, defensively-frozen DocumentSnapshot from an existing snapshot
+ * or Document-like object. Useful at subsystem boundaries that accept external
+ * snapshots and must not observe external mutation.
+ */
+export function makeSafeSnapshot(input: any): DocumentSnapshot | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  try {
+    const base: DocumentSnapshot = {
+      id: String(input.id),
+      title: typeof input.title === 'string' ? input.title : String(input.title || ''),
+      content: typeof input.content === 'string' ? input.content : String(input.content || ''),
+      tags: Array.isArray(input.tags) ? input.tags.map((t: any) => String(t)) : [],
+      links: Array.isArray(input.links) ? input.links.map((l: any) => ({ sourceId: String((l as any).sourceId), targetId: String((l as any).targetId), kind: (l as any).kind })) : [],
+      createdAt: Number.isFinite((input as any).createdAt) ? (input as any).createdAt : Date.now(),
+      updatedAt: Number.isFinite((input as any).updatedAt) ? (input as any).updatedAt : Date.now(),
+      version: typeof (input as any).version === 'number' ? (input as any).version : undefined,
+    } as DocumentSnapshot;
+
+    for (let i = 0; i < (base.links as any).length; i++) { (base.links as any)[i] = Object.freeze({ ...(base.links as any)[i] }); }
+    (base.links as any) = Object.freeze((base.links as any).slice());
+    (base.tags as any) = Object.freeze((base.tags as any).slice());
+    return Object.freeze(base);
+  } catch (_) {
+    return undefined;
+  }
 }
 
 // Normalize SearchQuery inputs to clamp pathological extremes. This protects
