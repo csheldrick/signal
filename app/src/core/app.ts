@@ -1,3 +1,4 @@
+import { MAX_LENGTH, cloneSafeInterface } from "../constants.js";
 // ── Signal Application ──────────────────────────────────────
 // Wires all subsystems together. High fan-out node importing
 // from every module — gives Loom a central hub in the graph.
@@ -197,7 +198,7 @@ const mod = require('../indexing/index.js');
             const now = Date.now();
             if (now - cachedTs < TTL_MS) return cached;
             const list = this.store.list();
-            const MAX_PLUGIN_LIST = 100;
+            const MAX_PLUGIN_LIST = MAX_LENGTH;
             const results = Array.isArray(list) ? list.slice(0, MAX_PLUGIN_LIST).map((d: any) => cloneDoc(d)) : [];
             cachedTs = now;
             cached = results;
@@ -218,7 +219,7 @@ const mod = require('../indexing/index.js');
       getDocument: (id) => {
         try {
           const d = this.store.read(id) as any;
-          return d ? cloneDoc(d) : undefined;
+          return d ? cloneSafeInterface(d) : undefined;
         } catch (_) {
           return undefined;
         }
