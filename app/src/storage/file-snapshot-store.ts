@@ -20,8 +20,9 @@ export class FileSnapshotStore implements SnapshotStore {
   }
 
   private fileForId(id: string): string {
-    // Sanitize id for file names conservatively
-    const safe = String(id).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    // Encode id for file names using a reversible transform so listing can
+    // map filenames back to the original document ids reliably.
+    const safe = encodeURIComponent(String(id));
     return join(this.dir, `${safe}.json`);
   }
 
@@ -29,7 +30,13 @@ export class FileSnapshotStore implements SnapshotStore {
     try {
       if (!existsSync(this.dir)) return [];
       const files = readdirSync(this.dir);
-      return files.filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, ''));
+      // Remove the .json suffix and decodeURIComponent to restore original ids.
+      return files
+        .filter(f => f.endsWith('.json'))
+        .map(f => f.replace(/\.json$/, ''))
+        .map(name => {
+          try { return decodeURIComponent(name); } catch (_) { return name; }
+        });
     } catch (_) {
       return [];
     }
