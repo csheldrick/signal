@@ -117,7 +117,7 @@ export class SyncManager {
       // initialize timers/maps
       this.sessionLastSeen = new Map<string, number>();
       this.sessionStale = new Map<string, boolean>();
-      const HEARTBEAT_INTERVAL_MS = 90_000; // heartbeat cadence (increased to reduce timer churn and timers under load)
+      const HEARTBEAT_INTERVAL_MS = 120_000; // heartbeat cadence (increased to reduce timer churn and timers under load) (raised to further reduce timer pressure)
       const STALE_MS = 180_000; // consider a session stale after 180s of inactivity to reduce churn
 
       this.heartbeatTimer = setInterval(() => {
@@ -582,7 +582,7 @@ export class SyncManager {
       // Batch enqueue outbound messages to avoid long synchronous bursts. Yield
       // to the event loop every BATCH_SIZE messages so the flush loop doesn't
       // monopolize the host when many outbound messages are present.
-      const BATCH_SIZE = 25; // smaller batch size to yield more frequently and avoid long sync bursts
+      const BATCH_SIZE = 10; // smaller batch size to yield more frequently and avoid long sync bursts (lowered to increase yielding)
       const enqPromises: Promise<void>[] = [];
 
       for (let i = 0; i < outbound.length; i++) {

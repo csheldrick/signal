@@ -30,7 +30,7 @@ export class LocalSummarizer implements Summarizer {
   private static globalActiveRequests: number = 0;
   // Timestamp of the last recorded acquisition; used to recover from leaked slots.
   private static lastAcquireAt: number = 0;
-  static readonly GLOBAL_MAX_CONCURRENT = 2; // allow a small amount of concurrency to reduce queueing latency
+  static readonly GLOBAL_MAX_CONCURRENT = 1; // reduce concurrency to avoid overload under bursty background jobs
 
   /**
    * Attempt to acquire a global LocalSummarizer request slot.
