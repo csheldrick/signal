@@ -3,7 +3,7 @@
 // is declared in core/types.ts so multiple implementations can coexist.
 
 import type { DocumentSnapshot, SearchQuery, SearchResult, IndexStats, InvertedIndex, IndexerContract, WorkerPoolOptions } from '../core/types.js';
-import { normalizeSearchQuery, createDocumentSnapshot } from '../core/types.js';
+import { normalizeSearchQuery } from '../core/types.js';
 import { WorkerPool } from './workerPool.js';
 import { telemetry } from '../sync/telemetry.js';
 import { createSafeSnapshot } from './snapshotHelper.js';
@@ -158,15 +158,7 @@ class InvertedIndexImpl implements InvertedIndex {
 
       results.sort((a, b) => b.score - a.score);
       return results.slice(0, 50).map(r => {
-        const s = createDocumentSnapshot(r.doc as any);
-        try { if (Array.isArray(s.tags)) Object.freeze(s.tags); } catch (_) {}
-        try {
-          if (Array.isArray(s.links)) {
-            for (const l of s.links) try { Object.freeze(l); } catch (_) {}
-            Object.freeze(s.links);
-          }
-        } catch (_) {}
-        try { Object.freeze(s); } catch (_) {}
+        const s = createSafeSnapshot(r.doc as any);
         return { document: s, score: r.score, highlights: r.highlights };
       });
     } catch (_) {
@@ -236,16 +228,7 @@ export class Indexer implements IndexerContract {
     // index state while the doc waits in the queue.
     const makeSafe = (doc: any) => {
       try {
-        const s = createDocumentSnapshot(doc);
-        try { if (Array.isArray(s.tags)) Object.freeze(s.tags); } catch (_) {}
-        try {
-          if (Array.isArray(s.links)) {
-            for (const l of s.links) try { Object.freeze(l); } catch (_) {}
-            Object.freeze(s.links);
-          }
-        } catch (_) {}
-        try { Object.freeze(s); } catch (_) {}
-        return s;
+        return createSafeSnapshot(doc as any);
       } catch (_) {
         return doc;
       }
