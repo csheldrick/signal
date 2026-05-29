@@ -68,7 +68,7 @@ export class DocumentStore {
   private _eventQueue: any[] = [];
   private _eventFlushScheduled: boolean = false;
   private static readonly _EVENT_MAX_FLUSH = 1; // max events per flush (smaller batch to reduce per-tick work)
-  private static readonly _EVENT_MAX_QUEUE = 20; // max queued events (drop oldest beyond this to bound memory) (increased slightly to tolerate bursts)
+  private static readonly _EVENT_MAX_QUEUE = 10; // max queued events (drop oldest beyond this to bound memory)
 
   private emitAsyncEvent(ev: any): void {
     try {
@@ -743,7 +743,17 @@ export class DocumentStore {
     try {
       const configured = (globalThis as any).__SIGNAL_STORE_FILEPATH;
       if (typeof configured === 'string' && configured.length > 0) {
-        try { this.save(configured); } catch (_) { /* swallow persistence errors */ }
+        try {
+          // Debounce frequent save requests to avoid overwhelming the filesystem
+          // during high-rate buffered mutation logging. Schedule a coalesced save
+          // within a short window so multiple mutations trigger at most one write.
+          if (!(this as any)._saveScheduled) {
+            try { (this as any)._saveScheduled = true; } catch (_) { (this as any)._saveScheduled = true; }
+            setTimeout(() => {
+              try { this.save(configured); } catch (_) { /* swallow */ } finally { try { (this as any)._saveScheduled = false; } catch (_) { /* swallow */ } }
+            }, 200);
+          }
+        } catch (_) { /* swallow */ }
       }
     } catch (_) { /* swallow */ }
 

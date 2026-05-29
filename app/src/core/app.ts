@@ -182,7 +182,8 @@ export class SignalApp {
     };
 
     let remoteSummarizeInFlight = 0;
-    const MAX_CONCURRENT_REMOTE_SUMMARIES = 2;
+    const MAX_CONCURRENT_REMOTE_SUMMARIES = 1; // reduce remote summarizer concurrency to limit network pressure
+
 
     const pluginContext: PluginContext = {
       listDocuments: (() => {
@@ -474,7 +475,7 @@ export class SignalApp {
 
       // Concurrency & queueing: bound concurrent background summarization jobs
       // to avoid unbounded CPU/network pressure from many timers firing.
-      const MAX_CONCURRENT_BG = 2; // allow a small amount of concurrency to improve throughput while still limiting pressure
+      const MAX_CONCURRENT_BG = 1; // allow a very small amount of concurrency to improve throughput while still limiting pressure
       const MAX_QUEUE = 200; // reduced queue size to limit memory growth under bursts
 
       // Initialize shared counters/queue on the app instance if absent.

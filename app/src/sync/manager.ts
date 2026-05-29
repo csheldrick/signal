@@ -99,8 +99,8 @@ export class SyncManager {
       // initialize timers/maps
       this.sessionLastSeen = new Map<string, number>();
       this.sessionStale = new Map<string, boolean>();
-      const HEARTBEAT_INTERVAL_MS = 180_000; // heartbeat cadence (increased to reduce timer churn and timers under load) (raised to further reduce timer pressure)
-      const STALE_MS = 180_000; // consider a session stale after 180s of inactivity to reduce churn
+      const HEARTBEAT_INTERVAL_MS = 300_000; // heartbeat cadence (increased to reduce timer churn and timers under load)
+      const STALE_MS = 300_000; // consider a session stale after 300s of inactivity to reduce churn
 
       this.heartbeatTimer = setInterval(() => {
         try {
@@ -247,7 +247,7 @@ export class SyncManager {
       const busAny: any = (this.store as any).events;
       if (busAny && (typeof busAny.on === 'function' || typeof busAny.onAsync === 'function')) {
         const buffer: StorageEvent[] = [];
-        const MAX_BUFFERED_EVENTS = 100; // reduced to bound memory and downstream fan-out (lowered to reduce stress)
+        const MAX_BUFFERED_EVENTS = 50; // reduced to bound memory and downstream fan-out
         let scheduled = false;
         const flush = () => {
           if (scheduled) return;
