@@ -71,12 +71,12 @@ export function createLazyPresenceTracker(contextGetter: () => PluginContext | u
 
   const ensure = () => {
     if (!real) {
-      real = new PresenceTracker(contextGetter?.());
+      real = new PresenceTracker(contextGetter());
       // Apply any pending configuration in a best-effort manner.
-      try { if (pending.pluginContextSet) real.setPluginContext(pending.pluginContext); } catch (_) {}
-      try { if (pending.sessionTrackerSet) real.setSessionTracker(pending.sessionTracker); } catch (_) {}
-      try { if (pending.validatorSet) real.setValidator(pending.validator); } catch (_) {}
-      try { if (pending.asyncValidatorSet) real.setAsyncValidator(pending.asyncValidator); } catch (_) {}
+      try { if (typeof (real as any).setPluginContext === 'function') (real as any).setPluginContext(pending.pluginContext); } catch (_) {}
+      try { if (typeof (real as any).setSessionTracker === 'function') (real as any).setSessionTracker(pending.sessionTracker); } catch (_) {}
+      try { if (typeof (real as any).setValidator === 'function') (real as any).setValidator(pending.validator); } catch (_) {}
+      try { if (typeof (real as any).setAsyncValidator === 'function') (real as any).setAsyncValidator(pending.asyncValidator); } catch (_) {}
     }
     return real!;
   };
@@ -90,9 +90,7 @@ export function createLazyPresenceTracker(contextGetter: () => PluginContext | u
         return (ctx?: PluginContext) => {
           pending.pluginContextSet = true;
           pending.pluginContext = ctx;
-          if (real) {
-            try { real.setPluginContext(ctx); } catch (_) {}
-          }
+          try { if (typeof (real as any).setPluginContext === 'function') (real as any).setPluginContext(ctx); } catch (_) {}
         };
       }
 
@@ -100,9 +98,7 @@ export function createLazyPresenceTracker(contextGetter: () => PluginContext | u
         return (tracker?: any) => {
           pending.sessionTrackerSet = true;
           pending.sessionTracker = tracker;
-          if (real) {
-            try { real.setSessionTracker(tracker); } catch (_) {}
-          }
+          try { if (typeof (real as any).setSessionTracker === 'function') (real as any).setSessionTracker(tracker); } catch (_) {}
         };
       }
 
@@ -110,9 +106,7 @@ export function createLazyPresenceTracker(contextGetter: () => PluginContext | u
         return (v?: any) => {
           pending.validatorSet = true;
           pending.validator = v;
-          if (real) {
-            try { real.setValidator(v); } catch (_) {}
-          }
+          try { if (typeof (real as any).setValidator === 'function') (real as any).setValidator(v); } catch (_) {}
         };
       }
 
@@ -120,18 +114,14 @@ export function createLazyPresenceTracker(contextGetter: () => PluginContext | u
         return (v?: any) => {
           pending.asyncValidatorSet = true;
           pending.asyncValidator = v;
-          if (real) {
-            try { real.setAsyncValidator(v); } catch (_) {}
-          }
+          try { if (typeof (real as any).setAsyncValidator === 'function') (real as any).setAsyncValidator(v); } catch (_) {}
         };
       }
 
       if (p === 'stopCleanupTimer') {
         // stopCleanupTimer is safe to be a no-op before instantiation.
         return () => {
-          if (real) {
-            try { real.stopCleanupTimer(); } catch (_) {}
-          }
+          try { if (typeof (real as any).stopCleanupTimer === 'function') (real as any).stopCleanupTimer(); } catch (_) {}
         };
       }
 

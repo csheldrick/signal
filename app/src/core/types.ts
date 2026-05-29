@@ -323,8 +323,8 @@ export interface PeerPresence {
 export interface PresenceTracker {
   setPluginContext(context?: PluginContext): void;
   setSessionTracker(tracker?: any): void;
-  setValidator?(validate?: (id: string) => boolean | Promise<boolean>): void;
-  setAsyncValidator?(validate?: (id: string) => Promise<boolean>): void;
+  setValidator(validate?: (id: string) => boolean | Promise<boolean>): void;
+  setAsyncValidator(validate?: (id: string) => Promise<boolean>): void;
   join(peerId: string, documentId?: string): PeerPresence;
   leave(peerId: string, awaitCleanup?: boolean): Promise<void>;
   getActive(): PeerPresence[];
