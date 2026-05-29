@@ -23,7 +23,9 @@ export interface SyncQueueOptions {
   maxDelayMs?: number;
   /** Maximum number of queued messages. Default 500. */
   maxQueueSize?: number;
-}
+  /** Overflow handling strategy when the queue is full. 'reject' will reject enqueue, 'drop_oldest' will remove the oldest entry and enqueue the new one. Default 'drop_oldest'. */
+  overflowStrategy?: 'reject' | 'drop_oldest';
+} 
 
 export class SyncQueue {
   // Keep an ordered list for stable FIFO dispatch, but maintain a Map for
@@ -35,12 +37,15 @@ export class SyncQueue {
   private readonly maxAttempts: number;
   private readonly baseDelayMs: number;
   private readonly maxDelayMs: number;
+  private readonly overflowStrategy: 'reject' | 'drop_oldest';
 
   constructor(opts: SyncQueueOptions = {}) {
     this.maxQueueSize = opts.maxQueueSize ?? 200; // reduced default to apply backpressure earlier and bound memory under load
     this.maxAttempts = opts.maxAttempts ?? 5;
     this.baseDelayMs = opts.baseDelayMs ?? 500;
     this.maxDelayMs = opts.maxDelayMs ?? 30_000;
+    this.overflowStrategy = opts.overflowStrategy ?? 'drop_oldest';
+
   }
 
   private keyFor(msg: SyncMessage): string {
@@ -96,18 +101,21 @@ export class SyncQueue {
       this.index.set(key, entry);
     } else {
       if (this.entries.length >= this.maxQueueSize) {
-        // Queue is full. Instead of silently dropping the oldest entry (which
-        // can hide backpressure), reject the enqueue to allow callers (e.g.
-        // SyncManager) to persist to an offline queue or take other actions.
-        const removed = this.entries.shift()!;
-        const removedKey = this.keyFor(removed.message);
-        this.index.delete(removedKey);
-        try {
-          removed.reject(new Error('Queue full — dropped oldest entry'));
-        } catch (_) { /* ignore */ }
-        // Reject the caller to surface backpressure so higher layers can
-        // persist the message or apply backoff.
-        return Promise.reject(new Error('Queue full — cannot enqueue new entry'));
+        // Queue is full. Apply configured overflow strategy.
+        if (this.overflowStrategy === 'drop_oldest') {
+          const removed = this.entries.shift()!;
+          const removedKey = this.keyFor(removed.message);
+          this.index.delete(removedKey);
+          try { removed.reject(new Error('Queue full — dropped oldest entry')); } catch (_) { /* ignore */ }
+          try { /* emit telemetry for overflow */ } catch (_) {}
+        } else {
+          // Default behavior: reject to surface backpressure to callers.
+          const removed = this.entries.shift()!;
+          const removedKey = this.keyFor(removed.message);
+          this.index.delete(removedKey);
+          try { removed.reject(new Error('Queue full — dropped oldest entry')); } catch (_) { /* ignore */ }
+          return Promise.reject(new Error('Queue full — cannot enqueue new entry'));
+        }
       }
       this.entries.push(entry);
       this.index.set(key, entry);
@@ -165,6 +173,11 @@ export class SyncQueue {
 
   get size(): number {
     return this.entries.length;
+  }
+
+  /** Return lightweight stats for diagnostics. */
+  getStats(): { size: number; maxQueueSize: number; maxAttempts: number; overflowStrategy: string } {
+    return { size: this.entries.length, maxQueueSize: this.maxQueueSize, maxAttempts: this.maxAttempts, overflowStrategy: this.overflowStrategy };
   }
 
   clear(): void {

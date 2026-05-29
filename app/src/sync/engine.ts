@@ -21,6 +21,7 @@ import { isValidDocumentSnapshot } from '../core/types.js';
 import { getSyncEngineFromStore, setSyncEngineOnStore } from '../storage/syncEngineRegistry.js';
 
 export class SyncEngine {
+  private readonly maxOutbound: number;
   private clock: VectorClock = {};
   private readonly peerId: string;
   private outbound: SyncMessage[] = [];
@@ -90,8 +91,10 @@ export class SyncEngine {
   constructor(
     private readonly store: DocumentStoreLike,
     peerId: string,
-    options?: { internal?: boolean },
+    options?: { internal?: boolean; maxOutbound?: number },
   ) {
+    this.maxOutbound = options?.maxOutbound ?? 500; // hard cap to avoid unbounded outbound growth
+
     this.peerId = peerId;
     this.clock[peerId] = 0;
 
@@ -319,10 +322,19 @@ export class SyncEngine {
       if (message.operation === 'delete') {
         // Remove any prior messages for this doc and append delete.
         if (idx !== -1) this.outbound.splice(idx, 1);
+        // Ensure we have room in the outbound buffer
+        if (this.outbound.length >= this.maxOutbound) {
+          try { telemetry.emit('engine_outbound_overflow', { action: 'drop_oldest', outboundLength: this.outbound.length, maxOutbound: this.maxOutbound, timestamp: Date.now() }); } catch (_) {}
+          this.outbound.shift();
+        }
         this.outbound.push(message);
       } else if (message.operation === 'create') {
         // Create supersedes prior messages for same doc.
         if (idx !== -1) this.outbound.splice(idx, 1);
+        if (this.outbound.length >= this.maxOutbound) {
+          try { telemetry.emit('engine_outbound_overflow', { action: 'drop_oldest', outboundLength: this.outbound.length, maxOutbound: this.maxOutbound, timestamp: Date.now() }); } catch (_) {}
+          this.outbound.shift();
+        }
         this.outbound.push(message);
       } else if (message.operation === 'update') {
         if (idx !== -1) {
@@ -341,6 +353,10 @@ export class SyncEngine {
             // existing is delete — keep delete, ignore update
           }
         } else {
+          if (this.outbound.length >= this.maxOutbound) {
+            try { telemetry.emit('engine_outbound_overflow', { action: 'drop_oldest', outboundLength: this.outbound.length, maxOutbound: this.maxOutbound, timestamp: Date.now() }); } catch (_) {}
+            this.outbound.shift();
+          }
           this.outbound.push(message);
         }
       }
