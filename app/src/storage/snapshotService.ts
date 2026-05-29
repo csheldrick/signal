@@ -83,7 +83,7 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
       }
 
       const resolvers: Array<() => void> = [];
-      const debounceMs = 1000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesystem IO)
+      const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesystem IO)
       const timer = setTimeout(async () => {
         try {
           const state = this._pending.get(documentId);

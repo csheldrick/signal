@@ -38,7 +38,7 @@ export class DocumentSnapshotService {
 
   constructor(store?: SnapshotStore, opts?: DocumentSnapshotServiceOptions) {
     this.store = store;
-    const defaultInterval = 6 * 60 * 60 * 1000; // 6 hours (less frequent compaction to reduce SnapshotStore pressure)
+    const defaultInterval = 12 * 60 * 60 * 1000; // 12 hours (less frequent compaction to reduce SnapshotStore pressure)
     const requested = opts && typeof opts.compactionIntervalMs === 'number' ? opts.compactionIntervalMs : defaultInterval;
     // minimum 30 minutes
     this.compactionIntervalMs = Math.max(30 * 60 * 1000, requested);
@@ -81,7 +81,9 @@ export class DocumentSnapshotService {
       const entries = Object.entries(out);
       if (entries.length <= this.maxClockEntries) return { ...out } as VectorClock;
       entries.sort(([, a], [, b]) => (b as number) - (a as number));
-      return Object.fromEntries(entries.slice(0, this.maxClockEntries)) as VectorClock;
+      // aggressively clamp to reduce vector clock size and downstream processing
+      const sliced = entries.slice(0, Math.max(1, Math.floor(this.maxClockEntries / 2)));
+      return Object.fromEntries(sliced) as VectorClock;
     } catch (_) {
       return out;
     }

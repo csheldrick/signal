@@ -53,8 +53,8 @@ export class StorageEventBus implements StorageEventBusContract {
     // Prevent unbounded listener growth which can cause heavy synchronous
     // fan-out and subsystem overload. Enforce soft caps and refuse to add new
     // listeners when global or per-type limits are exceeded.
-    const MAX_TOTAL_LISTENERS = 100; // lowered to reduce global fan-out under heavy plugin/use
-    const MAX_PER_TYPE = 20; // lower per-type bound to prevent high fan-out for single event types
+    const MAX_TOTAL_LISTENERS = 50; // lowered to reduce global fan-out under heavy plugin/use
+    const MAX_PER_TYPE = 10; // lower per-type bound to prevent high fan-out for single event types
 
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
@@ -95,8 +95,8 @@ export class StorageEventBus implements StorageEventBusContract {
     // accidental registration storms (e.g. plugins registering '*' listeners)
     // that can degrade runtime performance and observability.
     try {
-      const MAX_TOTAL_ASYNC = 200;
-      const MAX_PER_TYPE_ASYNC = 50;
+      const MAX_TOTAL_ASYNC = 100; // reduce async listener cap to limit background fan-out
+      const MAX_PER_TYPE_ASYNC = 20;
 
       // Compute current async totals conservatively
       let total = 0;
