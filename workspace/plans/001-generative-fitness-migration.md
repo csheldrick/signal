@@ -26,8 +26,20 @@ This plan flips Signal onto the generative + fitness machinery added in Substrat
 - Substrate: `GapProposalOperator`, `HypothesisGenerationOperator`, `CapabilitySynthesisOperator`,
   `VariationOperator`, `SelectionOperator`, `TestFitnessProbe`, and `weave evolve` (that plan must
   land first, or land in lockstep).
+- Substrate **Epic D** (generic shared-markdown cognition I/O: the `docs` config schema, doc
+  ingestion into bootstrap context + as wired nodes, and `DocWriter` write-back). This is the
+  prerequisite for SIG-008/009 below.
 - `weave bootstrap --utilis` (already exists) for generative seeding.
 - A configured Utilis provider for `--utilis` execution.
+
+## The workspace/ gap this plan also closes
+
+Signal's `workspace/` (goals, observations, architecture decisions, constraints, experiments) is
+declared as "cognition inputs" in ADR-001 and `.github/copilot-instructions.md`, but **nothing in
+the framework reads or writes it**: Loom only crystallizes `app/` source, `weave bootstrap` builds
+context from the Loom graph + `.loom/artifacts/*`, and `resolve`/`evolve` never touch the docs. The
+docs are orphaned. SIG-008/009 fix this by *configuring* Substrate's generic Epic-D bridge to point
+at `workspace/` — the framework stays app-agnostic; Signal owns the mapping.
 
 ## Tasks
 
@@ -90,6 +102,36 @@ This plan flips Signal onto the generative + fitness machinery added in Substrat
 - Files: the three docs above.
 - Acceptance: ADR + two experiment specs committed with hypotheses, setup, and exit criteria.
 
+### SIG-008 — Configure the docs bridge to read workspace/ (ingestion)
+- Why: Make the human-authored `workspace/` docs actually seed and ground the substrate.
+- Steps (config only — no framework changes; uses Substrate Epic D):
+  1. Add a `docs` section to `signal/.weave/config.json` mapping each `workspace/` subtree to a
+     node/edge type, e.g.:
+     - `workspace/goals/**`            → `goal`         / `supports`
+     - `workspace/observations/**`     → `observation`  / `related_to`
+     - `workspace/architecture/decisions/**`   → `architecture` / `related_to`
+     - `workspace/architecture/constraints/**` → `constraint`   / `blocks`
+     - `workspace/architecture/experiments/**` → `hypothesis`   / `predicts`
+     - `workspace/tasks/**`            → `task`         / `related_to`
+  2. Confirm `workspace/` is *not* excluded from this ingestion path (it remains excluded from
+     Loom's source crystallization — correct; it's markdown, not code).
+- Files: `signal/.weave/config.json`.
+- Acceptance: `weave bootstrap --utilis --dry-run` shows `workspace/` content in the prompt and the
+  ensuing run creates wired nodes for the goals/constraints/etc.
+
+### SIG-009 — Configure write-back into workspace/ (living loop)
+- Why: Let the framework's findings flow back into the docs humans read, instead of dying in the DB.
+- Steps (config + templates — uses Substrate Epic D `DocWriter`):
+  1. Set `docs.output` so:
+     - experiment outcomes are **appended** (in a fenced machine-marked block) to the matching
+       `workspace/architecture/experiments/00x-*.md`,
+     - emergent observations are **created** as new files under `workspace/observations/`,
+     - selection outcomes (survivor + pruned + fitness) are recorded on the originating goal/experiment.
+  2. Writes are append-or-create only; re-runs update the marked block in place.
+- Files: `signal/.weave/config.json` (templates), and the docs themselves get updated *by the run*.
+- Acceptance: After `weave evolve`, EXP-006/007 (from SIG-006) carry framework-written result blocks,
+  and at least one new observation file appears — none of it hand-edited.
+
 ### SIG-007 — Update README + framework-info to the new loop
 - Steps: Replace the curated-replay narrative with the generative/evolve loop; document
   `weave evolve`, the rediscovery-rate metric, and the new bootstrap flags.
@@ -99,11 +141,12 @@ This plan flips Signal onto the generative + fitness machinery added in Substrat
 ## New loop (target state)
 
 ```text
-loom onboard .                      crystallize source → .loom/loom.db
+loom onboard .                      crystallize app/ source → .loom/loom.db
 weave import                        merge into .weave/substrate.db
-weave bootstrap --utilis            DERIVE goals/observations/tensions from the graph (no replay)
+weave bootstrap --utilis            DERIVE seed from graph + READ workspace/ docs (no JSON replay)
 weave run --generative --ticks N    propagate; generative operators emit goals/hypotheses/capabilities
 weave evolve --variants K --dir app spawn variants → run → score by tests → retain fittest, prune rest
+                                    └─ WRITE-BACK: results appended to workspace/ experiments/observations
 weave observe activation|tensions   inspect what emerged and what survived
 scripts/check_bootstrap_drift.sh    report rediscovery rate vs curated baseline
 ```
