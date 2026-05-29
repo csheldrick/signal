@@ -96,7 +96,7 @@ export class StorageEventBus implements StorageEventBusContract {
     // that can degrade runtime performance and observability.
     try {
       const MAX_TOTAL_ASYNC = 100; // reduce async listener cap to limit background fan-out
-      const MAX_PER_TYPE_ASYNC = 20;
+      const MAX_PER_TYPE_ASYNC = type === 'linked' ? 10 : 20;
 
       // Compute current async totals conservatively
       let total = 0;
@@ -156,8 +156,8 @@ export class StorageEventBus implements StorageEventBusContract {
     // tiers: a microtask yield for moderate listener counts and a macrotask
     // (setTimeout) when listener counts are very large to allow the event
     // loop to recover and avoid long-running synchronous bursts.
-    const MICROTASK_YIELD_THRESHOLD = 1; // preserve synchronous semantics for small listener sets (validators rely on sync behaviour)
-    const MACROTASK_YIELD_THRESHOLD = 6; // more aggressive macrotask yield to avoid long synchronous bursts (lowered to yield earlier)
+    const MICROTASK_YIELD_THRESHOLD = event.type === 'linked' ? 0 : 1; // preserve synchronous semantics for small listener sets (validators rely on sync behaviour)
+    const MACROTASK_YIELD_THRESHOLD = event.type === 'linked' ? 3 : 6; // more aggressive macrotask yield to avoid long synchronous bursts (lowered to yield earlier)
 
     if (totalListeners > MACROTASK_YIELD_THRESHOLD) {
       // Very large listener counts: schedule a macrotask to avoid saturating
