@@ -1,5 +1,4 @@
 import { GraphBuilder } from '../graph/builder.js';
-import type { GraphBuilder as GraphBuilderType } from '../graph/builder.js';
 import { PluginHost } from '../plugins/host.js';
 import { PresenceTracker } from '../collaboration/presence.js';
 import type { PluginContext } from '../core/types.js';
@@ -25,7 +24,7 @@ export function createLazyGraph(storeGetter: () => any[]): GraphBuilder {
     buildGraph: () => ensure().buildGraph(),
     findClusters: () => ensure().findClusters(),
     findHubs: (minLinks?: number) => ensure().findHubs(minLinks),
-  } as unknown as GraphBuilder;
+  } as unknown as GraphBuilder; // lazy wrapper ensures GraphBuilder is shared and reduces subsystem fan-out
 }
 
 /**

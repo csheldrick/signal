@@ -66,8 +66,8 @@ export class GraphBuilder {
   // long synchronous loops when the doc set is large.
   private building?: Promise<AdjacencyList> | undefined;
   private lastBuildTs: number = 0;
-  private static readonly BUILD_THROTTLE_MS = 1000; // increased throttle window to reduce rebuild frequency under load
-  private static readonly MAX_DOCS_PROCESS = 300; // reduced cap to bound per-build work
+  private static readonly BUILD_THROTTLE_MS = 5000; // increased throttle window to reduce rebuild frequency under load
+  private static readonly MAX_DOCS_PROCESS = 200; // reduced cap to bound per-build work and lower per-build work under heavy load
 
   async buildGraph(): Promise<AdjacencyList> {
     const docs = this.listDocuments() || [];

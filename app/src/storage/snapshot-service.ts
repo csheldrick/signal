@@ -38,7 +38,7 @@ export class DocumentSnapshotService {
 
   constructor(store?: SnapshotStore, opts?: DocumentSnapshotServiceOptions) {
     this.store = store;
-    const defaultInterval = 120 * 60 * 1000; // 120 minutes (less frequent compaction to reduce SnapshotStore pressure)
+    const defaultInterval = 6 * 60 * 60 * 1000; // 6 hours (less frequent compaction to reduce SnapshotStore pressure)
     const requested = opts && typeof opts.compactionIntervalMs === 'number' ? opts.compactionIntervalMs : defaultInterval;
     // minimum 30 minutes
     this.compactionIntervalMs = Math.max(30 * 60 * 1000, requested);

@@ -74,9 +74,9 @@ export class PluginHost {
   // still bounding fan-out and resource pressure. Increasing these caps
   // resolves the monolithic 'single plugin' restriction while retaining
   // conservative safety limits for low-resource environments.
-  private static readonly MAX_REGISTERED_PLUGINS = 8; // previously 1
+  private static readonly MAX_REGISTERED_PLUGINS = 12; // increased cap to balance modularity with safety
   private plugins: Map<string, Plugin> = new Map();
-  private static readonly MAX_ENABLED_PLUGINS = 4; // previously 1
+  private static readonly MAX_ENABLED_PLUGINS = 6; // allow more simultaneous plugins while maintaining bounds
   private enabled: Set<string> = new Set();
   // Shared per-event-type managers to avoid registering one upstream
   // listener per plugin. This consolidates upstream listeners and
@@ -339,7 +339,7 @@ const wrapPluginWithBoundary = (p: Plugin): Plugin => {
                 // avoid unbounded growth of pluginEventManagers (each distinct
                 // type can hold many listeners). If the cap is reached, avoid
                 // adding another manager and fall back to a no-op behaviour.
-                const MAX_EVENT_TYPES = 4; // reduced to limit distinct event-type managers and control fan-out
+                const MAX_EVENT_TYPES = 8; // relax cap slightly to support more event types without unbounded growth
                 if (this.pluginEventManagers.size >= MAX_EVENT_TYPES) {
                   try { console.warn('PluginHost: event manager type limit reached; registering noop listener'); } catch (_) {}
                   mgr = { upstreamDispose: undefined, listeners: new Set() };

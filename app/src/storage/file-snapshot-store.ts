@@ -33,10 +33,33 @@ export class FileSnapshotStore implements SnapshotStore {
     } catch (_) {}
   }
 
+  private static encodeId(id: string): string {
+    // Use a URL-safe base64 variant to encode ids into filesystem-safe names.
+    // encodeURIComponent can be lossy or produce characters that are awkward on
+    // some filesystems; base64url is reversible and compact.
+    try {
+      const b = Buffer.from(String(id), 'utf8').toString('base64');
+      // base64url: replace +/ with -_ and strip padding =
+      return b.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (_) {
+      return encodeURIComponent(String(id));
+    }
+  }
+
+  private static decodeId(name: string): string {
+    try {
+      // Restore padding for base64 decode
+      let b = String(name).replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b.length % 4;
+      if (pad === 2) b += '=='; else if (pad === 3) b += '='; else if (pad === 1) b = b + '===';
+      return Buffer.from(b, 'base64').toString('utf8');
+    } catch (_) {
+      try { return decodeURIComponent(name); } catch (_) { return name; }
+    }
+  }
+
   private fileForId(id: string): string {
-    // Encode id for file names using a reversible transform so listing can
-    // map filenames back to the original document ids reliably.
-    const safe = encodeURIComponent(String(id));
+    const safe = FileSnapshotStore.encodeId(id);
     return join(this.dir, `${safe}.json`);
   }
 
@@ -49,7 +72,7 @@ export class FileSnapshotStore implements SnapshotStore {
         .filter(f => f.endsWith('.json'))
         .map(f => f.replace(/\.json$/, ''))
         .map(name => {
-          try { return decodeURIComponent(name); } catch (_) { return name; }
+          try { return FileSnapshotStore.decodeId(name); } catch (_) { return name; }
         });
     } catch (_) {
       return [];

@@ -11,8 +11,8 @@ const GLOBAL_DISK = '__SIGNAL_DISK_SNAPSHOT_STORE__';
 const GLOBAL_FILE = '__SIGNAL_FILE_SNAPSHOT_STORE__';
 
 let canonicalStore: SnapshotStore | undefined = (typeof globalThis !== 'undefined') ? (globalThis as any)[GLOBAL_KEY] : undefined;
-let diskStore: DiskStore | undefined = (typeof globalThis !== 'undefined') ? (globalThis as any)[GLOBAL_DISK] : undefined;
-let fileStore: FileStore | undefined = (typeof globalThis !== 'undefined') ? (globalThis as any)[GLOBAL_FILE] : undefined;
+let diskStore: SnapshotStore | undefined = (typeof globalThis !== 'undefined') ? (globalThis as any)[GLOBAL_DISK] : undefined;
+let fileStore: SnapshotStore | undefined = (typeof globalThis !== 'undefined') ? (globalThis as any)[GLOBAL_FILE] : undefined;
 
 function registerGlobal(kind: 'disk' | 'file', store: any) {
   try {

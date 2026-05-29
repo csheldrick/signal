@@ -33,7 +33,7 @@ class InvertedIndexImpl implements InvertedIndex {
 
   // Evict oldest documents when maxDocs is provided to bound memory usage and
   // avoid unbounded growth under heavy write loads.
-  private readonly DEFAULT_MAX_DOCS = 2000; // cap documents in the index to bound memory (reduced to limit memory under heavy load)
+  private readonly DEFAULT_MAX_DOCS = 1000; // cap documents in the index to bound memory (reduced to limit memory under heavy load)
   private evictToMax(maxDocs: number | undefined) {
     try {
       if (!maxDocs || maxDocs <= 0) return;

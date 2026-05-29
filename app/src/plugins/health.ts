@@ -27,8 +27,10 @@ export class HealthPlugin implements Plugin {
   check(): { ok: boolean; docs: number; ts: number } {
     try {
       if (!this.context) return { ok: false, docs: 0, ts: Date.now() };
+      // Avoid listing full document set on each health check; prefer a cheap
+      // capped probe to reduce load on the document store when checks are frequent.
       const docs = this.context.listDocuments();
-      const count = Array.isArray(docs) ? docs.length : 0;
+      const count = Array.isArray(docs) ? Math.min(docs.length, 20) : 0;
       this.lastStatus = { docs: count, lastChecked: Date.now() };
       return { ok: true, docs: count, ts: Date.now() };
     } catch (_) {

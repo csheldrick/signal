@@ -44,9 +44,25 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
     } catch (_) {}
   }
 
+  private static encodeId(id: string): string {
+    try {
+      const b = Buffer.from(String(id), 'utf8').toString('base64');
+      return b.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (_) { return encodeURIComponent(String(id)); }
+  }
+
+  private static decodeId(name: string): string {
+    try {
+      let b = String(name).replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b.length % 4;
+      if (pad === 2) b += '=='; else if (pad === 3) b += '='; else if (pad === 1) b = b + '===';
+      return Buffer.from(b, 'base64').toString('utf8');
+    } catch (_) { try { return decodeURIComponent(name); } catch (_) { return name; } }
+  }
+
   private docDir(documentId: string): string {
     // Safe per-document directory under basePath
-    return path.join(this.basePath, encodeURIComponent(documentId));
+    return path.join(this.basePath, DiskDocumentSnapshotStore.encodeId(documentId));
   }
 
   /**
@@ -159,8 +175,8 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
     try {
       const entries = await fsPromises.readdir(this.basePath, { withFileTypes: true });
       const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-      // decodeURIComponent to match docDir encoding
-      return dirs.map(d => decodeURIComponent(d));
+      // decode identifier to match docDir encoding
+      return dirs.map(d => DiskDocumentSnapshotStore.decodeId(d));
     } catch (_) {
       return [];
     }

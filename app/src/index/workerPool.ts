@@ -25,14 +25,21 @@ export class WorkerPool {
     // previous overly-conservative default to reduce indexing lag under load
     // while capping to a reasonable upper bound to avoid extreme fan-out.
     const defaultWorkers = Math.min(4, Math.max(1, cpus - 1));
-    // Cap upper bound to a modest number (8) to provide headroom on multi-core
-    // machines while preventing runaway task explosion.
-    this.numWorkers = Math.min(4, provided ?? defaultWorkers);
+    // Conservative concurrency policy: prefer a single worker by default to
+    // limit downstream fan-out and reduce the chance of overwhelming shared
+    // subsystems (e.g. export/health plugins, storage event bus). If callers
+    // explicitly set numWorkers in options we allow a modest increase but cap
+    // the maximum to avoid runaway parallelism.
+    if (options && typeof options.numWorkers === 'number') {
+      this.numWorkers = Math.max(1, Math.min(2, options.numWorkers));
+    } else {
+      this.numWorkers = 1; // default to single-worker to apply backpressure conservatively
+    }
 
-    // Tune chunk size to balance throughput and latency. Smaller chunks
-    // reduce per-worker blocking and improve responsiveness; allow hosts to
-    // override via options when needed.
-    const defaultMax = 2;
+    // Tune chunk size to balance throughput and latency. Increase default
+    // chunk size slightly to reduce the number of chunks produced for large
+    // document batches which helps avoid large scheduling queues.
+    const defaultMax = 4;
     this.maxDocsPerWorker = (options && typeof options.maxDocsPerWorker === 'number' && options.maxDocsPerWorker > 0)
       ? Math.max(1, options.maxDocsPerWorker)
       : defaultMax;

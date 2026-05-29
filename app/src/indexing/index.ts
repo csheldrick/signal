@@ -13,6 +13,15 @@ export class InvertedIndex {
   private knownDocs: Set<string> = new Set();
 
   constructor() {
+    // Defer creating the concrete inverted index until actually needed.
+    // Instantiating the index lazily reduces startup work and avoids
+    // constructing heavy subsystems for callers that only need a few
+    // legacy operations, helping relieve subsystem pressure under load.
+    this.impl = undefined;
+  }
+
+  private ensureImpl() {
+    if (this.impl) return;
     try {
       this.impl = createInvertedIndex();
     } catch (_) {
@@ -22,6 +31,7 @@ export class InvertedIndex {
 
   index(documentId: string, text: string): void {
     try {
+      this.ensureImpl();
       if (!this.impl) return;
       const now = Date.now();
       const snap = {
@@ -45,6 +55,7 @@ export class InvertedIndex {
 
   remove(documentId: string): void {
     try {
+      this.ensureImpl();
       if (!this.impl) return;
       if (typeof this.impl.removeDocument === 'function') {
         this.impl.removeDocument(documentId);
@@ -55,6 +66,7 @@ export class InvertedIndex {
 
   search(queryText: string): SearchHit[] {
     try {
+      this.ensureImpl();
       if (!this.impl) return [];
       const q = { text: String(queryText ?? '') } as any;
       if (typeof this.impl.search === 'function') {
