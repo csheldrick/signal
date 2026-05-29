@@ -73,11 +73,11 @@ export class PresenceTracker {
   private leaveBatch: Map<string, string | undefined> = new Map();
   private leaveBatchScheduled: boolean = false;
 
-  private static readonly MAX_PEERS = 100; // tightened to reduce memory/processing pressure and bound presence fan-out
+  private static readonly MAX_PEERS = 60; // tightened to reduce memory/processing pressure and bound presence fan-out
   // Cap the number of concurrent in-flight document validations to prevent
   // unbounded memory growth when many peers reference different documents.
   // Tighter cap reduces concurrent IO pressure when many peers are active.
-  private static readonly MAX_PENDING_VALIDATIONS = 2; // lower cap to avoid IO burst when many peers reference many docs
+  private static readonly MAX_PENDING_VALIDATIONS = 1; // lower cap to avoid IO burst when many peers reference many docs
 
   private evictIfNeeded(): void {
     try {

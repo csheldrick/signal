@@ -33,10 +33,10 @@ export class SyncSessionTracker extends EventEmitter {
     // Reduce EventEmitter listener ceiling to avoid accidental memory growth
     // when many subsystems attach to the tracker. Callers that legitimately
     // need more listeners may call setMaxListeners on the tracker instance.
-    try { this.setMaxListeners(50); } catch (_) {}
+    try { this.setMaxListeners(20); } catch (_) {}
     // Increase defaults to reduce hot timers and event fan-out
-    this.heartbeatIntervalMs = opts?.heartbeatIntervalMs ?? 30_000; // default 30s
-    this.staleTimeoutMs = opts?.staleTimeoutMs ?? 120_000; // default 2min
+    this.heartbeatIntervalMs = opts?.heartbeatIntervalMs ?? 60_000; // default 60s (reduce event fan-out)
+    this.staleTimeoutMs = opts?.staleTimeoutMs ?? 300_000; // default 5min (reduce churn from frequent stale detection)
 
     try {
       this.timer = setInterval(() => this.checkStale(), Math.max(1000, Math.floor(this.heartbeatIntervalMs / 2)));

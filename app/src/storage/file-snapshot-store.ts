@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { promises as fsPromises } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SnapshotStore } from '../core/types.js';
 import type { DocumentSnapshot } from '../core/types.js';
@@ -16,7 +17,7 @@ export class FileSnapshotStore implements SnapshotStore {
 
   constructor(dir: string) {
     this.dir = dir;
-    try { mkdirSync(this.dir, { recursive: true }); } catch (_) {}
+    try { if (!existsSync(this.dir)) { fsPromises.mkdir(this.dir, { recursive: true }).catch(() => {}); } } catch (_) {}
 
     // Register canonical store on globalThis to help avoid accidental
     // duplicate authoritative stores across differing import paths or
@@ -65,9 +66,14 @@ export class FileSnapshotStore implements SnapshotStore {
 
   async listDocumentIds(): Promise<string[]> {
     try {
-      if (!existsSync(this.dir)) return [];
-      const files = readdirSync(this.dir);
-      // Remove the .json suffix and decodeURIComponent to restore original ids.
+      // Prefer async filesystem ops to avoid blocking the event loop under load.
+      try {
+        await fsPromises.access(this.dir).catch(() => { throw new Error('no-dir'); });
+      } catch (_) {
+        return [];
+      }
+
+      const files = await fsPromises.readdir(this.dir).catch(() => [] as string[]);
       return files
         .filter(f => f.endsWith('.json'))
         .map(f => f.replace(/\.json$/, ''))
@@ -86,8 +92,13 @@ export class FileSnapshotStore implements SnapshotStore {
       if (pState && pState.snapshot) return pState.snapshot;
 
       const p = this.fileForId(documentId);
-      if (!existsSync(p)) return undefined;
-      const raw = readFileSync(p, 'utf-8');
+      try {
+        await fsPromises.access(p);
+      } catch (_) {
+        return undefined;
+      }
+
+      const raw = await fsPromises.readFile(p, 'utf-8').catch(() => undefined);
       if (!raw) return undefined;
       const parsed = JSON.parse(raw) as DocumentSnapshot;
       return parsed;
@@ -108,20 +119,22 @@ export class FileSnapshotStore implements SnapshotStore {
       }
 
       const resolvers: Array<() => void> = [];
-      const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesystem IO)
+      const debounceMs = 500; // shorter debounce to flush writes faster while still coalescing bursts
       const timer = setTimeout(() => {
-        try {
-          const state = this._pending.get(documentId);
-          if (!state) return;
-          const p = this.fileForId(documentId);
+        (async () => {
           try {
-            writeFileSync(p, JSON.stringify(state.snapshot, null, 2), 'utf-8');
-          } catch (_) { /* swallow write errors */ }
-          // resolve all awaiting promises
-          try { for (const r of state.resolvers) { try { r(); } catch (_) {} } } catch (_) {}
-        } finally {
-          this._pending.delete(documentId);
-        }
+            const state = this._pending.get(documentId);
+            if (!state) return;
+            const p = this.fileForId(documentId);
+            try {
+              await fsPromises.writeFile(p, JSON.stringify(state.snapshot, null, 2), 'utf-8');
+            } catch (_) { /* swallow write errors */ }
+            // resolve all awaiting promises
+            try { for (const r of state.resolvers) { try { r(); } catch (_) {} } } catch (_) {}
+          } finally {
+            this._pending.delete(documentId);
+          }
+        })();
       }, debounceMs);
 
       this._pending.set(documentId, { snapshot, timer, resolvers });

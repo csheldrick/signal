@@ -49,7 +49,7 @@ export class VersionHistory {
     history.push(version);
 
     // Cap history per-document to avoid unbounded memory growth.
-    const MAX_VERSIONS = 6; // reduce per-document in-memory versions to lower memory pressure
+    const MAX_VERSIONS = 4; // further reduce per-document in-memory versions to lower memory pressure under load
     if (history.length > MAX_VERSIONS) {
       const removed = history.splice(0, history.length - MAX_VERSIONS);
       for (const old of removed) {
@@ -57,7 +57,7 @@ export class VersionHistory {
       }
     }
 
-    this.chains.set(document.id, history);
+    this.chains.set(document.id, history); // update chain reference after potential truncation
     this.byId.set(version.versionId, version);
     return version;
   }

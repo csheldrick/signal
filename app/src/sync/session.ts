@@ -16,12 +16,12 @@ export class PeerSession {
   // Prevent unbounded growth under heavy inbound traffic; drop oldest when full.
   private maxInboundBufferSize: number;
 
-  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 10) {
+  constructor(peerId: string, initialClock: VectorClock = {}, maxInboundBufferSize: number = 20) {
     this.peerId = peerId;
     this._clock = { ...initialClock };
     this._state = 'idle';
     this._lastSeen = 0;
-    this.maxInboundBufferSize = maxInboundBufferSize;
+    this.maxInboundBufferSize = Math.max(10, Math.min(200, maxInboundBufferSize)); // clamp to sane bounds to avoid large buffers under load
   }
 
   // ── State ──────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export class PeerSession {
    */
   setMaxInboundBufferSize(size: number): void {
     try {
-      this.maxInboundBufferSize = Math.max(10, Math.min(1000, Math.floor(size)));
+      this.maxInboundBufferSize = Math.max(10, Math.min(200, Math.floor(size)));
       // Trim the buffer immediately if it currently exceeds the new cap.
       if (this.inboundBuffer.length > this.maxInboundBufferSize) {
         this.inboundBuffer = this.inboundBuffer.slice(-this.maxInboundBufferSize);
