@@ -341,9 +341,9 @@ export class Indexer implements IndexerContract {
     try {
       if (this.processing) return;
       if (typeof (globalThis as any).setImmediate === 'function') {
-        (globalThis as any).setImmediate(() => void this.processPending());
+        (globalThis as any).setImmediate(async () => await this.processPending());
       } else {
-        setTimeout(() => { void this.processPending(); }, 0);
+        setTimeout(async () => { await this.processPending(); }, 0);
       }
     } catch (_) { /* swallow */ }
   }
