@@ -234,15 +234,30 @@ export class SignalApp {
         if (!d) return undefined;
         // Use the configured summarizer when present; otherwise use a local one.
         if (!this._summarizer && !this._localSummarizer) { const Lc = getLocalSummarizerClass(); if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } } }
-        const summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
+        let summarizer: Summarizer | any = this._summarizer ?? this._localSummarizer;
 
-        // Deny network summarization when caller does not explicitly request it.
+        // If the configured summarizer is remote but the caller did not allow
+        // network usage, fall back to a LocalSummarizer to ensure background
+        // or conservative callers remain offline-first and deterministic.
         try {
-          if (summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
-            return undefined;
+          if (summarizer && summarizer.isRemote && (!allowNetwork || !summarizer.allowsNetwork)) {
+            // Attempt to ensure a LocalSummarizer is available and use it as a
+            // deterministic fallback instead of returning undefined. This
+            // prevents background tasks or plugins that did not opt-in from
+            // accidentally performing network IO.
+            if (!this._localSummarizer) {
+              const Lc = getLocalSummarizerClass();
+              if (Lc && typeof Lc === 'function') { try { this._localSummarizer = new Lc(3); } catch (_) { /* swallow */ } }
+            }
+            if (this._localSummarizer) {
+              summarizer = this._localSummarizer;
+            } else {
+              // Could not obtain a local summarizer; deny to preserve offline-first behaviour.
+              return undefined;
+            }
           }
 
-          const isRemote = summarizer.isRemote;
+          const isRemote = summarizer && summarizer.isRemote;
           // If remote, enforce a simple concurrency cap to avoid unbounded
           // in-flight remote requests that can backlog and affect realtime flows.
           if (isRemote && remoteSummarizeInFlight >= MAX_CONCURRENT_REMOTE_SUMMARIES) {
