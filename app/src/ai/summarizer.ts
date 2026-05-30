@@ -27,7 +27,7 @@ export const REMOTE_SUMMARIZER_USES_ON_DISK_MODEL = false;
 export class LocalSummarizer implements Summarizer {
   // Static sentinel so callers can check the packaging contract without
   // instantiating the class. Mirrors LOCAL_SUMMARIZER_USES_ON_DISK_MODEL.
-  static readonly usesOnDiskModel = LOCAL_SUMMARIZER_USES_ON_DISK_MODEL || false;
+
   // Local summarizer is explicitly in-memory and does not rely on bundled
   // model artifacts. Declare usesOnDiskModel=false to make the offline-only
   // packaging contract explicit for callers performing packaging analysis.
@@ -343,7 +343,7 @@ if (id) {
 export class RemoteSummarizer implements Summarizer {
   // Static sentinel so callers can check the packaging contract without
   // instantiating the class. Mirrors REMOTE_SUMMARIZER_USES_ON_DISK_MODEL.
-  static readonly usesOnDiskModel = REMOTE_SUMMARIZER_USES_ON_DISK_MODEL || false;
+
 
   // Remote summarizers may rely on remote services and do not ship bundled
   // model artifacts on-disk; declare usesOnDiskModel=false by default but
