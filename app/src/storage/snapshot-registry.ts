@@ -40,7 +40,8 @@ export function getOrCreateFileSnapshotStore(path?: string): SnapshotStore {
   return fileStore;
 }
 
-export function getCanonicalSnapshotStore(): SnapshotStore | undefined {
+export function getCanonicalSnapshotStore(): SnapshotStore {
+  const store = getOrCreateDiskDocumentSnapshotStore();
   if (!canonicalStore && typeof globalThis !== 'undefined') canonicalStore = (globalThis as any)[GLOBAL_KEY];
-  return canonicalStore;
+  return canonicalStore || store;
 }

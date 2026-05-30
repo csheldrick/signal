@@ -1,4 +1,4 @@
-import { WorkerPool, __TEST__ } from '../src/index/workerPool';
+import { WorkerPool, __TEST__ } from '../src/index/workerPool.js';
 
 describe('WorkerPool', () => {
   it('should drain the worker pool successfully', async () => {

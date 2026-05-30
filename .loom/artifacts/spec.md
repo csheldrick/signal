@@ -4,7 +4,7 @@
 ## Module Boundaries
 
 ### signal-app
-Module boundary at app containing 41 source file(s).
+Module boundary at app containing 46 source file(s).
 _Path: `app`_
 Confidence: 95%
 
@@ -26,6 +26,45 @@ Confidence: 85%
 Confidence: 85%
 
 ### Contract: AppConfig
+Confidence: 85%
+
+### Contract: VectorClock
+Confidence: 85%
+
+### Contract: SyncState
+Confidence: 85%
+
+### Contract: ConflictStrategy
+Confidence: 85%
+
+### Contract: PeerInfo
+Confidence: 85%
+
+### Contract: SyncAck
+Confidence: 85%
+
+### Contract: ConflictRecord
+Confidence: 85%
+
+### Contract: SyncMessage
+Confidence: 85%
+
+### Contract: OfflineEntry
+Confidence: 85%
+
+### Contract: OfflineSyncQueueOptions
+Confidence: 85%
+
+### Contract: OfflineSyncQueue
+Confidence: 85%
+
+### Contract: SyncManagerOptions
+Confidence: 85%
+
+### Contract: ConflictCandidate
+Confidence: 85%
+
+### Contract: ConflictCandidateRecord
 Confidence: 85%
 
 ### Contract: DocumentSnapshot
@@ -58,9 +97,6 @@ Confidence: 85%
 ### Contract: WorkerPool
 Confidence: 85%
 
-### Contract: InvertedIndex
-Confidence: 85%
-
 ### Contract: ExportPlugin
 Confidence: 85%
 
@@ -82,73 +118,25 @@ Confidence: 85%
 ### Contract: SearchPlugin
 Confidence: 85%
 
-### Contract: StorageEventCreated
-Confidence: 85%
-
-### Contract: StorageEventUpdated
-Confidence: 85%
-
-### Contract: StorageEventDeleted
-Confidence: 85%
-
-### Contract: StorageEventLinked
-Confidence: 85%
-
 ### Contract: StorageEvent
 Confidence: 85%
 
-### Contract: StorageEventListener
+### Contract: Listener
 Confidence: 85%
 
 ### Contract: StorageEventBusContract
 Confidence: 85%
 
-### Contract: DocumentSnapshotServiceOptions
-Confidence: 85%
-
 ### Contract: StorageEventBus
 Confidence: 85%
 
+### Contract: ScopedStorageEventBusContract
+Confidence: 85%
+
+### Contract: ScopedStorageEventBus
+Confidence: 85%
+
 ### Contract: TransportSend
-Confidence: 85%
-
-### Contract: OfflineSyncQueue
-Confidence: 85%
-
-### Contract: VectorClock
-Confidence: 85%
-
-### Contract: SyncState
-Confidence: 85%
-
-### Contract: ConflictStrategy
-Confidence: 85%
-
-### Contract: PeerInfo
-Confidence: 85%
-
-### Contract: SyncAck
-Confidence: 85%
-
-### Contract: ConflictRecord
-Confidence: 85%
-
-### Contract: SyncMessage
-Confidence: 85%
-
-### Contract: OfflineEntry
-Confidence: 85%
-
-### Contract: OfflineSyncQueueOptions
-Confidence: 85%
-
-### Contract: SyncManagerOptions
-Confidence: 85%
-
-### Contract: ConflictCandidate
-Confidence: 85%
-
-### Contract: ConflictCandidateRecord
 Confidence: 85%
 
 ### Contract: QueueEntry
@@ -273,11 +261,11 @@ Confidence: 95%
 
 ## Detected Invariants
 
-- **error-boundary: Error boundary (try/catch)**: Detected 252 occurrence(s) of error-boundary pattern across 25 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
-- **guard: Guard clause (null/undefined check)**: Detected 27 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **error-boundary: Defensive cleanup of global request slot after successful acquisition - prevents error propagation if release fails due to race conditions**: Detected 265 occurrence(s) of error-boundary pattern across 26 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Legitimate guard for Map entry existence check before accessing promise - standard defensive pattern**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 15 occurrence(s) of validation pattern across 6 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
 - **sanitization: Input sanitization**: Detected 5 occurrence(s) of sanitization pattern across 4 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
-- **rate-limit: Rate limiting enforcement**: Detected 2 occurrence(s) of rate-limit pattern across 2 file(s) in module 'signal-app'. Example: "const debounceMs = 200; // increased debounce to group bursts and reduce IO pressure" _(78%)_
+- **rate-limit: Rate limiting enforcement**: Detected 6 occurrence(s) of rate-limit pattern across 4 file(s) in module 'signal-app'. Example: "const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesyst" _(88%)_
 
 ## Architectural Decisions (Lineage)
 
@@ -298,6 +286,19 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **SignalApp**: class in app/src/core/app.ts
 - **Document**: interface in app/src/core/types.ts
 - **AppConfig**: interface in app/src/core/types.ts
+- **VectorClock**: interface in app/src/core/types.ts
+- **SyncState**: type in app/src/core/types.ts
+- **ConflictStrategy**: type in app/src/core/types.ts
+- **PeerInfo**: interface in app/src/core/types.ts
+- **SyncAck**: interface in app/src/core/types.ts
+- **ConflictRecord**: interface in app/src/core/types.ts
+- **SyncMessage**: interface in app/src/core/types.ts
+- **OfflineEntry**: interface in app/src/core/types.ts
+- **OfflineSyncQueueOptions**: interface in app/src/core/types.ts
+- **OfflineSyncQueue**: interface in app/src/core/types.ts
+- **SyncManagerOptions**: interface in app/src/core/types.ts
+- **ConflictCandidate**: interface in app/src/core/types.ts
+- **ConflictCandidateRecord**: type in app/src/core/types.ts
 - **DocumentSnapshot**: interface in app/src/core/types.ts
 - **DocumentLink**: interface in app/src/core/types.ts
 - **LinkKind**: type in app/src/core/types.ts
@@ -308,7 +309,6 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **GraphBuilder**: class in app/src/graph/builder.ts
 - **Indexer**: class in app/src/index/inverted.ts
 - **WorkerPool**: class in app/src/index/workerPool.ts
-- **InvertedIndex**: class in app/src/indexing/index.ts
 - **ExportPlugin**: class in app/src/plugins/export.ts
 - **HealthPlugin**: class in app/src/plugins/health.ts
 - **StorageEventType**: type in app/src/plugins/host.ts
@@ -316,29 +316,13 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **PluginContext**: type in app/src/plugins/host.ts
 - **PluginHost**: class in app/src/plugins/host.ts
 - **SearchPlugin**: class in app/src/plugins/search.ts
-- **StorageEventCreated**: interface in app/src/storage/event-types.ts
-- **StorageEventUpdated**: interface in app/src/storage/event-types.ts
-- **StorageEventDeleted**: interface in app/src/storage/event-types.ts
-- **StorageEventLinked**: interface in app/src/storage/event-types.ts
-- **StorageEvent**: type in app/src/storage/event-types.ts
-- **StorageEventListener**: type in app/src/storage/event-types.ts
-- **StorageEventBusContract**: interface in app/src/storage/event-types.ts
-- **DocumentSnapshotServiceOptions**: interface in app/src/storage/event-types.ts
+- **StorageEvent**: type in app/src/storage/events.ts
+- **Listener**: type in app/src/storage/events.ts
+- **StorageEventBusContract**: interface in app/src/storage/events.ts
 - **StorageEventBus**: class in app/src/storage/events.ts
+- **ScopedStorageEventBusContract**: interface in app/src/storage/scopedStorageBus.ts
+- **ScopedStorageEventBus**: class in app/src/storage/scopedStorageBus.ts
 - **TransportSend**: Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc.
-- **OfflineSyncQueue**: OfflineSyncQueue Durable, per-peer queue that persists opaque payloads to disk when network transport is unavailable. Ensures causal (timestamp/seq) ordering when draining and provides robust rewrite behaviour so partially applied drains do not lose remaining entries.
-- **VectorClock**: interface in app/src/sync/protocol.ts
-- **SyncState**: type in app/src/sync/protocol.ts
-- **ConflictStrategy**: type in app/src/sync/protocol.ts
-- **PeerInfo**: interface in app/src/sync/protocol.ts
-- **SyncAck**: interface in app/src/sync/protocol.ts
-- **ConflictRecord**: interface in app/src/sync/protocol.ts
-- **SyncMessage**: interface in app/src/sync/protocol.ts
-- **OfflineEntry**: interface in app/src/sync/protocol.ts
-- **OfflineSyncQueueOptions**: interface in app/src/sync/protocol.ts
-- **SyncManagerOptions**: interface in app/src/sync/protocol.ts
-- **ConflictCandidate**: interface in app/src/sync/protocol.ts
-- **ConflictCandidateRecord**: type in app/src/sync/protocol.ts
 - **QueueEntry**: interface in app/src/sync/queue.ts
 - **SyncQueueOptions**: interface in app/src/sync/queue.ts
 - **SyncQueue**: class in app/src/sync/queue.ts

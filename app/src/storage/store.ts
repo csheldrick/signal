@@ -2,7 +2,7 @@
 // In-memory document CRUD with JSON persistence.
 // Hub node in the dependency graph — multiple modules depend on this.
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import type {
   Document,
   DocumentLink,

@@ -4,9 +4,8 @@
 // This module exports types to reduce circular dependencies and
 // provide explicit typing for consumers.
 
-import type { StorageEventType, StorageEvent, StorageEventListener } from './events.js';
+import type { StorageEventType, StorageEvent, Listener } from './events.js';
 
-export type Listener = StorageEventListener;
 
 // Scoped bus contract that extends the base event bus contract
 // with scoped-specific capabilities.
@@ -54,4 +53,4 @@ export class ScopedStorageEventBus implements ScopedStorageEventBusContract {
 }
 
 // Export types for consumers that want to depend on the scoped bus contract.
-export type { ScopedStorageEventBusContract, Listener };
+export type { Listener };

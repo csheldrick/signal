@@ -9,6 +9,8 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^25.9.1",
     "typescript": "^5.5.0",
     "vitest": "^2.1.0"

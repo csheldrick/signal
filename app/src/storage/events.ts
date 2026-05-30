@@ -13,7 +13,7 @@ export type StorageEvent = LocalStorageEvent;
 // Listener receives a readonly snapshot of events to discourage mutation and
 // reduce coupling between event producers and consumers.
 
-type Listener = LocalStorageEventListener;
+export type Listener = LocalStorageEventListener;
 
 // Local bus contract extends the local event-types contract to keep the concrete
 // implementation aligned with the shared type definitions.
