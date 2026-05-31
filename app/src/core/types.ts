@@ -556,8 +556,11 @@ export type StorageEvent =
 export type StorageEventListener = (event: Readonly<StorageEvent>) => void;
 
 export interface StorageEventBusContract {
-  on(type: StorageEventType | '*', listener: StorageEventListener): void;
-  onAsync(type: StorageEventType | '*', listener: StorageEventListener): void;
+  // Return a disposer function so callers can unregister listeners without
+  // depending on separate 'off' calls. Many consumers (e.g. PluginContext)
+  // expect the on()/onAsync() helpers to return a cleanup function.
+  on(type: StorageEventType | '*', listener: StorageEventListener): () => void;
+  onAsync(type: StorageEventType | '*', listener: StorageEventListener): () => void;
   off(type: StorageEventType | '*', listener: StorageEventListener): void;
   offAsync(type: StorageEventType | '*', listener: StorageEventListener): void;
   emit(event: StorageEvent): void;

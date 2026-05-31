@@ -49,7 +49,7 @@ export class StorageEventBus implements StorageEventBusContract {
   // on load and are included in emitAsync flushes.
   private asyncListeners: Map<StorageEventType | '*', Set<Listener>> = new Map();
 
-  on(type: StorageEventType | '*', listener: Listener): void {
+  on(type: StorageEventType | '*', listener: Listener): () => void {
     // Prevent unbounded listener growth which can cause heavy synchronous
     // fan-out and subsystem overload. Enforce soft caps and refuse to add new
     // listeners when global or per-type limits are exceeded.
@@ -67,22 +67,23 @@ export class StorageEventBus implements StorageEventBusContract {
     const set = this.listeners.get(type)!;
     if (set.size >= MAX_PER_TYPE) {
       try { console.warn(`StorageEventBus: listener limit reached for type '${String(type)}' — ignoring new listener`); } catch (_) {}
-      return;
+      return () => {};
     }
 
     if (total >= MAX_TOTAL_LISTENERS) {
       try { console.warn('StorageEventBus: global listener limit reached — ignoring new listener'); } catch (_) {}
-      return;
+      return () => {};
     }
 
     set.add(listener);
+    return () => { try { this.off(type, listener); } catch (_) {} };
   }
 
   off(type: StorageEventType | '*', listener: Listener): void {
     this.listeners.get(type)?.delete(listener);
   }
 
-  onAsync(type: StorageEventType | '*', listener: Listener): void {
+  onAsync(type: StorageEventType | '*', listener: Listener): () => void {
     // Lazily create the set for async listeners
     if (!this.asyncListeners.has(type)) {
       this.asyncListeners.set(type, new Set());
@@ -104,18 +105,19 @@ export class StorageEventBus implements StorageEventBusContract {
 
       if (set.size >= MAX_PER_TYPE_ASYNC) {
         try { console.warn(`StorageEventBus: async listener limit reached for type '${String(type)}' — ignoring new listener`); } catch (_) {}
-        return;
+        return () => {};
       }
 
       if (total >= MAX_TOTAL_ASYNC) {
         try { console.warn('StorageEventBus: global async listener limit reached — ignoring new listener'); } catch (_) {}
-        return;
+        return () => {};
       }
     } catch (_) {
       // If anything goes wrong computing limits, fall back to permissive add
     }
 
     set.add(listener);
+    return () => { try { this.offAsync(type, listener); } catch (_) {} };
   }
 
   offAsync(type: StorageEventType | '*', listener: Listener): void {
