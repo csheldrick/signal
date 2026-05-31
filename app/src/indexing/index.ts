@@ -6,13 +6,13 @@
 // This keeps the startup fan-out low while exposing the same named exports.
 let _inv: any = undefined;
 try {
-  _inv = require('../index/inverted.js');
+  _inv = require('./inverted.js');
 } catch (e1) {
   try {
     // Try without .js extension or the .ts source file as a best-effort
-    _inv = require('../index/inverted');
+    _inv = require('./inverted');
   } catch (e2) {
-    try { _inv = require('../index/inverted.ts'); } catch (e3) { _inv = undefined; }
+    try { _inv = require('./inverted.ts'); } catch (e3) { _inv = undefined; }
   }
 }
 export const createInvertedIndex = (_inv && typeof _inv.createInvertedIndex === 'function') ? _inv.createInvertedIndex : (() => undefined as any);

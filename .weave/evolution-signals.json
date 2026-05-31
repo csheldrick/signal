@@ -14,7 +14,7 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "duplicate_behavior",
-      "resolvedCount": 35,
+      "resolvedCount": 40,
       "nodeCount": 33
     }
   },
@@ -26,7 +26,7 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "missing_tests",
-      "resolvedCount": 7,
+      "resolvedCount": 8,
       "nodeCount": 1
     }
   },
@@ -45,7 +45,7 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "hidden_dependency",
-      "resolvedCount": 35,
+      "resolvedCount": 40,
       "nodeCount": 13
     }
   }
