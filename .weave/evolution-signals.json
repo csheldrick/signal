@@ -2,20 +2,20 @@
   {
     "trigger": "observation_resolved",
     "nodeIds": [
-      "b2088674-c7aa-4cb9-91b6-c4fde0860129",
-      "4d5bceed-e894-40cf-922a-c7c758e6c551",
       "4d885527-c94a-493f-9993-a1e58a553d77",
+      "0762e582-f3c8-4dfb-8f88-1d535937e81c",
       "8ae24590-2373-4546-9173-638739c27935",
       "bf910c80-f8b3-40e1-b7f1-b804150a02e5",
-      "0762e582-f3c8-4dfb-8f88-1d535937e81c",
-      "53e08fb1-ce7b-4b80-9091-fedb38cf45c3",
-      "62b0055b-8a82-4200-a93d-badf1baaec43"
+      "b0d51d86-b869-409f-a57b-3be631518f9d",
+      "02c90eb9-96ed-423e-b6ca-8ec41c098aaf",
+      "e9b6117a-f0ab-46dd-820f-5030e29652c0",
+      "a4fb844a-25f2-4009-80ba-821190ba2429"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "duplicate_behavior",
-      "resolvedCount": 5,
-      "nodeCount": 10
+      "resolvedCount": 10,
+      "nodeCount": 14
     }
   },
   {
@@ -23,10 +23,10 @@
     "nodeIds": [
       "8e0764c6-4b7f-4a08-a897-c8f056f43b74"
     ],
-    "confidence": 0.6,
+    "confidence": 0.7,
     "evidence": {
       "observationKind": "missing_tests",
-      "resolvedCount": 1,
+      "resolvedCount": 2,
       "nodeCount": 1
     }
   },
@@ -38,13 +38,15 @@
       "3e0a1199-9d05-4aee-8cc3-e89d4f82fc99",
       "a873ffc7-2829-4da2-a2e3-98907547d755",
       "aa4a7251-a09f-4473-bf9d-11abfbe9bc7f",
-      "00e3ae48-6032-4806-b131-3870db896578"
+      "00e3ae48-6032-4806-b131-3870db896578",
+      "86bcf0fd-a58b-481a-aa47-1e3e1c1ab20f",
+      "afa84cf0-8fc2-46c6-8768-9cb19d4ad4e5"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "hidden_dependency",
-      "resolvedCount": 5,
-      "nodeCount": 6
+      "resolvedCount": 10,
+      "nodeCount": 10
     }
   }
 ]
