@@ -17,7 +17,7 @@ export type Listener = LocalStorageEventListener;
 
 // Local bus contract extends the local event-types contract to keep the concrete
 // implementation aligned with the shared type definitions.
-export interface StorageEventBusContract extends LocalStorageEventBusContract {}
+export type StorageEventBusContract = LocalStorageEventBusContract;
 
 // deprecated alias removed to reduce legacy surface area
 
