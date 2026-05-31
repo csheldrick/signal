@@ -8,6 +8,11 @@ Module boundary at app containing 46 source file(s).
 _Path: `app`_
 Confidence: 95%
 
+### src
+Module boundary at src containing 1 source file(s).
+_Path: `src`_
+Confidence: 80%
+
 ## Inferred Contracts
 
 ### Contract: LocalSummarizer
@@ -175,6 +180,15 @@ Confidence: 85%
 ### Contract: VersionHistory
 Confidence: 85%
 
+### Contract: InvertedIndex
+Confidence: 85%
+
+### Contract: IndexStats
+Confidence: 85%
+
+### Contract: SearchHit
+Confidence: 85%
+
 ### LocalSummarizer
 Exported function `LocalSummarizer` in app/src/ai/summarizer.ts. Pure function (no detected side effects).
 Confidence: 88%
@@ -259,12 +273,32 @@ Confidence: 95%
 Exported function `PresenceTracker.getActive(): PeerPresence[]` in app/src/collaboration/presence.ts. Pure function (no detected side effects).
 Confidence: 95%
 
+### createInvertedIndex
+Exported function `createInvertedIndex(): InvertedIndex` in src/indexing/index.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### Indexer
+Exported function `Indexer` in src/indexing/index.ts. Pure function (no detected side effects).
+Confidence: 88%
+
+### Indexer.dispose
+Exported function `Indexer.dispose(): void` in src/indexing/index.ts. Pure function (no detected side effects).
+Confidence: 70%
+
+### Indexer.drainNow
+Exported function `Indexer.drainNow(): Promise<void>` in src/indexing/index.ts. Pure function (no detected side effects).
+Confidence: 95%
+
+### Indexer.getPendingCount
+Exported function `Indexer.getPendingCount(): number` in src/indexing/index.ts. Pure function (no detected side effects).
+Confidence: 95%
+
 ## Detected Invariants
 
-- **error-boundary: Consistent error-swallowing pattern for cleanup operations during request release; the try-catch is intentional defensive programming to prevent exceptions from propagating during non-critical cleanup**: Detected 266 occurrence(s) of error-boundary pattern across 26 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
-- **guard: Simple guard returning undefined when entry doesn't exist; consistent null/undefined handling throughout the codebase**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **error-boundary: Intentional cleanup pattern - ensures request slot is released even if release fails; no rethrow means deliberate safety over correctness**: Detected 274 occurrence(s) of error-boundary pattern across 27 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Legitimate guard enforcing contract: no pending entry means no promise to return; this is core control flow logic**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 15 occurrence(s) of validation pattern across 6 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
-- **sanitization: Input sanitization**: Detected 5 occurrence(s) of sanitization pattern across 4 file(s) in module 'signal-app'. Example: "// Sanitize inputs to protect the search/subsystem from pathological" _(88%)_
+- **sanitization: Input sanitization**: Detected 4 occurrence(s) of sanitization pattern across 3 file(s) in module 'signal-app'. Example: "// Use a URL-safe base64 variant to encode ids into filesystem-safe names." _(88%)_
 - **rate-limit: Rate limiting enforcement**: Detected 6 occurrence(s) of rate-limit pattern across 4 file(s) in module 'signal-app'. Example: "const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesyst" _(88%)_
 
 ## Architectural Decisions (Lineage)
@@ -318,9 +352,9 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **SearchPlugin**: class in app/src/plugins/search.ts
 - **StorageEvent**: type in app/src/storage/events.ts
 - **Listener**: type in app/src/storage/events.ts
-- **StorageEventBusContract**: interface in app/src/storage/events.ts
+- **StorageEventBusContract**: type in app/src/storage/events.ts
 - **StorageEventBus**: class in app/src/storage/events.ts
-- **ScopedStorageEventBusContract**: interface in app/src/storage/scopedStorageBus.ts
+- **ScopedStorageEventBusContract**: type in app/src/storage/scopedStorageBus.ts
 - **ScopedStorageEventBus**: class in app/src/storage/scopedStorageBus.ts
 - **TransportSend**: Pluggable transport send function. Implementations wire WebSocket / WebRTC / etc.
 - **QueueEntry**: interface in app/src/sync/queue.ts
@@ -335,6 +369,9 @@ Implements plan 001 (workspace/plans/001-generative-fitne
 - **DocumentVersion**: interface in app/src/versioning/history.ts
 - **VersionDiff**: interface in app/src/versioning/history.ts
 - **VersionHistory**: class in app/src/versioning/history.ts
+- **InvertedIndex**: type in src/indexing/index.ts
+- **IndexStats**: type in src/indexing/index.ts
+- **SearchHit**: type in src/indexing/index.ts
 
 ## Services
 

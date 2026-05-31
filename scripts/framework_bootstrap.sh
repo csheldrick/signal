@@ -59,3 +59,5 @@ if [[ "$MODE" == "generative" ]]; then
 else
   weave resolve --loop
 fi
+
+weave resolve --loop

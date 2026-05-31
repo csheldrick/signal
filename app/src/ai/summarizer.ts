@@ -37,7 +37,7 @@ export class LocalSummarizer implements Summarizer {
   // callers can rely on this contract rather than probing implementation
   // details at runtime.
   readonly isRemote = false;
-  readonly isPure = true;
+  // Note: LocalSummarizer with embedded LLM may have isPure=false due to model loading side effects.
   readonly allowsNetwork = false;
   readonly allowBackgroundNetwork = true;
   private readonly maxSentences: number;

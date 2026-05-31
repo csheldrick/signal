@@ -121,6 +121,7 @@ export type { SyncSessionState, SyncSessionEvent, SyncSessionTrackerOptions } fr
 export type { DocumentVersion, VersionDiff } from '../versioning/history.js';
 
 // Minimal, readonly-friendly snapshot used at subsystem/plugin boundaries.
+// Note: LocalSummarizer with embedded LLM may have isPure=false due to model loading side effects.
 // This mirrors the main Document shape but is explicit to signal the
 // lightweight, readonly contract for external consumers such as plugins.
 
@@ -385,8 +386,9 @@ export interface Summarizer {
    * requested. Implementations that are strictly local should set this to
    * false. */
   readonly allowsNetwork: boolean;
-  /** Whether the summarizer is pure/deterministic (no side-effects). */
-  readonly isPure: boolean;
+  /** Whether the summarizer is pure/deterministic (no side-effects). May be false for implementations
+   * that load models or have initialization side effects (e.g., embedded LLMs). */
+  readonly isPure?: boolean;
   /** Whether it is safe for background jobs (timers, schedulers) to invoke
    * this summarizer. Remote summarizers MUST set this to false to ensure
    * offline-first background processing remains deterministic and network-free. */

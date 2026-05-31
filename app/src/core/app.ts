@@ -26,14 +26,18 @@ export class SignalApp {
   readonly graph: GraphBuilder;
   readonly plugins: PluginHost;
   readonly presence: PresenceTrackerContract; 
-  /* sync lazy-initialized at start */
+  readonly sync?: SyncEngine; // explicit reference for coordination
   /* summarizer lazy-initialized at start */
+  readonly localSummarizer?: any; // explicit reference for coordination
+
+  private _sync?: SyncEngine; // explicit reference for coordination
 
   private started = false;
   private readonly _peerId: string;
-  private _sync?: SyncEngine;
+  // Explicit coordination references to reduce dependency fan-out
+  private readonly _syncRef?: SyncEngine; // explicit reference for coordination
   private _summarizer?: Summarizer;
-  private _localSummarizer: any;
+  private _localSummarizer: any; // explicit reference for coordination
   private readonly _allowNetwork: boolean;
   private readonly _networkAuthToken?: string;
   private readonly _disableBgSummarize: boolean;
