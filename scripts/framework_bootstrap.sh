@@ -28,6 +28,8 @@ rm -rf .weave/substrate.db
 loom reset -y
 loom onboard --skip-drift --skip-handoff
 
+# 1.b
+loom observe 
 # 2. Import the graph into the Weave substrate
 weave import
 weave inspect nodes

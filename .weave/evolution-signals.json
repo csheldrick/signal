@@ -1,206 +1,50 @@
 [
   {
-    "trigger": "usage_pattern",
+    "trigger": "observation_resolved",
     "nodeIds": [
-      "tension_173_1780014485960",
-      "71c4bfcc-cc1c-4e13-95dc-3c9a3702c345",
-      "tension_400_1780017280260",
-      "fd656ce7-2fc8-47cc-9a32-95c25a64b54c",
-      "f79555bb-0e6b-4b1e-aad1-c314651b9098",
-      "bdc13d6b-72d3-4ca1-adee-842076a00f21",
-      "tension_401_1780017280310",
-      "0791e21a-0cbb-4249-90e5-370ef6b10458"
+      "b2088674-c7aa-4cb9-91b6-c4fde0860129",
+      "4d5bceed-e894-40cf-922a-c7c758e6c551",
+      "4d885527-c94a-493f-9993-a1e58a553d77",
+      "8ae24590-2373-4546-9173-638739c27935",
+      "bf910c80-f8b3-40e1-b7f1-b804150a02e5",
+      "0762e582-f3c8-4dfb-8f88-1d535937e81c",
+      "53e08fb1-ce7b-4b80-9091-fedb38cf45c3",
+      "62b0055b-8a82-4200-a93d-badf1baaec43"
     ],
     "confidence": 0.85,
     "evidence": {
-      "recurrenceCounts": {
-        "tension_173_1780014485960": 9,
-        "71c4bfcc-cc1c-4e13-95dc-3c9a3702c345": 9,
-        "tension_400_1780017280260": 9,
-        "fd656ce7-2fc8-47cc-9a32-95c25a64b54c": 8,
-        "f79555bb-0e6b-4b1e-aad1-c314651b9098": 8,
-        "bdc13d6b-72d3-4ca1-adee-842076a00f21": 8,
-        "tension_401_1780017280310": 7,
-        "0791e21a-0cbb-4249-90e5-370ef6b10458": 5
-      },
-      "windowSize": 12,
-      "maxRecurrence": 9
+      "observationKind": "duplicate_behavior",
+      "resolvedCount": 5,
+      "nodeCount": 10
     }
   },
   {
-    "trigger": "bottleneck_detected",
+    "trigger": "observation_resolved",
     "nodeIds": [
-      "71c4bfcc-cc1c-4e13-95dc-3c9a3702c345",
-      "fd656ce7-2fc8-47cc-9a32-95c25a64b54c",
-      "f79555bb-0e6b-4b1e-aad1-c314651b9098",
-      "bdc13d6b-72d3-4ca1-adee-842076a00f21",
-      "0791e21a-0cbb-4249-90e5-370ef6b10458",
-      "0fc1db06-e8b4-43c5-b12e-254e55640ff4",
-      "6f840ca9-1438-4414-b579-35575b71d8b6",
-      "336bad23-d520-43c9-b54e-0fc4cd18cf66",
-      "a3ffd760-4420-4ea7-b68c-7c4ab43c52b2",
-      "9ff8b148-5102-4cb0-9c53-cdda037d19c8",
-      "4b0ca00f-9b0d-41ed-adb7-f19405ed86b2",
-      "e6d012da-67c8-4a50-b2c0-b65c6687b561",
-      "aaacdb75-2a7e-4bc5-a8d3-af24bd1a6328",
-      "b59e385e-ef4b-47e6-b3e6-3e25760bfdba",
-      "f10081ad-8624-43e9-b263-821cf0cf7abb",
-      "a2826dd2-3e8b-429b-a1d3-92bd8feb8458",
-      "c58b98fe-4636-4fe5-a26e-44f2dcfc4a83",
-      "7f79538e-eafb-4b8b-90bd-2bafd3ad0d51",
-      "c6a8098a-4dc4-490e-9e9a-f50e7e9523ed",
-      "a82f759b-6f18-4af8-8a5c-66d6b698d664",
-      "9d885401-03df-4659-82ef-f91c1ab29fca",
-      "458b7446-e574-417b-b598-2aedf1089b3c",
-      "f485b7ea-00cc-4e1e-bee4-f3050a64e348",
-      "44f519fd-1ef5-41d8-ab0d-fbecddc2b75b",
-      "7137665f-062d-4cc4-942d-efe6e6a6cf5c",
-      "629904ea-15fb-4c4f-8e01-103168b74390",
-      "3f5b6757-d718-48de-80b0-9f3535c2014d",
-      "0f3f76ba-dfcd-4d48-afa1-7d4433959616",
-      "aec7e66a-d4d8-4290-87e8-f264f4a66e50",
-      "89221f6e-7fd0-4b85-a331-a6a0221b0a18"
+      "8e0764c6-4b7f-4a08-a897-c8f056f43b74"
     ],
-    "confidence": 0.8181818181818181,
+    "confidence": 0.6,
     "evidence": {
-      "degrees": {
-        "71c4bfcc-cc1c-4e13-95dc-3c9a3702c345": 17,
-        "fd656ce7-2fc8-47cc-9a32-95c25a64b54c": 16,
-        "f79555bb-0e6b-4b1e-aad1-c314651b9098": 24,
-        "bdc13d6b-72d3-4ca1-adee-842076a00f21": 24,
-        "0791e21a-0cbb-4249-90e5-370ef6b10458": 37,
-        "0fc1db06-e8b4-43c5-b12e-254e55640ff4": 17,
-        "6f840ca9-1438-4414-b579-35575b71d8b6": 19,
-        "336bad23-d520-43c9-b54e-0fc4cd18cf66": 12,
-        "a3ffd760-4420-4ea7-b68c-7c4ab43c52b2": 98,
-        "9ff8b148-5102-4cb0-9c53-cdda037d19c8": 35,
-        "4b0ca00f-9b0d-41ed-adb7-f19405ed86b2": 12,
-        "e6d012da-67c8-4a50-b2c0-b65c6687b561": 27,
-        "aaacdb75-2a7e-4bc5-a8d3-af24bd1a6328": 35,
-        "b59e385e-ef4b-47e6-b3e6-3e25760bfdba": 22,
-        "f10081ad-8624-43e9-b263-821cf0cf7abb": 27,
-        "a2826dd2-3e8b-429b-a1d3-92bd8feb8458": 19,
-        "c58b98fe-4636-4fe5-a26e-44f2dcfc4a83": 26,
-        "7f79538e-eafb-4b8b-90bd-2bafd3ad0d51": 19,
-        "c6a8098a-4dc4-490e-9e9a-f50e7e9523ed": 29,
-        "a82f759b-6f18-4af8-8a5c-66d6b698d664": 18,
-        "9d885401-03df-4659-82ef-f91c1ab29fca": 22,
-        "458b7446-e574-417b-b598-2aedf1089b3c": 18,
-        "f485b7ea-00cc-4e1e-bee4-f3050a64e348": 17,
-        "44f519fd-1ef5-41d8-ab0d-fbecddc2b75b": 15,
-        "7137665f-062d-4cc4-942d-efe6e6a6cf5c": 21,
-        "629904ea-15fb-4c4f-8e01-103168b74390": 15,
-        "3f5b6757-d718-48de-80b0-9f3535c2014d": 15,
-        "0f3f76ba-dfcd-4d48-afa1-7d4433959616": 24,
-        "aec7e66a-d4d8-4290-87e8-f264f4a66e50": 25,
-        "89221f6e-7fd0-4b85-a331-a6a0221b0a18": 16
-      },
-      "degreeThreshold": 4
+      "observationKind": "missing_tests",
+      "resolvedCount": 1,
+      "nodeCount": 1
     }
   },
   {
-    "trigger": "drift_detected",
+    "trigger": "observation_resolved",
     "nodeIds": [
-      "tension_173_1780014485960",
-      "71c4bfcc-cc1c-4e13-95dc-3c9a3702c345",
-      "tension_400_1780017280260",
-      "fd656ce7-2fc8-47cc-9a32-95c25a64b54c",
-      "f79555bb-0e6b-4b1e-aad1-c314651b9098",
-      "bdc13d6b-72d3-4ca1-adee-842076a00f21"
+      "45694978-6259-4fe8-ac76-55df250bd41d",
+      "c2d28687-f123-4692-9c65-9cbf7e91032c",
+      "3e0a1199-9d05-4aee-8cc3-e89d4f82fc99",
+      "a873ffc7-2829-4da2-a2e3-98907547d755",
+      "aa4a7251-a09f-4473-bf9d-11abfbe9bc7f",
+      "00e3ae48-6032-4806-b131-3870db896578"
     ],
-    "confidence": 0.75,
-    "evidence": {
-      "persistentKinds": [
-        "subsystem_overload",
-        "boundary_erosion",
-        "contradiction",
-        "cyclic_dependency",
-        "co_activation_affinity",
-        "activation_imbalance"
-      ],
-      "persistenceRatios": {
-        "subsystem_overload": 1,
-        "boundary_erosion": 1,
-        "contradiction": 1,
-        "cyclic_dependency": 1,
-        "co_activation_affinity": 1,
-        "activation_imbalance": 1
-      }
-    }
-  },
-  {
-    "trigger": "operator_drift",
-    "nodeIds": [],
     "confidence": 0.85,
     "evidence": {
-      "operatorId": "infer:cyclic-dependency",
-      "kind": "underperforming",
-      "fireCount": 21,
-      "successCount": 0,
-      "successRate": 0.0046116860184273935,
-      "meanActivationAtFire": 0.9921927805896229,
-      "meanTensionsResolved": 0,
-      "starvationCount": 0
-    }
-  },
-  {
-    "trigger": "operator_drift",
-    "nodeIds": [],
-    "confidence": 0.85,
-    "evidence": {
-      "operatorId": "infer:subsystem-overload",
-      "kind": "underperforming",
-      "fireCount": 21,
-      "successCount": 0,
-      "successRate": 0.0046116860184273935,
-      "meanActivationAtFire": 0.9921927805896229,
-      "meanTensionsResolved": 0,
-      "starvationCount": 0
-    }
-  },
-  {
-    "trigger": "operator_drift",
-    "nodeIds": [],
-    "confidence": 0.85,
-    "evidence": {
-      "operatorId": "infer:boundary-erosion",
-      "kind": "underperforming",
-      "fireCount": 21,
-      "successCount": 0,
-      "successRate": 0.0046116860184273935,
-      "meanActivationAtFire": 0.9921927805896229,
-      "meanTensionsResolved": 0,
-      "starvationCount": 0
-    }
-  },
-  {
-    "trigger": "operator_drift",
-    "nodeIds": [],
-    "confidence": 0.85,
-    "evidence": {
-      "operatorId": "builtin:graph-clustering",
-      "kind": "underperforming",
-      "fireCount": 21,
-      "successCount": 0,
-      "successRate": 0.0046116860184273935,
-      "meanActivationAtFire": 0.9921927805896229,
-      "meanTensionsResolved": 0,
-      "starvationCount": 0
-    }
-  },
-  {
-    "trigger": "operator_drift",
-    "nodeIds": [],
-    "confidence": 0.8666666666666667,
-    "evidence": {
-      "operatorId": "builtin:contradiction-detection",
-      "kind": "underperforming",
-      "fireCount": 22,
-      "successCount": 0,
-      "successRate": 0.003689348814741915,
-      "meanActivationAtFire": 0.9946220774545345,
-      "meanTensionsResolved": 0,
-      "starvationCount": 0
+      "observationKind": "hidden_dependency",
+      "resolvedCount": 5,
+      "nodeCount": 6
     }
   }
 ]
