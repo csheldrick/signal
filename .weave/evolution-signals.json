@@ -14,8 +14,8 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "duplicate_behavior",
-      "resolvedCount": 15,
-      "nodeCount": 18
+      "resolvedCount": 20,
+      "nodeCount": 20
     }
   },
   {
@@ -23,10 +23,10 @@
     "nodeIds": [
       "8e0764c6-4b7f-4a08-a897-c8f056f43b74"
     ],
-    "confidence": 0.8,
+    "confidence": 0.85,
     "evidence": {
       "observationKind": "missing_tests",
-      "resolvedCount": 3,
+      "resolvedCount": 4,
       "nodeCount": 1
     }
   },
@@ -45,7 +45,7 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "hidden_dependency",
-      "resolvedCount": 15,
+      "resolvedCount": 20,
       "nodeCount": 11
     }
   }
