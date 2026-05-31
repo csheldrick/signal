@@ -5,6 +5,7 @@
 // Weave's ContradictionDetectionOperator should surface it as a tension.
 
 import type { Plugin, PluginContext, SearchQuery, SearchResult } from '../core/types.js';
+import { normalizeSearchQuery } from '../core/types.js';
 
 
 export class SearchPlugin implements Plugin {
@@ -46,28 +47,16 @@ export class SearchPlugin implements Plugin {
       return [];
     }
 
-    // Sanitize inputs to protect the search/subsystem from pathological
-    // queries (very long text or excessively many tags). This reduces
-    // accidental overload while preserving useful behaviour.
-    const safeQuery: any = { ...query } as any;
+    // Use central normalization to avoid duplicate sanitization logic and
+    // ensure host and plugin behave consistently when query shape changes.
+    let normalized;
     try {
-      if (typeof safeQuery.text === 'string' && safeQuery.text.length > SearchPlugin.MAX_TEXT_LENGTH) {
-        safeQuery.text = safeQuery.text.slice(0, SearchPlugin.MAX_TEXT_LENGTH);
-      }
-      if (Array.isArray(safeQuery.tags) && safeQuery.tags.length > SearchPlugin.MAX_TAGS) {
-        safeQuery.tags = safeQuery.tags.slice(0, SearchPlugin.MAX_TAGS);
-      }
-    } catch (_) {
-      // If sanitization fails for any reason, avoid escalating the error to
-      // the host; return a safe empty result.
-      return [];
-    }
+      normalized = normalizeSearchQuery(query as any);
+    } catch (_) { return []; }
 
     try {
-      // Pass the sanitized, bounded query directly to the host search API.
-      return this.context.searchDocuments(safeQuery as SearchQuery);
+      return this.context.searchDocuments(normalized as SearchQuery);
     } catch (_) {
-      // Protect callers from upstream errors in search implementations.
       return [];
     }
   }

@@ -8,14 +8,14 @@ import { telemetry } from '../sync/telemetry.js';
 // centralize the lightweight interfaces and reduce duplication. Keep local
 // aliases so existing imports from './host.js' continue to work while
 // ensuring the host implements the core-defined contract.
-import type { Plugin as CorePlugin, PluginContext as CorePluginContext, SearchQuery as CoreSearchQuery, SearchResult as CoreSearchResult, DocumentSnapshot as CoreDocumentSnapshot } from '../core/types.js';
+import type { Plugin as CorePlugin, PluginContext as CorePluginContext, SearchQuery as CoreSearchQuery, SearchResult as CoreSearchResult, SearchResultSnapshot as CoreSearchResultSnapshot, DocumentSnapshot as CoreDocumentSnapshot } from '../core/types.js';
 import { makeSafeSnapshot, normalizeSearchQuery } from '../core/types.js';
 import type { StorageEventType as LocalStorageEventType } from '../storage/event-types.js';
 
 
 export type StorageEventType = LocalStorageEventType;
 export type DocumentSnapshot = CoreDocumentSnapshot;
-export type SearchResultSnapshot = CoreSearchResult;
+export type SearchResultSnapshot = CoreSearchResultSnapshot;
 export type SearchQuery = CoreSearchQuery;
 export type SearchResult = CoreSearchResult;
 export type Plugin = CorePlugin;
@@ -253,27 +253,27 @@ const wrapPluginWithBoundary = (p: Plugin): Plugin => {
         },
         searchDocuments: (q: SearchQuery) => {
           try {
-            // Lightweight, short-lived cache to reduce repeated identical
-            // search requests from plugins. Keying by a conservative JSON
-            // serialization is sufficient for typical plugin queries; avoid
-            // calling into core normalization here to keep the plugin host
-            // decoupled and reduce centrality.
-            const key = (() => {
-              try { return JSON.stringify(q); } catch (_) { return String(q); }
-            })();
+// Normalize the incoming query to ensure consistent sanitization rules
+              // are applied across host and plugin callers. Using the central
+              // normalizeSearchQuery reduces hidden dependencies between modules
+              // and ensures changes to sanitization affect all callers uniformly.
+              const normalized = normalizeSearchQuery(q as any);
+              const key = (() => {
+                try { return JSON.stringify(normalized); } catch (_) { return String(normalized); }
+              })();
 
-            const now = Date.now();
-            const cached = searchCache.get(key);
-            if (cached && (now - cached.ts) < 250) {
-              return cached.results;
-            }
+              const now = Date.now();
+              const cached = searchCache.get(key);
+              if (cached && (now - cached.ts) < 250) {
+                return cached.results;
+              }
 
-            // Call host search once and produce safe, frozen clones for plugins.
-            const raw = (() => {
-              try {
-                return this.context.searchDocuments(q);
-              } catch (_) { return []; }
-            })();
+              // Call host search once and produce safe, frozen clones for plugins.
+              const raw = (() => {
+                try {
+                  return this.context.searchDocuments(normalized);
+                } catch (_) { return []; }
+              })();
 
             const results = raw.map(r => {
               const d = (r && typeof r === 'object') ? ((r as any).document && typeof (r as any).document === 'object' ? (r as any).document : r) : undefined;
