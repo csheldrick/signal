@@ -24,8 +24,8 @@ export class ExportPlugin implements Plugin {
   private static readonly MIN_EXPORT_INTERVAL_MS = 4000;
   private static readonly EXPORT_CACHE_TTL_MS = 60000;
 
-  exportToMarkdown(): string {
-    if (!this.context) return '';
+  exportToMarkdown(): string | undefined {
+    if (!this.context) return undefined;
 
     // Throttle exports to avoid repeated expensive list/cloning operations
     // that can overload the document store or plugin host. If called too
@@ -36,7 +36,7 @@ export class ExportPlugin implements Plugin {
       // the document list on rapid repeated calls which can overload the
       // store and plugin host.
       if (this.cachedExport && (now - this.lastExportTs) < ExportPlugin.EXPORT_CACHE_TTL_MS) return this.cachedExport;
-      return '';
+      return undefined;
     }
     this.lastExportTs = now;
 
@@ -84,8 +84,8 @@ export class ExportPlugin implements Plugin {
       this.cachedExport = out;
       return out;
     } catch (_) {
-      // Fail-safe: never throw from a plugin helper; return empty export on error.
-      return '';
+      // Fail-safe: never throw from a plugin helper; return undefined on error.
+      return undefined;
     }
   }
 }
