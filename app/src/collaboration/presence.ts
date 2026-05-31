@@ -4,7 +4,7 @@
 // PluginContext that provides readonly access to documents without direct
 // store or sync engine imports.
 
-import type { PluginContext } from '../core/types.js';
+import type { PluginContext, SearchQuery } from '../core/types.js';
 import type { DocumentSnapshot } from '../core/types.js';
 import type { PresenceTracker as PresenceTrackerContract, PeerPresence as PeerPresenceContract, PresenceStatus } from './types.js';
 
@@ -59,7 +59,7 @@ export function createValidatorFromStore(_store: any): (id: string) => Promise<b
  * is the recommended way to wire presence validation in the refactored code.
  */
 export function createValidatorFromPluginContext(context?: PluginContext): (id: string) => Promise<boolean> {
-  let warned = false;
+  let warned = false; type _SearchQueryRef = SearchQuery;
   const validator = async (id: string) => {
     if (!warned) {
       try { console.warn('createValidatorFromPluginContext: PluginContext-based validator active. Prefer wiring this via PresenceTracker.setPluginContext.'); } catch (_) {}
