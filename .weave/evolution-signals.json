@@ -2,20 +2,20 @@
   {
     "trigger": "observation_resolved",
     "nodeIds": [
-      "83f190ba-e64b-4f5e-a9dd-d5e078558ffb",
-      "734079df-ce9f-4199-8a1d-4419adffeb92",
-      "4b7da2f3-973f-4f26-8dfb-fee6d490e193",
-      "af804de4-8ba2-4809-8942-781bc8d66d53",
-      "4dce80b2-e0ea-4fd7-9ccc-6f4c84f54dcf",
-      "f4aa87cf-abb6-4959-af19-ae8f22b273a4",
       "f3f3d0c2-dc06-40e4-80fe-98c45e3758b8",
-      "aedd772b-6b2c-4496-b1da-b275a1b653bf"
+      "66d17903-99d9-490a-963b-c816b823a472",
+      "9c66362f-caca-41d9-9b23-460a605f2386",
+      "aedd772b-6b2c-4496-b1da-b275a1b653bf",
+      "c2e8dcb6-3015-4096-b3b9-78351a72b7c5",
+      "81389eb4-d9ca-4bce-97e3-6c9627598b92",
+      "83f190ba-e64b-4f5e-a9dd-d5e078558ffb",
+      "734079df-ce9f-4199-8a1d-4419adffeb92"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "duplicate_behavior",
-      "resolvedCount": 5,
-      "nodeCount": 10
+      "resolvedCount": 10,
+      "nodeCount": 12
     }
   },
   {
@@ -25,13 +25,15 @@
       "efc54333-d983-4e72-84b2-f582747c62bb",
       "fe3b0090-2ca3-48d0-bd68-7a1edee661e8",
       "d2219024-299d-424d-82f1-102e1ed9382c",
-      "8259b42c-a74a-40dc-a744-2787133f7669"
+      "8259b42c-a74a-40dc-a744-2787133f7669",
+      "d4cc0864-6a06-47dd-a0da-2827b43971d3",
+      "17dfce0d-0c4c-4334-a025-0bbe314d097d"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "missing_tests",
-      "resolvedCount": 5,
-      "nodeCount": 5
+      "resolvedCount": 10,
+      "nodeCount": 7
     }
   },
   {
@@ -42,13 +44,15 @@
       "41984dd6-88dd-469a-be30-5a8819a35e69",
       "dd279f8c-951f-492d-b293-0801e66ab88b",
       "c8cfa8f4-bb0a-4bd5-9f55-713c58c28031",
-      "418604ed-a5b9-4533-ab21-f5f0dfbc6361"
+      "418604ed-a5b9-4533-ab21-f5f0dfbc6361",
+      "598a2021-11f2-4384-a7d9-8268083e8901",
+      "dc0b3294-6d62-42b4-b280-400449cd8d98"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "hidden_dependency",
-      "resolvedCount": 5,
-      "nodeCount": 6
+      "resolvedCount": 10,
+      "nodeCount": 8
     }
   }
 ]

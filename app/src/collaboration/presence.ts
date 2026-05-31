@@ -23,6 +23,18 @@ export const PRESENCE_STATUS = {
   OFFLINE: 'offline' as PresenceStatus,
 } as const;
 
+// Central helper: when errors must be swallowed to preserve realtime
+// lifecycles we still emit a minimal telemetry event so failures remain
+// visible to observability tooling. This keeps the non-fatal, best-effort
+// behaviour while satisfying the requirement that suppressed errors are
+// observable.
+function swallowWithTelemetry(context: string, err?: any): void {
+  try {
+    telemetry.emit('presence_swallowed_error', { context, error: String(err), timestamp: Date.now() });
+  } catch (_) {
+    /* swallow telemetry emission errors to avoid recursion */
+  }
+}
 
 
 
@@ -102,8 +114,8 @@ export class PresenceTracker {
         }
       }
       if (oldestKey) this.peers.delete(oldestKey);
-    } catch (_) {
-      /* swallow */
+    } catch (err) {
+      swallowWithTelemetry('evictIfNeeded', err);
     }
   }
 
@@ -123,7 +135,7 @@ export class PresenceTracker {
         try {
           // Drop references to any pending validation promises so they can be GC'd.
           this.pendingValidations.clear();
-        } catch (_) { /* swallow */ }
+        } catch (err) { swallowWithTelemetry('setPluginContext.pendingValidations.clear', err); }
         try { telemetry.emit('plugin_context_cleared', { timestamp: Date.now() }); } catch (_) { /* swallow */ }
         return;
       }
@@ -139,9 +151,10 @@ export class PresenceTracker {
         // If wiring the validator fails for any reason, degrade safely.
         this.validator = undefined;
       }
-    } catch (_) {
+    } catch (err) {
+      swallowWithTelemetry('setPluginContext.top', err);
       this.context = context;
-      try { this.validator = createValidatorFromPluginContext(context); } catch (_) { this.validator = undefined; }
+      try { this.validator = createValidatorFromPluginContext(context); } catch (e) { swallowWithTelemetry('setPluginContext.createValidator', e); this.validator = undefined; }
     }
   }
 
@@ -228,11 +241,12 @@ export class PresenceTracker {
               this.peers.set(peerId, { ...p, status: 'offline' });
             }
           }
-        } catch (_) {
-          /* swallow cleanup errors */
+        } catch (err) {
+          swallowWithTelemetry('cleanupTimer.loop', err);
         }
       }, 30 * 1000); // run cleanup every 30s to detect inactive peers faster and free resources
-    } catch (_) {
+    } catch (err) {
+      swallowWithTelemetry('cleanupTimer.setup', err);
       // If timers are not available for any reason (test envs), degrade silently.
     }
   }
@@ -243,7 +257,7 @@ export class PresenceTracker {
         clearInterval(this.cleanupTimer);
         this.cleanupTimer = undefined;
       }
-    } catch (_) { /* swallow */ }
+    } catch (err) { swallowWithTelemetry('stopCleanupTimer', err); }
   }
 
   join(peerId: string, documentId?: string): PeerPresence {
@@ -366,7 +380,7 @@ export class PresenceTracker {
               // from blocking indefinitely if a plugin misbehaves.
               try {
                 await Promise.race([
-                  (async () => { try { await hook(peerId, existing.documentId); } catch (_) { /* swallow hook errors */ } })(),
+                  (async () => { try { await hook(peerId, existing.documentId); } catch (err) { swallowWithTelemetry('onPeerLeave.awaitHook', err); } })(),
                   new Promise<void>(res => setTimeout(res, 200)),
                 ]);
               } catch (_) { /* swallow */ }
@@ -384,7 +398,7 @@ export class PresenceTracker {
                       // Batch full: avoid unbounded growth. Invoke the hook immediately
                       // for this peer as a best-effort, swallowing errors to keep the
                       // realtime path non-blocking.
-                      try { hook(peerId, existing.documentId); } catch (_) { /* swallow */ }
+                      try { hook(peerId, existing.documentId); } catch (err) { swallowWithTelemetry('onPeerLeave.syncHook', err); }
                     } else {
                       this.leaveBatch.set(peerId, existing.documentId);
                     }
@@ -399,10 +413,10 @@ export class PresenceTracker {
                         this.leaveBatchScheduled = false;
 
                         for (const [pId, docId] of batch.entries()) {
-                          try { hook(pId, docId); } catch (_) { /* swallow individual hook errors */ }
+                          try { hook(pId, docId); } catch (err) { swallowWithTelemetry('onPeerLeave.batchHook', err); }
                         }
-                      } catch (_) {
-                        /* swallow batch delivery errors */
+                      } catch (err) {
+                        swallowWithTelemetry('onPeerLeave.batchDelivery', err);
                         try { this.leaveBatch.clear(); } catch (_) {}
                         this.leaveBatchScheduled = false;
                       }
