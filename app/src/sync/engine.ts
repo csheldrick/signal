@@ -93,7 +93,7 @@ export class SyncEngine {
     peerId: string,
     options?: { internal?: boolean; maxOutbound?: number },
   ) {
-    this.maxOutbound = options?.maxOutbound ?? 12; // tighter cap to limit outbound queue growth and reduce pressure on transports
+    this.maxOutbound = options?.maxOutbound ?? 6; // tighter cap to limit outbound queue growth and reduce pressure on transports (lowered default to reduce subsystem pressure)
 
     this.peerId = peerId;
     this.clock[peerId] = 0;

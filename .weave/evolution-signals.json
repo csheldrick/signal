@@ -2,20 +2,20 @@
   {
     "trigger": "observation_resolved",
     "nodeIds": [
-      "4d885527-c94a-493f-9993-a1e58a553d77",
-      "0762e582-f3c8-4dfb-8f88-1d535937e81c",
       "8ae24590-2373-4546-9173-638739c27935",
-      "bf910c80-f8b3-40e1-b7f1-b804150a02e5",
-      "b0d51d86-b869-409f-a57b-3be631518f9d",
+      "53e08fb1-ce7b-4b80-9091-fedb38cf45c3",
+      "4d5bceed-e894-40cf-922a-c7c758e6c551",
+      "354fb58c-9b7a-4ebf-b8a5-7f6b7d91bf6b",
+      "acb430ce-0090-4dbe-8949-c9f52cfef6b5",
       "02c90eb9-96ed-423e-b6ca-8ec41c098aaf",
-      "e9b6117a-f0ab-46dd-820f-5030e29652c0",
-      "a4fb844a-25f2-4009-80ba-821190ba2429"
+      "2d0d2874-ff3f-4bb7-a85f-4b8e47ccdde1",
+      "b0d51d86-b869-409f-a57b-3be631518f9d"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "duplicate_behavior",
-      "resolvedCount": 10,
-      "nodeCount": 14
+      "resolvedCount": 15,
+      "nodeCount": 18
     }
   },
   {
@@ -23,10 +23,10 @@
     "nodeIds": [
       "8e0764c6-4b7f-4a08-a897-c8f056f43b74"
     ],
-    "confidence": 0.7,
+    "confidence": 0.8,
     "evidence": {
       "observationKind": "missing_tests",
-      "resolvedCount": 2,
+      "resolvedCount": 3,
       "nodeCount": 1
     }
   },
@@ -45,8 +45,8 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "hidden_dependency",
-      "resolvedCount": 10,
-      "nodeCount": 10
+      "resolvedCount": 15,
+      "nodeCount": 11
     }
   }
 ]
