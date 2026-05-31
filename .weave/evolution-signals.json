@@ -3,19 +3,19 @@
     "trigger": "observation_resolved",
     "nodeIds": [
       "f3f3d0c2-dc06-40e4-80fe-98c45e3758b8",
-      "66d17903-99d9-490a-963b-c816b823a472",
-      "9c66362f-caca-41d9-9b23-460a605f2386",
-      "aedd772b-6b2c-4496-b1da-b275a1b653bf",
-      "c2e8dcb6-3015-4096-b3b9-78351a72b7c5",
-      "81389eb4-d9ca-4bce-97e3-6c9627598b92",
       "83f190ba-e64b-4f5e-a9dd-d5e078558ffb",
-      "734079df-ce9f-4199-8a1d-4419adffeb92"
+      "734079df-ce9f-4199-8a1d-4419adffeb92",
+      "f4aa87cf-abb6-4959-af19-ae8f22b273a4",
+      "988f5570-0c0c-4dc5-a82d-2a3783f43ceb",
+      "fd3a89a7-ab56-4c2c-94d3-09fa5eb31c3d",
+      "dd460201-d316-4f3c-a939-a7d6d1fade66",
+      "d2219024-299d-424d-82f1-102e1ed9382c"
     ],
     "confidence": 0.85,
     "evidence": {
       "observationKind": "duplicate_behavior",
-      "resolvedCount": 10,
-      "nodeCount": 12
+      "resolvedCount": 20,
+      "nodeCount": 22
     }
   },
   {
@@ -32,7 +32,7 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "missing_tests",
-      "resolvedCount": 10,
+      "resolvedCount": 15,
       "nodeCount": 7
     }
   },
@@ -51,8 +51,8 @@
     "confidence": 0.85,
     "evidence": {
       "observationKind": "hidden_dependency",
-      "resolvedCount": 10,
-      "nodeCount": 8
+      "resolvedCount": 15,
+      "nodeCount": 11
     }
   }
 ]

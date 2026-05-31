@@ -11,19 +11,18 @@ import type { DocumentSnapshot, SnapshotStore } from '../core/types.js';
 // SnapshotStore contract imported from core/types.ts to avoid circular imports.
 
 export class DiskDocumentSnapshotStore implements SnapshotStore {
-  private readonly basePath: string;
+  private readonly basePath!: string;
   private _pending: Map<string, { snapshot: DocumentSnapshot; timer: ReturnType<typeof setTimeout>; resolvers: Array<() => void> }> = new Map();
   // Optional in-memory cache of known document ids to reduce expensive directory scans
   // on heavily-loaded systems. Invalidated on writes.
   private _idCache?: { ids: string[]; ts: number };
 
   constructor(basePath = '.snapshots') {
-    // Assign before any closure captures to satisfy strict-initialization
-    this.basePath = basePath;
-
-    // Use a local copy in the async initializer to avoid TypeScript warning
-    // about using 'this' before initialization in captured closures.
-    const bp = this.basePath;
+    // Use a local copy of the constructor parameter first to avoid any risk
+    // of capturing 'this' before it has been assigned in closures.
+    const bp = basePath;
+    // Assign after establishing the local copy to satisfy strict-init checks.
+    this.basePath = bp;
 
     // Best-effort create base directory
     (async () => {
