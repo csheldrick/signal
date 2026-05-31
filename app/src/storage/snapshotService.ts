@@ -32,19 +32,11 @@ export class DiskDocumentSnapshotStore implements SnapshotStore {
       } catch (_) { /* swallow */ }
     })();
 
-    // Register canonical disk store on globalThis to reduce accidental
-    // duplicate authoritative stores across differing import paths or
-    // build artifacts. The registry module will prefer the first created
-    // canonical store when queried.
-    try {
-      if (typeof globalThis !== 'undefined') {
-        const g = globalThis as any;
-        const GLOBAL_KEY = '__SIGNAL_CANONICAL_SNAPSHOT_STORE__';
-        const GLOBAL_DISK = '__SIGNAL_DISK_SNAPSHOT_STORE__';
-        if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = this;
-        g[GLOBAL_DISK] = this;
-      }
-    } catch (_) {}
+    // Canonical global registration is intentionally delegated to
+    // snapshot-registry.ts. Avoid writing to globalThis here to prevent
+    // duplicate authoritative stores when modules are imported via
+    // inconsistent paths or during mixed CommonJS/ESM bundling.
+
   }
 
   private static encodeId(id: string): string {

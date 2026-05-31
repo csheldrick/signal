@@ -2,6 +2,11 @@ import type { SnapshotStore } from '../core/types.js';
 import DiskStore from './snapshotService.js';
 import FileStore from './file-snapshot-store.js';
 
+// Ensure concrete implementations do NOT perform globalThis registration
+// themselves (which can lead to duplicate canonical instances). The
+// registry is the single place that assigns canonical instances to
+// globalThis and returns stable references to callers.
+
 // Global coordination key to avoid accidental multiple authoritative stores
 // across differing import paths or build artifacts. Some consumers may still
 // construct stores directly; registering on globalThis ensures a canonical

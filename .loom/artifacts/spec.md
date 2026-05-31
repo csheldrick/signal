@@ -295,8 +295,8 @@ Confidence: 95%
 
 ## Detected Invariants
 
-- **error-boundary: Intentional cleanup pattern - ensures request slot is released even if release fails; no rethrow means deliberate safety over correctness**: Detected 274 occurrence(s) of error-boundary pattern across 27 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
-- **guard: Legitimate guard enforcing contract: no pending entry means no promise to return; this is core control flow logic**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
+- **error-boundary: Cleanup operation intentionally swallows errors to prevent transient failures from breaking the request lifecycle**: Detected 274 occurrence(s) of error-boundary pattern across 27 file(s) in module 'signal-app'. Example: "try { LocalSummarizer.releaseRequest(); } catch (_) { /* swallow */ }" _(88%)_
+- **guard: Consistent guard pattern for optional values - codebase always returns undefined when entry is missing**: Detected 28 occurrence(s) of guard pattern across 16 file(s) in module 'signal-app'. Example: "if (!entry) return undefined;" _(88%)_
 - **validation: Input validation boundary**: Detected 15 occurrence(s) of validation pattern across 6 file(s) in module 'signal-app'. Example: "// If a validator exists, validate in the background with a short timeout." _(88%)_
 - **sanitization: Input sanitization**: Detected 4 occurrence(s) of sanitization pattern across 3 file(s) in module 'signal-app'. Example: "// Use a URL-safe base64 variant to encode ids into filesystem-safe names." _(88%)_
 - **rate-limit: Rate limiting enforcement**: Detected 6 occurrence(s) of rate-limit pattern across 4 file(s) in module 'signal-app'. Example: "const debounceMs = 2000; // increased debounce to group bursts and reduce IO pressure (longer coalescing to cut filesyst" _(88%)_
